@@ -1,0 +1,5 @@
+{
+  "clientId": "YOUR_CLIENT_ID.apps.googleusercontent.com",
+  "clientSecret": "SET_AT_RUNTIME_OR_CI",
+  "redirectURI": "com.googleusercontent.apps.YOUR_CLIENT_ID:/oauth2redirect"
+}

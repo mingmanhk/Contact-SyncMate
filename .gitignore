@@ -1,0 +1,52 @@
+# Xcode
+build/
+DerivedData/
+*.xcworkspace/xcuserdata/
+*.xcuserdatad/
+*.xcscmblueprint
+*.xcodeproj/project.xcworkspace/
+*.xcodeproj/xcuserdata/
+
+# Swift Package Manager
+/.build/
+/Packages/
+
+# CocoaPods
+Pods/
+
+# Carthage
+Carthage/Build/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output
+
+# Secrets
+GoogleOAuthConfig.json
+Contact SyncMate/GoogleOAuthConfig.json
+Contact SyncMate/GoogleOAuthConfig.swift
+
+# Misc
+.DS_Store
+
+# Xcode
+DerivedData/
+build/
+*.xcuserdatad
+*.xcscmblueprint
+*.xcworkspace/xcuserdata
+*.moved-aside
+
+# SwiftPM
+.swiftpm/
+.build/
+
+# macOS
+.DS_Store
+
+# App secrets (keep out of git)
+GoogleOAuthConfig.swift
+GoogleAPIConfig.swift
+GoogleOAuthConfig.json
