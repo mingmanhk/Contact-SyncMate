@@ -1,0 +1,17 @@
+//
+//  GoogleOAuthConfig.swift.template
+//  Contact SyncMate
+//
+//  Template for OAuth credentials
+//  Copy this file to GoogleOAuthConfig.swift and fill in your credentials
+//
+
+import Foundation
+
+/// Configuration for Google OAuth credentials
+/// Keep this file in .gitignore to protect your secrets
+struct GoogleOAuthConfig {
+    static let clientId = "YOUR_CLIENT_ID.apps.googleusercontent.com"
+    static let clientSecret = "YOUR_CLIENT_SECRET"
+    static let redirectURI = "com.googleusercontent.apps.YOUR_CLIENT_ID:/oauth2redirect"
+}
