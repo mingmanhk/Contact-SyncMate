@@ -124,7 +124,7 @@ struct DashboardView: View {
                     .fontWeight(.medium)
                 Text(detail)
                     .font(.caption)
-                    .foregroundStyle(isConnected ? .secondary : .red)
+                    .foregroundStyle(isConnected ? Color.secondary : Color.red)
                     .lineLimit(1)
             }
 

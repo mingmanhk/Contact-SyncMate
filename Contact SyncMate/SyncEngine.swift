@@ -11,10 +11,10 @@ import Combine
 
 /// Core sync engine that orchestrates the sync process
 class SyncEngine: ObservableObject {
-    private let googleConnector: GoogleContactsConnector
-    private let macConnector: MacContactsConnector
-    private let mappingStore: ContactMappingStore
-    private let settings = AppSettings.shared
+    let googleConnector: GoogleContactsConnector
+    let macConnector: MacContactsConnector
+    let mappingStore: ContactMappingStore
+    let settings = AppSettings.shared
     
     @Published var isRunning = false
     @Published var progress: SyncProgress?
@@ -199,7 +199,7 @@ class SyncEngine: ObservableObject {
     
     // MARK: - Private Helpers
     
-    private func computeChanges(
+    func computeChanges(
         googleContacts: [UnifiedContact],
         macContacts: [UnifiedContact],
         direction: SyncDirection
