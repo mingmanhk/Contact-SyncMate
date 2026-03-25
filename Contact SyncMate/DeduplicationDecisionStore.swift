@@ -6,13 +6,15 @@
 //
 
 import Foundation
+import Combine
 
 /// Persistent storage for user's duplicate resolution decisions
-class DeduplicationDecisionStore {
+class DeduplicationDecisionStore: ObservableObject {
     
     static let shared = DeduplicationDecisionStore()
     
     private let fileURL: URL
+@Published private(set) var lastUpdated: Date = Date()
     private var patterns: [String: DuplicatePattern] = [:]
     private let queue = DispatchQueue(label: "DeduplicationDecisionStore.queue", attributes: .concurrent)
     

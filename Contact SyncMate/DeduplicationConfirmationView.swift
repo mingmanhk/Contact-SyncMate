@@ -7,6 +7,11 @@
 
 import SwiftUI
 
+// UUID conforms to Identifiable for sheet(item:) usage
+extension UUID: @retroactive Identifiable {
+    public var id: UUID { self }
+}
+
 /// View for confirming duplicate contact merges
 struct DeduplicationConfirmationView: View {
     @Environment(\.dismiss) private var dismiss
@@ -526,16 +531,16 @@ struct MergeChangeRow: View {
         id: UUID(),
         givenName: "John",
         familyName: "Smith",
-        emailAddresses: [.init(value: "john@company.com", label: "work")],
-        phoneNumbers: [.init(value: "555-1234", label: "mobile")]
+        phoneNumbers: [.init(value: "555-1234", label: "mobile")],
+        emailAddresses: [.init(value: "john@company.com", label: "work")]
     )
     
     let contact2 = UnifiedContact(
         id: UUID(),
         givenName: "J.",
         familyName: "Smith",
-        emailAddresses: [.init(value: "john@company.com", label: "work")],
-        phoneNumbers: [.init(value: "555-1234", label: "work")]
+        phoneNumbers: [.init(value: "555-1234", label: "work")],
+        emailAddresses: [.init(value: "john@company.com", label: "work")]
     )
     
     let group = DuplicateGroup(

@@ -160,15 +160,15 @@ import Foundation
  let contact1 = UnifiedContact(
      givenName: "John",
      familyName: "Smith",
-     emailAddresses: [.init(value: "john@company.com", label: "work")],
-     phoneNumbers: [.init(value: "+15551234567", label: "mobile")]
+     phoneNumbers: [.init(value: "+15551234567", label: "mobile")],
+     emailAddresses: [.init(value: "john@company.com", label: "work")]
  )
  
  let contact2 = UnifiedContact(
      givenName: "John",
      familyName: "Smith",
-     emailAddresses: [.init(value: "john@company.com", label: "personal")],
-     phoneNumbers: [.init(value: "555-123-4567", label: "work")]
+     phoneNumbers: [.init(value: "555-123-4567", label: "work")],
+     emailAddresses: [.init(value: "john@company.com", label: "personal")]
  )
  
  // Expected score: 60 (email) + 60 (phone) + 30 (exact name) = 100+
@@ -243,16 +243,16 @@ fileprivate enum DeduplicationExamples {
             id: UUID(),
             givenName: "John",
             familyName: "Smith",
-            emailAddresses: [.init(value: "john@company.com", label: "work")],
-            phoneNumbers: [.init(value: "+15551234567", label: "mobile")]
+            phoneNumbers: [.init(value: "+15551234567", label: "mobile")],
+            emailAddresses: [.init(value: "john@company.com", label: "work")]
         )
         
         let contact2 = UnifiedContact(
             id: UUID(),
             givenName: "J.",
             familyName: "Smith",
-            emailAddresses: [.init(value: "john@company.com", label: "personal")],
-            phoneNumbers: [.init(value: "555-123-4567", label: "work")]
+            phoneNumbers: [.init(value: "555-123-4567", label: "work")],
+            emailAddresses: [.init(value: "john@company.com", label: "personal")]
         )
         
         let deduplicator = ContactDeduplicator()
@@ -268,16 +268,16 @@ fileprivate enum DeduplicationExamples {
             id: UUID(),
             givenName: "John",
             familyName: "Smith",
-            emailAddresses: [.init(value: "john@company.com", label: "work")],
-            organizationName: "Acme Corp"
+            organizationName: "Acme Corp",
+            emailAddresses: [.init(value: "john@company.com", label: "work")]
         )
         
         let contact2 = UnifiedContact(
             id: UUID(),
             givenName: "John",
             familyName: "Smith",
-            emailAddresses: [.init(value: "john@example.com", label: "personal")],
-            organizationName: "Acme Corp"
+            organizationName: "Acme Corp",
+            emailAddresses: [.init(value: "john@example.com", label: "personal")]
         )
         
         let deduplicator = ContactDeduplicator()

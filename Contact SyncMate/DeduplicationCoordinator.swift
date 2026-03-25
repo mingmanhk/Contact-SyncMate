@@ -225,11 +225,7 @@ extension DeduplicationCoordinator {
 }
 
 // MARK: - Supporting Types
-
-enum SyncMode {
-    case manual
-    case automatic
-}
+// SyncMode is defined in SyncTypes.swift
 
 // MARK: - View Extension
 

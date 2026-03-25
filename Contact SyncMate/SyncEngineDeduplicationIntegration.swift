@@ -1,3 +1,4 @@
+import Contacts
 //
 //  SyncEngineDeduplicationIntegration.swift
 //  Contact SyncMate
@@ -101,7 +102,7 @@ extension SyncEngine {
         )
         
         // 3. Check if we should proceed
-        if !coordinator.shouldProceedWithSync(result: dedupResult, mode: .auto) {
+        if !coordinator.shouldProceedWithSync(result: dedupResult, mode: .automatic) {
             // Duplicates need manual confirmation, skip this sync
             throw SyncEngineError.conditionsNotMet
         }
@@ -120,7 +121,7 @@ extension SyncEngine {
         )
         
         let session = SyncSession(
-            mode: .auto,
+            mode: .automatic,
             direction: direction,
             startTime: Date(),
             contactChanges: changes

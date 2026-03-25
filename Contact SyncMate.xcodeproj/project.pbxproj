@@ -6,10 +6,6 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		99F2E1412EC3CE960072FEBA /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 99F2E1402EC3CE960072FEBA /* .gitignore */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXFileReference section */
 		992B71C62EBFDF2A00F9355F /* Contact SyncMate.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Contact SyncMate.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		99F2E1402EC3CE960072FEBA /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
@@ -18,6 +14,8 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		992B71C82EBFDF2A00F9355F /* Contact SyncMate */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = "Contact SyncMate";
 			sourceTree = "<group>";
 		};
@@ -70,8 +68,6 @@
 				992B71C82EBFDF2A00F9355F /* Contact SyncMate */,
 			);
 			name = "Contact SyncMate";
-			packageProductDependencies = (
-			);
 			productName = "Contact SyncMate";
 			productReference = 992B71C62EBFDF2A00F9355F /* Contact SyncMate.app */;
 			productType = "com.apple.product-type.application";
@@ -115,7 +111,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				99F2E1412EC3CE960072FEBA /* .gitignore in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

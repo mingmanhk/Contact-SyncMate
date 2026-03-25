@@ -227,7 +227,7 @@ extension ContactDeduplicator.Configuration {
     
     /// Create configuration from user defaults
     static func fromUserDefaults() -> ContactDeduplicator.Configuration {
-        var config = Configuration()
+        var config = ContactDeduplicator.Configuration()
         
         config.autoMergeThreshold = UserDefaults.standard.integer(forKey: "dedup.autoMergeThreshold")
         if config.autoMergeThreshold == 0 {
