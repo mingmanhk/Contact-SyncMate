@@ -6,9 +6,27 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		59235F6DAB6951FB60576085 /* ContactSyncMateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCDE55A132E2B58183C73CCD /* ContactSyncMateTests.swift */; };
+		E11F2AABB59A0DB789A69822 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3C8A6A5187D68D00E5642E92 /* Cocoa.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		0B4632074B6169FFD111FCFD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 992B71BE2EBFDF2A00F9355F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 992B71C52EBFDF2A00F9355F;
+			remoteInfo = "Contact SyncMate";
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		3C8A6A5187D68D00E5642E92 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
 		992B71C62EBFDF2A00F9355F /* Contact SyncMate.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Contact SyncMate.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		99F2E1402EC3CE960072FEBA /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
+		CCDE55A132E2B58183C73CCD /* ContactSyncMateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContactSyncMateTests.swift; sourceTree = "<group>"; };
+		DD6309A32985498D18CDCBB9 /* ContactSyncMateTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ContactSyncMateTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -22,6 +40,14 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		54BCE1CCD06AB2C0BF609304 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E11F2AABB59A0DB789A69822 /* Cocoa.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		992B71C32EBFDF2A00F9355F /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -32,12 +58,30 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		14E011529DD7F0B380D1A186 /* OS X */ = {
+			isa = PBXGroup;
+			children = (
+				3C8A6A5187D68D00E5642E92 /* Cocoa.framework */,
+			);
+			name = "OS X";
+			sourceTree = "<group>";
+		};
+		1C771DE245DEB9C1B1222ACA /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				14E011529DD7F0B380D1A186 /* OS X */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		992B71BD2EBFDF2A00F9355F = {
 			isa = PBXGroup;
 			children = (
 				992B71C82EBFDF2A00F9355F /* Contact SyncMate */,
 				992B71C72EBFDF2A00F9355F /* Products */,
 				99F2E1402EC3CE960072FEBA /* .gitignore */,
+				1C771DE245DEB9C1B1222ACA /* Frameworks */,
+				D07C53C62989FEB4124EDAD1 /* ContactSyncMateTests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -45,8 +89,18 @@
 			isa = PBXGroup;
 			children = (
 				992B71C62EBFDF2A00F9355F /* Contact SyncMate.app */,
+				DD6309A32985498D18CDCBB9 /* ContactSyncMateTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		D07C53C62989FEB4124EDAD1 /* ContactSyncMateTests */ = {
+			isa = PBXGroup;
+			children = (
+				CCDE55A132E2B58183C73CCD /* ContactSyncMateTests.swift */,
+			);
+			name = ContactSyncMateTests;
+			path = ContactSyncMateTests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -71,6 +125,24 @@
 			productName = "Contact SyncMate";
 			productReference = 992B71C62EBFDF2A00F9355F /* Contact SyncMate.app */;
 			productType = "com.apple.product-type.application";
+		};
+		E915DE4C5C04CF06DA5753F4 /* ContactSyncMateTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 31616A54550978EBCE5F53EE /* Build configuration list for PBXNativeTarget "ContactSyncMateTests" */;
+			buildPhases = (
+				674CCAE228BB0B7003FD38A6 /* Sources */,
+				54BCE1CCD06AB2C0BF609304 /* Frameworks */,
+				26A3CD2778582348AE1F6E1F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				15285B5418CDAC08D64D21D4 /* PBXTargetDependency */,
+			);
+			name = ContactSyncMateTests;
+			productName = ContactSyncMateTests;
+			productReference = DD6309A32985498D18CDCBB9 /* ContactSyncMateTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -102,11 +174,19 @@
 			projectRoot = "";
 			targets = (
 				992B71C52EBFDF2A00F9355F /* Contact SyncMate */,
+				E915DE4C5C04CF06DA5753F4 /* ContactSyncMateTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		26A3CD2778582348AE1F6E1F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		992B71C42EBFDF2A00F9355F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -117,6 +197,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		674CCAE228BB0B7003FD38A6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				59235F6DAB6951FB60576085 /* ContactSyncMateTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		992B71C22EBFDF2A00F9355F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -126,7 +214,33 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		15285B5418CDAC08D64D21D4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = "Contact SyncMate";
+			target = 992B71C52EBFDF2A00F9355F /* Contact SyncMate */;
+			targetProxy = 0B4632074B6169FFD111FCFD /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		5D173F1B930A29A4751DF3D6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.taskin.ContactSyncMateTests;
+				PRODUCT_MODULE_NAME = ContactSyncMateTests;
+				PRODUCT_NAME = ContactSyncMateTests;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Contact SyncMate.app/Contents/MacOS/Contact SyncMate";
+			};
+			name = Debug;
+		};
 		992B71CF2EBFDF2C00F9355F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -181,6 +295,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -237,6 +352,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
@@ -269,7 +385,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "ContactSyncMate.Contact-SyncMate";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -313,7 +429,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "ContactSyncMate.Contact-SyncMate";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -331,9 +447,35 @@
 			};
 			name = Release;
 		};
+		E5ED3860D676FAD5D872F338 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.taskin.ContactSyncMateTests;
+				PRODUCT_MODULE_NAME = ContactSyncMateTests;
+				PRODUCT_NAME = ContactSyncMateTests;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Contact SyncMate.app/Contents/MacOS/Contact SyncMate";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		31616A54550978EBCE5F53EE /* Build configuration list for PBXNativeTarget "ContactSyncMateTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E5ED3860D676FAD5D872F338 /* Release */,
+				5D173F1B930A29A4751DF3D6 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		992B71C12EBFDF2A00F9355F /* Build configuration list for PBXProject "Contact SyncMate" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
