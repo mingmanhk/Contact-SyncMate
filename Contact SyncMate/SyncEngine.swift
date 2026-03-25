@@ -442,26 +442,91 @@ enum ContactMapper {
 
 /// Stores mappings between Google and Mac contact IDs
 class ContactMappingStore {
-    // TODO: Implement with Core Data or SQLite
-    
+
+    // In-memory store (backed by JSON on disk for persistence)
+    private var mappings: [String: ContactMapping] = [:] // keyed by googleResourceName
+    private let queue = DispatchQueue(label: "ContactMappingStore", attributes: .concurrent)
+    private let persistenceURL: URL
+
+    init() {
+        let fm = FileManager.default
+        let appSupport = (try? fm.url(for: .applicationSupportDirectory,
+                                      in: .userDomainMask,
+                                      appropriateFor: nil,
+                                      create: true)) ?? fm.temporaryDirectory
+        let dir = appSupport.appendingPathComponent(
+            Bundle.main.bundleIdentifier ?? "ContactSyncMate", isDirectory: true)
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        persistenceURL = dir.appendingPathComponent("contact_mappings.json")
+        loadFromDisk()
+    }
+
     func getAllMappings() -> [ContactMapping] {
-        return []
+        queue.sync { Array(mappings.values) }
     }
-    
+
     func getMapping(googleResourceName: String) -> ContactMapping? {
-        return nil
+        queue.sync { mappings[googleResourceName] }
     }
-    
+
     func getMapping(macIdentifier: String) -> ContactMapping? {
-        return nil
+        queue.sync { mappings.values.first { $0.macContactIdentifier == macIdentifier } }
     }
-    
+
     func saveMapping(_ mapping: ContactMapping) {
-        // TODO: Implement
+        queue.async(flags: .barrier) {
+            self.mappings[mapping.googleResourceName] = mapping
+            self.saveToDisk()
+        }
     }
-    
+
     func deleteMapping(googleResourceName: String) {
-        // TODO: Implement
+        queue.async(flags: .barrier) {
+            self.mappings.removeValue(forKey: googleResourceName)
+            self.saveToDisk()
+        }
+    }
+
+    // MARK: - Persistence
+
+    private func saveToDisk() {
+        struct CodableMapping: Codable {
+            var googleResourceName: String
+            var macContactIdentifier: String
+            var lastSyncedAt: Date
+            var googleEtag: String?
+        }
+        let codable = mappings.values.map {
+            CodableMapping(googleResourceName: $0.googleResourceName,
+                           macContactIdentifier: $0.macContactIdentifier,
+                           lastSyncedAt: $0.lastSyncedAt,
+                           googleEtag: $0.googleEtag)
+        }
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        if let data = try? encoder.encode(codable) {
+            try? data.write(to: persistenceURL, options: .atomic)
+        }
+    }
+
+    private func loadFromDisk() {
+        struct CodableMapping: Codable {
+            var googleResourceName: String
+            var macContactIdentifier: String
+            var lastSyncedAt: Date
+            var googleEtag: String?
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let data = try? Data(contentsOf: persistenceURL),
+              let loaded = try? decoder.decode([CodableMapping].self, from: data) else { return }
+        for m in loaded {
+            mappings[m.googleResourceName] = ContactMapping(
+                googleResourceName: m.googleResourceName,
+                macContactIdentifier: m.macContactIdentifier,
+                lastSyncedAt: m.lastSyncedAt,
+                googleEtag: m.googleEtag)
+        }
     }
 }
 
