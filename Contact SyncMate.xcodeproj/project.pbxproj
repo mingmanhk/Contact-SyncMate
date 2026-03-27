@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		17613B48D3B1EEDC02B492F6 /* SyncEngineDiffTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED900472F5BD3D97B7521F5C /* SyncEngineDiffTests.swift */; };
 		59235F6DAB6951FB60576085 /* ContactSyncMateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCDE55A132E2B58183C73CCD /* ContactSyncMateTests.swift */; };
 		E11F2AABB59A0DB789A69822 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3C8A6A5187D68D00E5642E92 /* Cocoa.framework */; };
 /* End PBXBuildFile section */
@@ -27,6 +28,7 @@
 		99F2E1402EC3CE960072FEBA /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 		CCDE55A132E2B58183C73CCD /* ContactSyncMateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContactSyncMateTests.swift; sourceTree = "<group>"; };
 		DD6309A32985498D18CDCBB9 /* ContactSyncMateTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ContactSyncMateTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		ED900472F5BD3D97B7521F5C /* SyncEngineDiffTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncEngineDiffTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -98,6 +100,7 @@
 			isa = PBXGroup;
 			children = (
 				CCDE55A132E2B58183C73CCD /* ContactSyncMateTests.swift */,
+				ED900472F5BD3D97B7521F5C /* SyncEngineDiffTests.swift */,
 			);
 			name = ContactSyncMateTests;
 			path = ContactSyncMateTests;
@@ -202,6 +205,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				59235F6DAB6951FB60576085 /* ContactSyncMateTests.swift in Sources */,
+				17613B48D3B1EEDC02B492F6 /* SyncEngineDiffTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
