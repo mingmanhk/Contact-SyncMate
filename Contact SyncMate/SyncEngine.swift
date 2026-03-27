@@ -308,100 +308,76 @@ class SyncEngine: ObservableObject {
                 continue
 
             case (.some(let g), nil):
-                // Mac side deleted → delete from Google too (if syncDeleted enabled)
                 if settings.syncDeletedContacts {
                     changes.append(ContactChange(
-                        contactName: g.displayName,
-                        action: .delete,
-                        direction: .macToGoogle,
-                        changes: ["Deleted on Mac side"]
-                    ))
+                        contactName: g.displayName, action: .delete,
+                        direction: .macToGoogle, changes: ["Deleted on Mac side"],
+                        sourceContact: g, targetContact: nil))
                 }
 
             case (nil, .some(let m)):
-                // Google side deleted → delete from Mac too
                 if settings.syncDeletedContacts {
                     changes.append(ContactChange(
-                        contactName: m.displayName,
-                        action: .delete,
-                        direction: .googleToMac,
-                        changes: ["Deleted on Google side"]
-                    ))
+                        contactName: m.displayName, action: .delete,
+                        direction: .googleToMac, changes: ["Deleted on Google side"],
+                        sourceContact: m, targetContact: nil))
                 }
 
             case (.some(let g), .some(let m)):
-                // Both exist — compare fields
                 let fieldDiffs = diffFields(g, m)
                 if fieldDiffs.isEmpty { continue }
 
                 let gModified = g.lastModified ?? .distantPast
                 let mModified = m.lastModified ?? .distantPast
                 let syncedAt  = mapping.lastSyncedAt
+                let gChanged  = gModified > syncedAt
+                let mChanged  = mModified > syncedAt
 
-                let gChangedSinceSync = gModified > syncedAt
-                let mChangedSinceSync = mModified > syncedAt
-
-                if gChangedSinceSync && mChangedSinceSync {
-                    // Conflict — both changed, mark as merge needed
+                if gChanged && mChanged {
                     changes.append(ContactChange(
-                        contactName: g.displayName,
-                        action: .merge,
+                        contactName: g.displayName, action: .merge,
                         direction: .twoWay,
-                        changes: fieldDiffs + ["⚠️ Conflict: both sides changed since last sync"]
-                    ))
-                } else if gChangedSinceSync {
-                    // Only Google changed → push to Mac
+                        changes: fieldDiffs + ["⚠️ Conflict: both sides changed since last sync"],
+                        sourceContact: g, targetContact: m))
+                } else if gChanged {
                     changes.append(ContactChange(
-                        contactName: g.displayName,
-                        action: .update,
-                        direction: .googleToMac,
-                        changes: fieldDiffs
-                    ))
-                } else if mChangedSinceSync {
-                    // Only Mac changed → push to Google
+                        contactName: g.displayName, action: .update,
+                        direction: .googleToMac, changes: fieldDiffs,
+                        sourceContact: g, targetContact: m))
+                } else if mChanged {
                     changes.append(ContactChange(
-                        contactName: m.displayName,
-                        action: .update,
-                        direction: .macToGoogle,
-                        changes: fieldDiffs
-                    ))
+                        contactName: m.displayName, action: .update,
+                        direction: .macToGoogle, changes: fieldDiffs,
+                        sourceContact: m, targetContact: g))
                 }
             }
         }
 
-        // --- Step 2: New contacts on Google not yet mapped ---
+        // --- Step 2: New on Google, not yet mapped ---
         for (gID, gContact) in googleByResourceName where !processedGoogle.contains(gID) {
-            // Fuzzy match against unmapped Mac contacts
             let fuzzyMatch = findFuzzyMatch(for: gContact,
                                             in: macByIdentifier.filter { !processedMac.contains($0.key) })
             if let (mID, mContact) = fuzzyMatch {
-                // Potential merge candidate
                 changes.append(ContactChange(
-                    contactName: gContact.displayName,
-                    action: .merge,
+                    contactName: gContact.displayName, action: .merge,
                     direction: .twoWay,
-                    changes: ["Potential match: \(mContact.displayName) (fuzzy match — review before merging)"]
-                ))
+                    changes: ["Potential match: \(mContact.displayName) (fuzzy — review before merging)"],
+                    sourceContact: gContact, targetContact: mContact))
                 processedMac.insert(mID)
             } else {
-                // Genuinely new — add to Mac
                 changes.append(ContactChange(
-                    contactName: gContact.displayName,
-                    action: .add,
-                    direction: .googleToMac,
-                    changes: ["New contact from Google"]
-                ))
+                    contactName: gContact.displayName, action: .add,
+                    direction: .googleToMac, changes: ["New contact from Google"],
+                    sourceContact: gContact, targetContact: nil))
             }
         }
 
-        // --- Step 3: New contacts on Mac not yet mapped ---
-        for (mID, mContact) in macByIdentifier where !processedMac.contains(mID) {
+        // --- Step 3: New on Mac, not yet mapped ---
+        for (_, mContact) in macByIdentifier where !processedMac.contains(mContact.macContactIdentifier ?? "") {
             changes.append(ContactChange(
-                contactName: mContact.displayName,
-                action: .add,
-                direction: .macToGoogle,
-                changes: ["New contact from Mac"]
-            ))
+                contactName: mContact.displayName, action: .add,
+                direction: .macToGoogle, changes: ["New contact from Mac"],
+                sourceContact: mContact, targetContact: nil))
         }
 
         return changes
@@ -438,34 +414,26 @@ class SyncEngine: ObservableObject {
         for (sourceID, sourceContact) in source {
             if let targetID = sourceToTargetMap[sourceID] {
                 mappedTargetIDs.insert(targetID)
-                // Mapped — check for updates
                 if let targetContact = target[targetID] {
                     let diffs = diffFields(sourceContact, targetContact)
                     if !diffs.isEmpty {
                         changes.append(ContactChange(
                             contactName: sourceContact.displayName,
-                            action: .update,
-                            direction: direction,
-                            changes: diffs
-                        ))
+                            action: .update, direction: direction, changes: diffs,
+                            sourceContact: sourceContact, targetContact: targetContact))
                     }
                 } else if settings.syncDeletedContacts {
-                    // Target was deleted — delete from source too
                     changes.append(ContactChange(
                         contactName: sourceContact.displayName,
-                        action: .delete,
-                        direction: direction,
-                        changes: ["Deleted on target side"]
-                    ))
+                        action: .delete, direction: direction,
+                        changes: ["Deleted on target side"],
+                        sourceContact: sourceContact, targetContact: nil))
                 }
             } else {
-                // Not mapped — new contact, add to target
                 changes.append(ContactChange(
                     contactName: sourceContact.displayName,
-                    action: .add,
-                    direction: direction,
-                    changes: ["New contact"]
-                ))
+                    action: .add, direction: direction, changes: ["New contact"],
+                    sourceContact: sourceContact, targetContact: nil))
             }
         }
 
@@ -534,38 +502,134 @@ class SyncEngine: ObservableObject {
     // MARK: - Apply Changes
 
     private func performAdd(change: ContactChange, direction: SyncDirection) async throws {
-        // The change carries contactName but not the full contact object.
-        // Real add requires access to the source contact — delegate to the caller.
-        // Log the intent; actual writes happen in executeSync via the session's sourceContact ref.
-        SyncHistory.shared.log(
-            source: "SyncEngine",
-            action: "add.\(direction == .googleToMac ? "google→mac" : "mac→google")",
-            details: change.contactName
-        )
+        guard let source = change.sourceContact else {
+            throw SyncEngineError.missingContactData(change.contactName)
+        }
+
+        switch direction {
+        case .googleToMac:
+            // Add Google contact to Mac
+            let cnContact = ContactMapper.toMac(from: source)
+            try macConnector.saveContact(cnContact, to: nil)
+            // Store mapping using the new Mac identifier
+            if let gID = source.googleResourceName {
+                let mID = cnContact.identifier
+                mappingStore.saveMapping(ContactMapping(
+                    googleResourceName: gID,
+                    macContactIdentifier: mID,
+                    lastSyncedAt: Date()))
+            }
+
+        case .macToGoogle:
+            // Add Mac contact to Google
+            let googleContact = ContactMapper.toGoogle(from: source)
+            let created = try await googleConnector.createContact(googleContact)
+            // Store mapping
+            if let mID = source.macContactIdentifier {
+                mappingStore.saveMapping(ContactMapping(
+                    googleResourceName: created.resourceName,
+                    macContactIdentifier: mID,
+                    lastSyncedAt: Date()))
+            }
+
+        case .twoWay:
+            // twoWay adds go toward the side that doesn't have the contact
+            if source.googleResourceName != nil {
+                try await performAdd(change: change, direction: .googleToMac)
+            } else {
+                try await performAdd(change: change, direction: .macToGoogle)
+            }
+        }
+
+        SyncHistory.shared.log(source: "SyncEngine", action: "add",
+            details: "\(change.contactName) → \(direction == .googleToMac ? "Mac" : "Google")")
     }
 
     private func performUpdate(change: ContactChange, direction: SyncDirection) async throws {
-        SyncHistory.shared.log(
-            source: "SyncEngine",
-            action: "update.\(direction == .googleToMac ? "google→mac" : "mac→google")",
-            details: "\(change.contactName): \(change.changes.joined(separator: ", "))"
-        )
+        guard let source = change.sourceContact else {
+            throw SyncEngineError.missingContactData(change.contactName)
+        }
+
+        switch direction {
+        case .googleToMac:
+            // Update Mac contact with Google data
+            guard let mID = change.targetContact?.macContactIdentifier else { return }
+            guard let existing = try macConnector.fetchContact(withIdentifier: mID) else { return }
+            let mutableContact = existing.mutableCopy() as! CNMutableContact
+            ContactMapper.applyToMac(from: source, to: mutableContact)
+            try macConnector.updateContact(mutableContact)
+            mappingStore.saveMapping(ContactMapping(
+                googleResourceName: source.googleResourceName ?? "",
+                macContactIdentifier: mID,
+                lastSyncedAt: Date()))
+
+        case .macToGoogle:
+            // Update Google contact with Mac data
+            guard let gID = change.targetContact?.googleResourceName else { return }
+            var googleContact = ContactMapper.toGoogle(from: source)
+            googleContact = GoogleContact(id: gID) // preserve resource name
+            ContactMapper.applyToGoogle(from: source, to: &googleContact)
+            _ = try await googleConnector.updateContact(googleContact)
+            if let mID = source.macContactIdentifier {
+                mappingStore.saveMapping(ContactMapping(
+                    googleResourceName: gID,
+                    macContactIdentifier: mID,
+                    lastSyncedAt: Date()))
+            }
+
+        case .twoWay:
+            // 2-way updates: source drives the direction
+            if source.googleResourceName != nil {
+                try await performUpdate(change: change, direction: .googleToMac)
+            } else {
+                try await performUpdate(change: change, direction: .macToGoogle)
+            }
+        }
+
+        SyncHistory.shared.log(source: "SyncEngine", action: "update",
+            details: "\(change.contactName): \(change.changes.joined(separator: ", "))")
     }
 
     private func performDelete(change: ContactChange, direction: SyncDirection) async throws {
-        SyncHistory.shared.log(
-            source: "SyncEngine",
-            action: "delete.\(direction == .googleToMac ? "google→mac" : "mac→google")",
-            details: change.contactName
-        )
+        guard let source = change.sourceContact else {
+            throw SyncEngineError.missingContactData(change.contactName)
+        }
+
+        switch direction {
+        case .googleToMac:
+            // Delete from Mac (Google side was deleted)
+            if let mID = source.macContactIdentifier {
+                try macConnector.deleteContact(withIdentifier: mID)
+                if let gID = source.googleResourceName {
+                    mappingStore.deleteMapping(googleResourceName: gID)
+                }
+            }
+
+        case .macToGoogle:
+            // Delete from Google (Mac side was deleted)
+            if let gID = source.googleResourceName {
+                try await googleConnector.deleteContact(resourceName: gID)
+                mappingStore.deleteMapping(googleResourceName: gID)
+            }
+
+        case .twoWay:
+            if source.googleResourceName != nil {
+                try await performDelete(change: change, direction: .macToGoogle)
+            } else {
+                try await performDelete(change: change, direction: .googleToMac)
+            }
+        }
+
+        SyncHistory.shared.log(source: "SyncEngine", action: "delete",
+            details: change.contactName)
     }
 
     private func performMerge(change: ContactChange, direction: SyncDirection) async throws {
-        SyncHistory.shared.log(
-            source: "SyncEngine",
-            action: "merge.pending",
-            details: change.contactName
-        )
+        // Merge is a user-guided operation — by the time executeSync runs,
+        // the user should have resolved conflicts (userOverride set to .add/.update/.skip).
+        // If it reaches here unresolved, treat as skip and flag for review.
+        SyncHistory.shared.log(source: "SyncEngine", action: "merge.deferred",
+            details: "\(change.contactName) — needs user review")
     }
 
     private func checkAutoSyncConditions() -> Bool {
@@ -824,8 +888,89 @@ enum ContactMapper {
         if let photoData = unified.photoData {
             mac.imageData = photoData
         }
-        
+
         return mac
+    }
+
+    /// Apply fields from a UnifiedContact onto an existing CNMutableContact (for updates)
+    /// Preserves the contact's identifier — only overwrites changed fields.
+    static func applyToMac(from unified: UnifiedContact, to mac: CNMutableContact) {
+        if let v = unified.givenName          { mac.givenName          = v }
+        if let v = unified.middleName         { mac.middleName         = v }
+        if let v = unified.familyName         { mac.familyName         = v }
+        if let v = unified.namePrefix         { mac.namePrefix         = v }
+        if let v = unified.nameSuffix         { mac.nameSuffix         = v }
+        if let v = unified.nickname           { mac.nickname           = v }
+        if let v = unified.phoneticGivenName  { mac.phoneticGivenName  = v }
+        if let v = unified.phoneticFamilyName { mac.phoneticFamilyName = v }
+        if let v = unified.organizationName   { mac.organizationName   = v }
+        if let v = unified.department         { mac.departmentName     = v }
+        if let v = unified.jobTitle           { mac.jobTitle           = v }
+        if let v = unified.note               { mac.note               = v }
+        if let v = unified.photoData          { mac.imageData          = v }
+        if let v = unified.birthday           { mac.birthday           = v }
+
+        if !unified.phoneNumbers.isEmpty {
+            mac.phoneNumbers = unified.phoneNumbers.map {
+                CNLabeledValue<CNPhoneNumber>(
+                    label: cnLabelFromString($0.label),
+                    value: CNPhoneNumber(stringValue: $0.value))
+            }
+        }
+        if !unified.emailAddresses.isEmpty {
+            mac.emailAddresses = unified.emailAddresses.map {
+                CNLabeledValue<NSString>(
+                    label: cnLabelFromString($0.label),
+                    value: $0.value as NSString)
+            }
+        }
+        if !unified.postalAddresses.isEmpty {
+            mac.postalAddresses = unified.postalAddresses.map { addr in
+                let cn = CNMutablePostalAddress()
+                cn.street = addr.street ?? ""; cn.city = addr.city ?? ""
+                cn.state  = addr.state  ?? ""; cn.postalCode = addr.postalCode ?? ""
+                cn.country = addr.country ?? ""
+                if let cc = addr.countryCode, !cc.isEmpty { cn.isoCountryCode = cc }
+                return CNLabeledValue<CNPostalAddress>(label: cnLabelFromString(addr.label), value: cn)
+            }
+        }
+        if !unified.urls.isEmpty {
+            mac.urlAddresses = unified.urls.map {
+                CNLabeledValue<NSString>(
+                    label: cnLabelFromString($0.label),
+                    value: $0.value as NSString)
+            }
+        }
+    }
+
+    /// Apply fields from UnifiedContact onto an existing GoogleContact (for updates)
+    static func applyToGoogle(from unified: UnifiedContact, to google: inout GoogleContact) {
+        google.givenName          = unified.givenName
+        google.middleName         = unified.middleName
+        google.familyName         = unified.familyName
+        google.namePrefix         = unified.namePrefix
+        google.nameSuffix         = unified.nameSuffix
+        google.nickname           = unified.nickname
+        google.phoneticGivenName  = unified.phoneticGivenName
+        google.phoneticMiddleName = unified.phoneticMiddleName
+        google.phoneticFamilyName = unified.phoneticFamilyName
+        google.organizationName   = unified.organizationName
+        google.department         = unified.department
+        google.jobTitle           = unified.jobTitle
+        google.note               = unified.note
+        google.photoData          = unified.photoData
+
+        google.phoneNumbers    = unified.phoneNumbers.map    { GooglePhoneNumber(value: $0.value,    type: $0.label, label: $0.label) }
+        google.emailAddresses  = unified.emailAddresses.map  { GoogleEmailAddress(value: $0.value,  type: $0.label, label: $0.label) }
+        google.urls            = unified.urls.map            { GoogleUrl(value: $0.value, type: $0.label, label: $0.label) }
+        google.addresses       = unified.postalAddresses.map { addr in
+            GoogleAddress(streetAddress: addr.street, city: addr.city, region: addr.state,
+                         postalCode: addr.postalCode, country: addr.country,
+                         countryCode: addr.countryCode, type: addr.label, label: addr.label)
+        }
+        if let bd = unified.birthday {
+            google.birthday = GoogleDate(year: bd.year, month: bd.month, day: bd.day)
+        }
     }
 }
 
@@ -935,7 +1080,8 @@ enum SyncEngineError: LocalizedError {
     case autoSyncDisabled
     case conditionsNotMet
     case notImplemented
-    
+    case missingContactData(String)
+
     var errorDescription: String? {
         switch self {
         case .syncAlreadyInProgress:
@@ -946,6 +1092,8 @@ enum SyncEngineError: LocalizedError {
             return "Auto-sync conditions not met (check power/network/idle settings)."
         case .notImplemented:
             return "This feature is not yet implemented."
+        case .missingContactData(let name):
+            return "Missing contact data for: \(name)"
         }
     }
 }

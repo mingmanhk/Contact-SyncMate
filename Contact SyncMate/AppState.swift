@@ -92,8 +92,12 @@ struct ContactChange: Identifiable {
     var contactName: String
     var action: SyncAction
     var direction: SyncDirection
-    var changes: [String] // Human-readable change descriptions
-    var userOverride: SyncAction? // User can override the planned action
+    var changes: [String]          // Human-readable change descriptions
+    var userOverride: SyncAction?  // User can override the planned action
+
+    // Full contact references — populated during diff, used during apply
+    var sourceContact: UnifiedContact?   // The contact to read from
+    var targetContact: UnifiedContact?   // The contact to update (for updates/deletes)
 }
 
 enum SyncAction: String, CaseIterable {
