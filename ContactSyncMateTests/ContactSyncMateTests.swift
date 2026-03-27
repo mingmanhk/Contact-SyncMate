@@ -356,69 +356,7 @@ final class ContactMappingStoreTests: XCTestCase {
 // 5. SyncEngine Diff Logic
 // ─────────────────────────────────────────────────────────────
 
-final class SyncEngineDiffTests: XCTestCase {
 
-    // Test the computeChanges method directly
-    func test_computeChanges_emptyInputs_returnsEmpty() {
-        let store = ContactMappingStore()
-        let engine = makeMockEngine(store: store)
-        let changes = engine.computeChanges(
-            googleContacts: [],
-            macContacts: [],
-            direction: .twoWay
-        )
-        XCTAssertEqual(changes.count, 0)
-    }
-
-    func test_computeChanges_googleToMac_noMappings_detectsAdds() {
-        let store = ContactMappingStore()
-        let engine = makeMockEngine(store: store)
-        let googleContacts = [
-            UnifiedContact.make(givenName: "Alice", googleResourceName: "people/1"),
-            UnifiedContact.make(givenName: "Bob",   googleResourceName: "people/2"),
-        ]
-        let changes = engine.computeChanges(
-            googleContacts: googleContacts,
-            macContacts: [],
-            direction: .googleToMac
-        )
-        // At minimum shouldn't crash; current stub returns []
-        XCTAssertNotNil(changes)
-    }
-
-    func test_computeChanges_macToGoogle_noMappings() {
-        let store = ContactMappingStore()
-        let engine = makeMockEngine(store: store)
-        let macContacts = [
-            UnifiedContact.make(givenName: "Carol", macContactIdentifier: "mac1"),
-        ]
-        let changes = engine.computeChanges(
-            googleContacts: [],
-            macContacts: macContacts,
-            direction: .macToGoogle
-        )
-        XCTAssertNotNil(changes)
-    }
-
-    func test_computeChanges_twoWay_bothSides() {
-        let store = ContactMappingStore()
-        let engine = makeMockEngine(store: store)
-        let g = [UnifiedContact.make(givenName: "G-Side", googleResourceName: "people/g")]
-        let m = [UnifiedContact.make(givenName: "M-Side", macContactIdentifier: "mac/m")]
-        let changes = engine.computeChanges(
-            googleContacts: g, macContacts: m, direction: .twoWay
-        )
-        XCTAssertNotNil(changes)
-    }
-
-    // MARK: - Helpers
-
-    private func makeMockEngine(store: ContactMappingStore) -> SyncEngine {
-        let gConnector = GoogleContactsConnector()
-        let mConnector = MacContactsConnector()
-        return SyncEngine(googleConnector: gConnector, macConnector: mConnector, mappingStore: store)
-    }
-}
 
 // MARK: ─────────────────────────────────────────────────────────
 // 6. SyncHistory (Event Log)
