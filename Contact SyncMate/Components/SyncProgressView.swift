@@ -22,7 +22,7 @@ struct SyncProgressView: View {
             // Animated infinity symbol
             Image(systemName: "infinity")
                 .font(.system(size: 64, weight: .ultraLight))
-                .foregroundStyle(Color("BrandIndigo").gradient)
+                .foregroundStyle(Color.accentColor.gradient)
                 .rotationEffect(.degrees(rotation))
                 .onAppear {
                     withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {

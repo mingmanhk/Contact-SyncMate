@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import Combine
 
 // MARK: - History Filter
 
@@ -25,13 +26,14 @@ struct SyncHistoryView: View {
     private var filteredEvents: [SyncEvent] {
         var events = allEvents
         if !searchText.isEmpty {
+            let q = searchText
             events = events.filter {
-                $0.action.localizedCaseInsensitiveContains(searchText) ||
-                $0.source.localizedCaseInsensitiveContains(searchText) ||
-                ($0.details ?? "").localizedCaseInsensitiveContains(searchText)
+                friendlyLabel(for: $0.action).localizedCaseInsensitiveContains(q) ||
+                $0.action.localizedCaseInsensitiveContains(q) ||
+                $0.source.localizedCaseInsensitiveContains(q) ||
+                ($0.details ?? "").localizedCaseInsensitiveContains(q)
             }
         }
-        // Simple filter by action keyword (no separate success/error status on SyncEvent)
         switch activeFilter {
         case .all:      break
         case .success:  events = events.filter { !$0.action.lowercased().contains("error") && !$0.action.lowercased().contains("warn") }
@@ -109,11 +111,17 @@ struct SyncHistoryView: View {
             if groupedEvents.isEmpty {
                 Spacer()
                 VStack(spacing: 8) {
-                    Image(systemName: "clock.badge.xmark")
+                    Image(systemName: searchText.isEmpty ? "clock.arrow.circlepath" : "magnifyingglass")
                         .font(.largeTitle)
+                        .foregroundStyle(.tertiary)
+                    Text(searchText.isEmpty ? "No sync history yet" : "No results for \"\(searchText)\"")
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    Text("No history found.")
-                        .foregroundStyle(.secondary)
+                    if searchText.isEmpty {
+                        Text("Run your first sync to see activity here.")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
                 Spacer()
             } else {
@@ -150,7 +158,7 @@ struct SyncHistoryView: View {
                         .frame(width: 20)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(event.action)
+                        Text(friendlyLabel(for: event.action))
                             .font(.subheadline)
                             .fontWeight(.medium)
                         Text(event.source)
@@ -194,7 +202,7 @@ struct SyncHistoryView: View {
             .fontWeight(selected ? .semibold : .regular)
             .padding(.horizontal, 14)
             .padding(.vertical, 6)
-            .background(selected ? Color("BrandIndigo") : Color.secondary.opacity(0.1))
+            .background(selected ? Color.accentColor : Color.secondary.opacity(0.1))
             .foregroundStyle(selected ? Color.white : Color.primary)
             .clipShape(Capsule())
             .animation(.easeInOut(duration: 0.15), value: selected)
@@ -202,18 +210,59 @@ struct SyncHistoryView: View {
 
     // MARK: - Helpers
 
+    private func friendlyLabel(for action: String) -> String {
+        switch action {
+        case "sync.complete":                       return "Sync completed"
+        case "sync.start", "scanForDuplicates.start": return "Sync started"
+        case "add":                                 return "Contact added"
+        case "update":                              return "Contact updated"
+        case "delete":                              return "Contact deleted"
+        case "merge.deferred":                      return "Conflict flagged for review"
+        case "autoMerge":                           return "Duplicates auto-merged"
+        case "userMerge":                           return "Duplicates merged"
+        case "keepSeparate":                        return "Contacts kept separate"
+        case "skippedDuplicatesNotification":       return "Duplicates skipped (auto-sync)"
+        case "createMappingFromMerge":              return "Contact mapping created"
+        case "clearPatterns":                       return "Saved patterns cleared"
+        default:
+            return action
+                .replacingOccurrences(of: ".", with: " ")
+                .replacingOccurrences(of: "_", with: " ")
+                .capitalized
+        }
+    }
+
     private func eventIcon(_ event: SyncEvent) -> String {
-        let a = event.action.lowercased()
-        if a.contains("error") { return "xmark.circle.fill" }
-        if a.contains("warn")  { return "exclamationmark.triangle.fill" }
-        return "checkmark.circle.fill"
+        let a = event.action
+        if a.contains("error") || a.contains("Error") { return "xmark.circle.fill" }
+        if a.contains("warn")  || a.contains("Warn")  { return "exclamationmark.triangle.fill" }
+        switch a {
+        case "sync.complete":          return "checkmark.circle.fill"
+        case "sync.start", "scanForDuplicates.start": return "arrow.triangle.2.circlepath"
+        case "add":                    return "plus.circle.fill"
+        case "update":                 return "pencil.circle.fill"
+        case "delete":                 return "minus.circle.fill"
+        case "merge.deferred":         return "exclamationmark.triangle.fill"
+        case "autoMerge", "userMerge": return "arrow.triangle.merge"
+        case "keepSeparate":           return "xmark.circle"
+        default:                       return "clock.fill"
+        }
     }
 
     private func eventColor(_ event: SyncEvent) -> Color {
-        let a = event.action.lowercased()
-        if a.contains("error") { return .red }
-        if a.contains("warn")  { return .orange }
-        return .green
+        let a = event.action
+        if a.contains("error") || a.contains("Error") { return .red }
+        if a.contains("warn")  || a.contains("Warn")  { return .orange }
+        switch a {
+        case "sync.complete":          return .green
+        case "sync.start", "scanForDuplicates.start": return Color.accentColor
+        case "add":                    return .green
+        case "update":                 return .blue
+        case "delete":                 return .red
+        case "merge.deferred":         return .orange
+        case "autoMerge", "userMerge": return .purple
+        default:                       return .secondary
+        }
     }
 
     private func exportLog() {

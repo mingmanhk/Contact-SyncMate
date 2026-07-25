@@ -13,43 +13,60 @@ import Foundation
 struct DuplicateGroup: Identifiable {
     let id: UUID
     var contacts: [DuplicateCandidate]
-    var matchScore: Int  // 0-100 score
+    /// Rule-based score (0–100) from ContactDeduplicator
+    var matchScore: Int
+    /// AI-enhanced score (0–100); nil if AI matching has not run yet
+    var aiEnhancedScore: Int?
     var matchReason: String
     var groupType: DuplicateGroupType
     var userDecision: DuplicateDecision?
     var detectedAt: Date
-    
+    /// Result from the AI matching tier (local NLP or Anthropic API)
+    var aiMatchResult: AIMatchResult?
+
     init(id: UUID = UUID(),
          contacts: [DuplicateCandidate],
          matchScore: Int,
          matchReason: String,
          groupType: DuplicateGroupType,
          userDecision: DuplicateDecision? = nil,
-         detectedAt: Date = Date()) {
+         detectedAt: Date = Date(),
+         aiMatchResult: AIMatchResult? = nil) {
         self.id = id
         self.contacts = contacts
         self.matchScore = matchScore
+        self.aiEnhancedScore = nil
         self.matchReason = matchReason
         self.groupType = groupType
         self.userDecision = userDecision
         self.detectedAt = detectedAt
+        self.aiMatchResult = aiMatchResult
     }
-    
+
+    /// The best available score: AI-enhanced if present, otherwise the rule score.
+    var effectiveScore: Int { aiEnhancedScore ?? matchScore }
+
     var shouldAutoMerge: Bool {
-        return matchScore >= 80 && contacts.count <= 3
+        return effectiveScore >= 80 && contacts.count <= 3
     }
-    
+
     var shouldPromptUser: Bool {
-        return matchScore >= 50 && matchScore < 80
+        return effectiveScore >= 50 && effectiveScore < 80
     }
-    
+
     var shouldKeepSeparate: Bool {
-        return matchScore < 50
+        return effectiveScore < 50
     }
-    
+
     var needsUserConfirmation: Bool {
         return shouldPromptUser || (shouldAutoMerge && userDecision == nil)
     }
+
+    /// Whether this group was analysed by the AI tier
+    var hasAIAnalysis: Bool { aiMatchResult != nil }
+
+    /// Source label for display ("Local NLP" / "Claude AI" / "Cached")
+    var aiSourceLabel: String? { aiMatchResult?.source.rawValue }
 }
 
 // MARK: - Duplicate Candidate
@@ -123,9 +140,18 @@ enum DuplicateDecision: String, Codable {
     
     var displayName: String {
         switch self {
-        case .merge: return "✅ Merge as same person"
+        case .merge:        return "✅ Merge as same person"
         case .keepSeparate: return "➖ Keep separate"
-        case .skip: return "🚫 Ignore for now"
+        case .skip:         return "🚫 Ignore for now"
+        }
+    }
+
+    /// Short label used in AI suggestion badge
+    var aiLabel: String {
+        switch self {
+        case .merge:        return "Merge"
+        case .keepSeparate: return "Keep separate"
+        case .skip:         return "Review"
         }
     }
 }
@@ -142,10 +168,18 @@ struct MatchScoreBreakdown {
     var addressMatch: Int = 0
     var emailDomainMismatch: Int = 0
     var differentContactInfo: Int = 0
-    
+
+    /// Extra points contributed by the AI matching tier (local NLP / Anthropic API)
+    var aiBonus: Int = 0
+
     var totalScore: Int {
         return max(0, emailMatch + phoneMatch + exactNameMatch + similarNameMatch +
                    organizationMatch + addressMatch + emailDomainMismatch + differentContactInfo)
+    }
+
+    /// Total score including AI bonus (capped at 100)
+    var totalScoreWithAI: Int {
+        return min(100, totalScore + aiBonus)
     }
     
     var reasons: [String] {

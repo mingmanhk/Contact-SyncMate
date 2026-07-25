@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Contacts
+import Combine
 
 // MARK: - Dashboard View
 
@@ -13,42 +14,80 @@ struct DashboardView: View {
     @StateObject private var settings = AppSettings.shared
     @ObservedObject private var oauth = GoogleOAuthManager.shared
 
+    // Shared coordinator — single source of truth for sync state
+    @StateObject private var sync = SyncCoordinator.shared
+
     @State private var showSyncPreview = false
+    @State private var showHistoryView = false
     @State private var recentEvents: [SyncEvent] = []
+
+    // Sync feedback (derived from sync.phase — see onChange below)
+    @State private var syncResultBanner: SyncResultBanner?
+    @State private var syncErrorMessage: String?
 
     // MARK: Computed helpers
 
     private var syncStatus: SyncStatus {
-        if appState.isSyncing { return .syncing }
-        if let result = appState.lastSyncResult, !result.successful { return .error }
-        return .idle
+        switch sync.phase {
+        case .preparing, .syncing:           return .syncing
+        case .failed:                        return .error
+        case .completed(let r):              return r.successful ? .success : .error
+        default:
+            if let result = appState.lastSyncResult, !result.successful { return .error }
+            return .idle
+        }
     }
 
     private var lastSyncLabel: String {
-        guard let date = appState.lastSyncDate else { return "Never" }
+        guard let date = appState.lastSyncDate else { return "Never synced" }
         let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
+        formatter.unitsStyle = .full
+        return "Synced \(formatter.localizedString(for: date, relativeTo: Date()))"
+    }
+
+    private var canSync: Bool {
+        !sync.phase.isActive && oauth.isAuthenticated && appState.isMacContactsAuthorized
+    }
+
+    private var syncButtonTooltip: String {
+        if sync.phase.isActive { return "Sync is already in progress" }
+        if !oauth.isAuthenticated { return "Connect your Google account first" }
+        if !appState.isMacContactsAuthorized { return "Grant Mac Contacts access first" }
+        return "Start syncing contacts now"
     }
 
     // MARK: Body
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header toolbar
             headerBar
-
             Divider()
 
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: 20) {
+                    // Result banner (success/error)
+                    if let banner = syncResultBanner {
+                        resultBannerView(banner)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+
+                    if let error = syncErrorMessage {
+                        errorBannerView(error)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+
+                    // Prerequisite warnings
+                    if !oauth.isAuthenticated || !appState.isMacContactsAuthorized {
+                        prerequisiteWarning
+                    }
+
                     // Account cards
                     accountCardsSection
 
-                    // Sync direction picker
+                    // Sync direction
                     syncDirectionSection
 
-                    // Sync Now button
+                    // Sync Now button + progress
                     syncNowSection
 
                     // Recent activity
@@ -58,33 +97,157 @@ struct DashboardView: View {
             }
         }
         .frame(minWidth: 640, minHeight: 480)
+        .animation(.easeInOut(duration: 0.25), value: syncResultBanner != nil)
+        .animation(.easeInOut(duration: 0.25), value: syncErrorMessage != nil)
+        .animation(.easeInOut(duration: 0.2), value: appState.isSyncing)
         .sheet(isPresented: $showSyncPreview) {
             if let session = appState.currentSyncSession {
                 SyncPreviewView(session: session, isPresented: $showSyncPreview)
             }
         }
-        .onAppear { recentEvents = Array(SyncHistory.shared.events().suffix(5).reversed()) }
+        .sheet(isPresented: $showHistoryView) {
+            SyncHistoryAndBackupView()
+        }
+        .onAppear {
+            recentEvents = Array(SyncHistory.shared.events().suffix(5).reversed())
+            // Give the coordinator a handle to AppState so it can update isSyncing etc.
+            sync.appState = appState
+        }
+        // Drive banners from the coordinator's phase
+        .onChange(of: sync.phase) { _, phase in
+            switch phase {
+            case .completed(let r):
+                withAnimation {
+                    syncErrorMessage = nil
+                    syncResultBanner = SyncResultBanner(
+                        icon: r.successful
+                            ? "checkmark.circle.fill"
+                            : "exclamationmark.triangle.fill",
+                        color: r.successful ? .green : .orange,
+                        title: r.successful ? "Sync Completed" : "Sync Completed with Errors",
+                        detail: r.summary
+                    )
+                }
+                recentEvents = Array(SyncHistory.shared.events().suffix(5).reversed())
+            case .failed(let msg):
+                withAnimation {
+                    syncResultBanner = nil
+                    syncErrorMessage = msg
+                }
+            case .preparing, .syncing:
+                withAnimation {
+                    syncResultBanner = nil
+                    syncErrorMessage = nil
+                }
+            case .idle:
+                break
+            }
+        }
     }
 
     // MARK: - Header
 
     private var headerBar: some View {
-        HStack {
+        HStack(spacing: 12) {
             Text("Contact SyncMate")
                 .font(.title2)
                 .fontWeight(.semibold)
 
             Spacer()
 
-            HStack(spacing: 8) {
+            // Last-sync result pill
+            if let result = appState.lastSyncResult, !appState.isSyncing {
+                lastSyncResultPill(result)
+            }
+
+            HStack(spacing: 6) {
                 StatusDot(status: syncStatus)
-                Text(appState.isSyncing ? "Syncing…" : "Last synced \(lastSyncLabel)")
+                Text(appState.isSyncing ? "Syncing…" : lastSyncLabel)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
+
+            Button {
+                NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+            } label: {
+                Image(systemName: "gear")
+                    .font(.body)
+            }
+            .buttonStyle(.plain)
+            .help("Open Preferences")
         }
         .padding(.horizontal, 24)
-        .padding(.vertical, 16)
+        .padding(.vertical, 14)
+    }
+
+    private func lastSyncResultPill(_ result: SyncResult) -> some View {
+        HStack(spacing: 10) {
+            if result.added > 0 {
+                Label("\(result.added)", systemImage: "plus")
+                    .foregroundStyle(Color.appSuccess)
+            }
+            if result.updated > 0 {
+                Label("\(result.updated)", systemImage: "pencil")
+                    .foregroundStyle(Color.appInfo)
+            }
+            if result.deleted > 0 {
+                Label("\(result.deleted)", systemImage: "minus")
+                    .foregroundStyle(Color.appError)
+            }
+            if result.added == 0 && result.updated == 0 && result.deleted == 0 {
+                Text("No changes")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .font(.caption)
+        .fontWeight(.medium)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(Color.secondary.opacity(0.08))
+        .clipShape(Capsule())
+    }
+
+    // MARK: - Prerequisite Warning
+
+    private var prerequisiteWarning: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Setup Required", systemImage: "exclamationmark.triangle.fill")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(Color.appWarning)
+
+            if !oauth.isAuthenticated {
+                HStack(spacing: 8) {
+                    Image(systemName: "xmark.circle")
+                        .foregroundStyle(Color.appError)
+                        .font(.caption)
+                    Text("Google account not connected — open Settings → Accounts to sign in.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if !appState.isMacContactsAuthorized {
+                HStack(spacing: 8) {
+                    Image(systemName: "xmark.circle")
+                        .foregroundStyle(Color.appError)
+                        .font(.caption)
+                    Text("Mac Contacts access not granted — open Settings → Accounts to authorize.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Button("Open Accounts Settings") {
+                NotificationCenter.default.post(name: .openSettingsWindow, object: nil)
+            }
+            .font(.caption)
+            .buttonStyle(.bordered)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.appWarning.opacity(0.10))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.appWarning.opacity(0.3)))
     }
 
     // MARK: - Account Cards
@@ -124,14 +287,14 @@ struct DashboardView: View {
                     .fontWeight(.medium)
                 Text(detail)
                     .font(.caption)
-                    .foregroundStyle(isConnected ? Color.secondary : Color.red)
+                    .foregroundStyle(isConnected ? Color.secondary : Color.appError)
                     .lineLimit(1)
             }
 
             Spacer()
 
             Circle()
-                .fill(isConnected ? Color.green : Color.red)
+                .fill(isConnected ? Color.appSuccess : Color.appError)
                 .frame(width: 8, height: 8)
         }
         .padding(16)
@@ -145,8 +308,14 @@ struct DashboardView: View {
 
     private var syncDirectionSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Sync Direction")
-                .font(.headline)
+            HStack {
+                Text("Sync Direction")
+                    .font(.headline)
+                Spacer()
+                Text("Applied on next sync")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
 
             Picker("Sync direction", selection: $settings.autoSyncDirection) {
                 Text("2-Way").tag(SyncDirection.twoWay)
@@ -154,42 +323,183 @@ struct DashboardView: View {
                 Text("Mac → Google").tag(SyncDirection.macToGoogle)
             }
             .pickerStyle(.segmented)
+
+            Text(settings.autoSyncDirection.directionDescription)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 2)
+                .animation(.easeInOut(duration: 0.2), value: settings.autoSyncDirection)
         }
     }
 
     // MARK: - Sync Now
 
     private var syncNowSection: some View {
-        HStack {
+        VStack(spacing: 12) {
+            // Phase-aware progress block (visible during active sync)
+            if sync.phase.isActive {
+                VStack(spacing: 6) {
+                    ProgressView(value: sync.progress)
+                        .progressViewStyle(.linear)
+                        .animation(.easeInOut(duration: 0.3), value: sync.progress)
+
+                    HStack {
+                        Text(sync.stepLabel)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        Spacer()
+                        Text(sync.phase.label)
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .monospacedDigit()
+                    }
+                }
+                .padding(.horizontal, 4)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
+            // ── Sync Now button ───────────────────────────────────────
             Button {
                 triggerSync()
             } label: {
-                HStack {
-                    Image(systemName: appState.isSyncing ? "infinity" : "arrow.triangle.2.circlepath")
-                    Text(appState.isSyncing ? "Syncing…" : "Sync Now")
+                HStack(spacing: 8) {
+                    if sync.phase.isActive {
+                        ProgressView()
+                            .controlSize(.small)
+                            .scaleEffect(0.85)
+                    } else {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .symbolRenderingMode(.hierarchical)
+                    }
+                    Text(sync.phase.isActive ? sync.phase.label : "Sync Now")
+                        .fontWeight(.semibold)
                 }
                 .frame(maxWidth: .infinity)
+                .padding(.vertical, 2)
             }
             .buttonStyle(.borderedProminent)
-            .tint(Color("BrandIndigo"))
+            .tint(buttonTint)
             .controlSize(.large)
-            .disabled(appState.isSyncing || !oauth.isAuthenticated)
+            .disabled(!canSync)
+            .help(syncButtonTooltip)
+
+            // Quick status line below the button
+            if case .completed(let r) = sync.phase {
+                Label(r.summary, systemImage: r.successful ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(r.successful ? .green : .orange)
+                    .transition(.opacity)
+            }
         }
+        .animation(.easeInOut(duration: 0.2), value: sync.phase.isActive)
+    }
+
+    private var buttonTint: Color {
+        switch sync.phase {
+        case .failed:       return .red
+        case .completed(let r): return r.successful ? .green : .orange
+        default:            return .accentColor
+        }
+    }
+
+    // MARK: - Result / Error Banners
+
+    private func resultBannerView(_ banner: SyncResultBanner) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: banner.icon)
+                .foregroundStyle(banner.color)
+                .font(.body)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(banner.title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Text(banner.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button {
+                withAnimation { syncResultBanner = nil }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(12)
+        .background(banner.color.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(banner.color.opacity(0.2)))
+    }
+
+    private func errorBannerView(_ message: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(Color.appError)
+                .font(.body)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Sync Failed")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
+            }
+
+            Spacer()
+
+            Button {
+                withAnimation { syncErrorMessage = nil }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(12)
+        .background(Color.appError.opacity(0.10))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.appError.opacity(0.3)))
     }
 
     // MARK: - Recent Activity
 
     private var recentActivitySection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Recent Activity")
-                .font(.headline)
+            HStack {
+                Text("Recent Activity")
+                    .font(.headline)
+                Spacer()
+                Button("View History & Backups") {
+                    showHistoryView = true
+                }
+                .font(.subheadline)
+                .foregroundStyle(Color.accentColor)
+                .buttonStyle(.plain)
+            }
 
             if recentEvents.isEmpty {
-                Text("No sync history yet.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(24)
+                VStack(spacing: 8) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.largeTitle)
+                        .foregroundStyle(.tertiary)
+                    Text("No sync history yet")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Text("Run your first sync to see activity here.")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 32)
             } else {
                 VStack(spacing: 0) {
                     ForEach(recentEvents) { event in
@@ -206,16 +516,18 @@ struct DashboardView: View {
     }
 
     private func recentEventRow(_ event: SyncEvent) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-                .frame(width: 20)
+        let icon = eventIcon(for: event.action)
+        return HStack(spacing: 12) {
+            Image(systemName: icon.name)
+                .foregroundStyle(icon.color)
+                .font(.body)
+                .frame(width: 22)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(event.action)
+                Text(friendlyLabel(for: event.action))
                     .font(.subheadline)
                     .fontWeight(.medium)
-                if let detail = event.details {
+                if let detail = event.details, !detail.isEmpty {
                     Text(detail)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -227,26 +539,223 @@ struct DashboardView: View {
 
             Text(event.timestamp, style: .relative)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.tertiary)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(.background)
     }
 
-    // MARK: - Actions
+    // MARK: - Sync Action
 
     private func triggerSync() {
-        // For manual mode, show preview; otherwise sync directly
+        withAnimation {
+            syncResultBanner = nil
+            syncErrorMessage = nil
+        }
+
+        // Manual-with-preview mode: build the diff first and show the sheet.
+        // This path does NOT go through SyncCoordinator so the sheet can inspect
+        // the pending changes before they are applied.
         if settings.selectedSyncType == .manual {
-            showSyncPreview = true
+            triggerManualSyncWithPreview()
         } else {
-            // TODO: invoke SyncEngine directly
-            appState.isSyncing = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                appState.isSyncing = false
-                appState.lastSyncDate = Date()
+            // All other modes: delegate to the shared SyncCoordinator.
+            Task { await sync.runSync() }
+        }
+    }
+
+    /// Manual mode: prepare a preview session, then show the SyncPreviewView sheet.
+    private func triggerManualSyncWithPreview() {
+        appState.isSyncing = true
+
+        Task {
+            do {
+                let engine = SyncEngine(
+                    googleConnector: GoogleContactsConnector(),
+                    macConnector: MacContactsConnector(),
+                    mappingStore: ContactMappingStore()
+                )
+
+                let session = try await engine.prepareManualSync(
+                    direction: settings.autoSyncDirection
+                )
+
+                await MainActor.run {
+                    appState.currentSyncSession = session
+                    appState.isSyncing = false
+                    showSyncPreview = true
+                }
+
+                SyncHistory.shared.log(
+                    source: "Dashboard",
+                    action: "sync.preview",
+                    details: "\(session.contactChanges.count) changes prepared for review"
+                )
+            } catch {
+                await MainActor.run {
+                    appState.isSyncing = false
+                    handleSyncError(error)
+                }
             }
+        }
+    }
+
+    // MARK: - Error Handling (used only by the manual-preview path)
+
+    private func handleSyncError(_ error: Error) {
+        let friendly = SyncCoordinator.shared.friendlyMessage(for: error)
+        withAnimation { syncErrorMessage = friendly }
+        SyncHistory.shared.log(source: "Dashboard", action: "sync.error",
+                               details: "\(friendly) — \(error.localizedDescription)")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 12) {
+            withAnimation { self.syncErrorMessage = nil }
+        }
+        recentEvents = Array(SyncHistory.shared.events().suffix(5).reversed())
+    }
+
+    private func friendlyErrorMessage(for error: Error) -> String {
+        // SyncEngine errors
+        if let syncError = error as? SyncEngineError {
+            switch syncError {
+            case .syncAlreadyInProgress:
+                return "A sync is already running. Please wait for it to finish."
+            case .autoSyncDisabled:
+                return "Auto-sync is disabled in settings."
+            case .conditionsNotMet:
+                return "Sync conditions not met — check power, network, and idle settings."
+            case .notImplemented:
+                return "This sync feature is not yet available."
+            case .missingContactData(let detail):
+                return "Missing contact data: \(detail)"
+            case .backupNotFound:
+                return "Backup not found."
+            }
+        }
+
+        // Network errors
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain {
+            switch nsError.code {
+            case NSURLErrorNotConnectedToInternet:
+                return "No internet connection. Check your network and try again."
+            case NSURLErrorTimedOut:
+                return "The request timed out. Google's servers may be slow — try again later."
+            case NSURLErrorNetworkConnectionLost:
+                return "Network connection was lost during sync. Try again."
+            case NSURLErrorCannotFindHost, NSURLErrorCannotConnectToHost:
+                return "Cannot reach Google servers. Check your internet connection."
+            default:
+                return "Network error: \(nsError.localizedDescription)"
+            }
+        }
+
+        // Contacts framework errors
+        if nsError.domain == "CNErrorDomain" {
+            switch nsError.code {
+            case 100: // CNErrorCodeAuthorizationDenied
+                return "Contacts access was denied. Open System Settings → Privacy → Contacts to re-enable."
+            case 200: // CNErrorCodeCommunicationError
+                return "Could not communicate with the Contacts database. Try restarting the app."
+            default:
+                return "Contacts error: \(nsError.localizedDescription)"
+            }
+        }
+
+        // Google API / OAuth errors
+        let desc = error.localizedDescription.lowercased()
+        if desc.contains("401") || desc.contains("unauthorized") || desc.contains("token") {
+            return "Google authentication expired. Please sign out and sign back in from Settings → Accounts."
+        }
+        if desc.contains("403") || desc.contains("forbidden") {
+            return "Google API access forbidden. Check that the Contacts API is enabled for your account."
+        }
+        if desc.contains("429") || desc.contains("rate limit") {
+            return "Google API rate limit reached. Wait a few minutes and try again."
+        }
+
+        return error.localizedDescription
+    }
+
+    private func formatResultSummary(_ result: SyncResult) -> String {
+        var parts: [String] = []
+        if result.added > 0   { parts.append("\(result.added) added") }
+        if result.updated > 0 { parts.append("\(result.updated) updated") }
+        if result.deleted > 0 { parts.append("\(result.deleted) deleted") }
+        if result.merged > 0  { parts.append("\(result.merged) merged") }
+        if result.skipped > 0 { parts.append("\(result.skipped) skipped") }
+        if !result.errors.isEmpty {
+            parts.append("\(result.errors.count) error\(result.errors.count == 1 ? "" : "s")")
+        }
+        if parts.isEmpty { return "Everything is already in sync." }
+        let duration = String(format: "%.1fs", result.duration)
+        return parts.joined(separator: ", ") + " in \(duration)"
+    }
+
+    // MARK: - Event Helpers
+
+    private func friendlyLabel(for action: String) -> String {
+        switch action {
+        case "sync.complete":           return "Sync completed"
+        case "sync.start", "scanForDuplicates.start": return "Sync started"
+        case "sync.preview":            return "Sync preview prepared"
+        case "sync.error":              return "Sync failed"
+        case "add":                     return "Contact added"
+        case "update":                  return "Contact updated"
+        case "delete":                  return "Contact deleted"
+        case "merge.deferred":          return "Conflict flagged for review"
+        case "autoMerge":               return "Duplicates auto-merged"
+        case "userMerge":               return "Duplicates merged"
+        case "keepSeparate":            return "Contacts kept separate"
+        case "skippedDuplicatesNotification": return "Duplicates skipped (auto-sync)"
+        case "createMappingFromMerge":  return "Contact mapping created"
+        case "clearPatterns":           return "Saved patterns cleared"
+        default:
+            return action
+                .replacingOccurrences(of: ".", with: " ")
+                .replacingOccurrences(of: "_", with: " ")
+                .capitalized
+        }
+    }
+
+    private func eventIcon(for action: String) -> (name: String, color: Color) {
+        if action.contains("error") || action.contains("Error") {
+            return ("xmark.circle.fill", .red)
+        }
+        switch action {
+        case "sync.complete":         return ("checkmark.circle.fill", .green)
+        case "sync.start", "scanForDuplicates.start": return ("arrow.triangle.2.circlepath", Color.accentColor)
+        case "sync.preview":          return ("eye.circle.fill", .blue)
+        case "add":                   return ("plus.circle.fill", .green)
+        case "update":                return ("pencil.circle.fill", .blue)
+        case "delete":                return ("minus.circle.fill", .red)
+        case "merge.deferred":        return ("exclamationmark.triangle.fill", .orange)
+        case "autoMerge", "userMerge": return ("arrow.triangle.merge", .purple)
+        default:                      return ("clock.fill", .secondary)
+        }
+    }
+}
+
+// MARK: - Sync Result Banner Model
+
+struct SyncResultBanner: Equatable {
+    let icon: String
+    let color: Color
+    let title: String
+    let detail: String
+}
+
+// MARK: - SyncDirection helpers (Dashboard)
+
+private extension SyncDirection {
+    var directionDescription: String {
+        switch self {
+        case .twoWay:
+            return "Changes on either side are merged — additions, edits and deletions flow in both directions."
+        case .googleToMac:
+            return "Google Contacts are the master copy. Changes in Google overwrite Mac; Mac-only changes are ignored."
+        case .macToGoogle:
+            return "Mac Contacts are the master copy. Changes on Mac overwrite Google; Google-only changes are ignored."
         }
     }
 }

@@ -8,6 +8,7 @@
 import Foundation
 import AuthenticationServices
 import Security
+import CryptoKit
 import Combine
 import AppKit
 
@@ -46,13 +47,17 @@ class GoogleOAuthManager: NSObject, ObservableObject {
     static let shared = GoogleOAuthManager()
     
     // MARK: - Google OAuth Configuration
-    // Credentials are loaded from GoogleOAuthConfig.swift (kept in .gitignore)
-    // Remember to update the URL Types scheme in your app's Info.plist
-    // to match the redirect URI scheme, e.g. com.googleusercontent.apps.YOUR_CLIENT_ID
+    // Client ID is loaded from GoogleOAuthConfig (public, safe to embed).
+    // Client secret is stored in the macOS Keychain (never in plain-text files).
     private let config = GoogleOAuthConfig()
     private var clientId: String { config.clientId }
-    private var clientSecret: String { config.clientSecret }
     private var redirectURI: String { config.redirectURI }
+
+    // PKCE (Proof Key for Code Exchange) — industry standard per RFC 7636 / OAuth 2.1
+    private var codeVerifier: String?
+
+    // Keychain key for the client secret
+    private static let clientSecretKeychainKey = "GoogleOAuthClientSecret"
     
     // Scopes needed for Google People API
     private let scopes = [
@@ -98,6 +103,55 @@ class GoogleOAuthManager: NSObject, ObservableObject {
         }
     }
     
+    // MARK: - Client Secret (Keychain-backed)
+
+    /// Retrieve the client secret from the Keychain.
+    /// On first launch the secret is migrated from GoogleOAuthConfig.json into the
+    /// Keychain and then the JSON value is no longer needed.
+    private var clientSecret: String {
+        // Try Keychain first
+        if let stored = getFromKeychain(key: Self.clientSecretKeychainKey) {
+            return stored
+        }
+        // Fall back to config file for first-run migration
+        let fromConfig = config.clientSecret
+        if !fromConfig.isEmpty && fromConfig != "SET_AT_RUNTIME_OR_CI" {
+            try? saveToKeychain(key: Self.clientSecretKeychainKey, value: fromConfig)
+            return fromConfig
+        }
+        return ""
+    }
+
+    /// Manually store a client secret in the Keychain (e.g. from Settings UI).
+    func setClientSecret(_ secret: String) throws {
+        try saveToKeychain(key: Self.clientSecretKeychainKey, value: secret)
+    }
+
+    // MARK: - PKCE Helpers (RFC 7636)
+
+    /// Generate a cryptographically random code verifier (43–128 chars, URL-safe).
+    private func generateCodeVerifier() -> String {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        return Data(bytes)
+            .base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
+    /// Derive the S256 code challenge from a code verifier.
+    private func generateCodeChallenge(from verifier: String) -> String {
+        let digest = SHA256.hash(data: Data(verifier.utf8))
+        return Data(digest)
+            .base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
+    // MARK: - Sign In
+
     /// Start OAuth flow
     func signIn() async throws {
         guard !getCallbackScheme().isEmpty,
@@ -153,7 +207,14 @@ class GoogleOAuthManager: NSObject, ObservableObject {
                 self.authSession?.presentationContextProvider = self
                 self.authSession?.prefersEphemeralWebBrowserSession = false
                 
-                if !self.authSession!.start() {
+                guard let session = self.authSession else {
+                    if !isResumed {
+                        isResumed = true
+                        continuation.resume(throwing: GoogleOAuthError.sessionStartFailed)
+                    }
+                    return
+                }
+                if !session.start() {
                     if !isResumed {
                         isResumed = true
                         continuation.resume(throwing: GoogleOAuthError.sessionStartFailed)
@@ -165,34 +226,25 @@ class GoogleOAuthManager: NSObject, ObservableObject {
     
     @MainActor
     func startSignInFromCurrentWindow() {
-        // Temporarily switch to regular activation policy for OAuth
-        let previousPolicy = NSApp.activationPolicy()
-        if previousPolicy == .accessory {
+        // Switch to regular activation policy so the OAuth browser sheet
+        // has a window to anchor to.  We intentionally do NOT restore
+        // .accessory afterwards — that would hide the app and make it
+        // look like a crash.  The user's activation-policy preference
+        // is applied the next time updateActivationPolicy() runs (e.g.
+        // when a window is closed or the setting is toggled).
+        if NSApp.activationPolicy() == .accessory {
             NSApp.setActivationPolicy(.regular)
         }
-        
+
         // Ensure the app is properly activated before showing OAuth
         NSApp.activate(ignoringOtherApps: true)
-        
+
         Task { [weak self] in
             do {
                 try await self?.signIn()
-                
-                // Restore previous activation policy after OAuth completes
-                await MainActor.run {
-                    if previousPolicy == .accessory {
-                        NSApp.setActivationPolicy(previousPolicy)
-                    }
-                }
+                print("Google sign-in succeeded")
             } catch {
                 print("Google sign-in failed: \(error)")
-                
-                // Restore previous activation policy on error
-                await MainActor.run {
-                    if previousPolicy == .accessory {
-                        NSApp.setActivationPolicy(previousPolicy)
-                    }
-                }
             }
         }
     }
@@ -207,6 +259,11 @@ class GoogleOAuthManager: NSObject, ObservableObject {
     // MARK: - OAuth Flow Helpers
     
     private func buildAuthorizationURL() -> URL {
+        // Generate fresh PKCE pair for each sign-in attempt
+        let verifier = generateCodeVerifier()
+        codeVerifier = verifier
+        let challenge = generateCodeChallenge(from: verifier)
+
         var components = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
         components.queryItems = [
             URLQueryItem(name: "client_id", value: clientId),
@@ -214,7 +271,10 @@ class GoogleOAuthManager: NSObject, ObservableObject {
             URLQueryItem(name: "response_type", value: "code"),
             URLQueryItem(name: "scope", value: scopes.joined(separator: " ")),
             URLQueryItem(name: "access_type", value: "offline"),
-            URLQueryItem(name: "prompt", value: "consent")
+            URLQueryItem(name: "prompt", value: "consent"),
+            // PKCE parameters (RFC 7636)
+            URLQueryItem(name: "code_challenge", value: challenge),
+            URLQueryItem(name: "code_challenge_method", value: "S256")
         ]
         return components.url!
     }
@@ -253,14 +313,19 @@ class GoogleOAuthManager: NSObject, ObservableObject {
         var request = URLRequest(url: tokenURL)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        
-        let bodyParams = [
+
+        var bodyParams = [
             "code": code,
             "client_id": clientId,
             "client_secret": clientSecret,
             "redirect_uri": redirectURI,
             "grant_type": "authorization_code"
         ]
+
+        // Include PKCE code_verifier (RFC 7636)
+        if let verifier = codeVerifier {
+            bodyParams["code_verifier"] = verifier
+        }
         
         request.httpBody = bodyParams
             .map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed) ?? "")" }

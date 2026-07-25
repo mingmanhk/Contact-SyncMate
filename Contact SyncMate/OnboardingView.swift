@@ -19,16 +19,43 @@ struct OnboardingView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Progress dots
-            HStack(spacing: 8) {
-                ForEach(0..<kTotalSteps, id: \.self) { idx in
-                    Circle()
-                        .fill(idx <= currentStep ? Color("BrandIndigo") : Color.secondary.opacity(0.3))
-                        .frame(width: 8, height: 8)
-                        .animation(.easeInOut, value: currentStep)
+            // Top bar: step counter + Skip
+            HStack {
+                Text("Step \(currentStep + 1) of \(kTotalSteps)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                if currentStep < kTotalSteps - 1 {
+                    Button("Skip setup") {
+                        settings.hasCompletedOnboarding = true
+                        isPresented = false
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .buttonStyle(.plain)
                 }
             }
-            .padding(.top, 24)
+            .padding(.horizontal, 32)
+            .padding(.top, 20)
+            .padding(.bottom, 8)
+
+            // Progress bar
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.secondary.opacity(0.15))
+                        .frame(height: 4)
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.accentColor)
+                        .frame(width: geo.size.width * (Double(currentStep + 1) / Double(kTotalSteps)), height: 4)
+                        .animation(.spring(response: 0.4), value: currentStep)
+                }
+            }
+            .frame(height: 4)
+            .padding(.horizontal, 32)
+            .padding(.bottom, 4)
 
             // Step content
             TabView(selection: $currentStep) {
@@ -45,37 +72,57 @@ struct OnboardingView: View {
                     .tag(3)
             }
             .tabViewStyle(.automatic)
-            .animation(.easeInOut, value: currentStep)
+            .animation(.easeInOut(duration: 0.3), value: currentStep)
 
             // Navigation
             HStack {
                 if currentStep > 0 {
-                    Button("Back") {
-                        withAnimation { currentStep -= 1 }
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.25)) { currentStep -= 1 }
+                    } label: {
+                        Label("Back", systemImage: "chevron.left")
                     }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
                 }
 
                 Spacer()
 
                 if currentStep < kTotalSteps - 1 {
-                    Button("Next") {
-                        withAnimation { currentStep += 1 }
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.25)) { currentStep += 1 }
+                    } label: {
+                        Label("Continue", systemImage: "chevron.right")
+                            .labelStyle(RightIconLabelStyle())
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(Color("BrandIndigo"))
+                    .tint(Color.accentColor)
                 } else {
-                    Button("Get Started") {
+                    Button {
                         settings.hasCompletedOnboarding = true
                         isPresented = false
+                    } label: {
+                        Label("Get Started", systemImage: "checkmark")
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(Color("BrandIndigo"))
+                    .tint(Color.accentColor)
                 }
             }
             .padding(.horizontal, 32)
             .padding(.bottom, 24)
+            .padding(.top, 8)
         }
-        .frame(width: 560, height: 480)
+        .frame(width: 560, height: 500)
+    }
+}
+
+// MARK: - Label style helper (icon on the right)
+private struct RightIconLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 4) {
+            configuration.title
+            configuration.icon
+        }
     }
 }
 
@@ -88,7 +135,7 @@ private struct OnboardingWelcomeStep: View {
 
             Image(systemName: "person.2.circle.fill")
                 .font(.system(size: 72))
-                .foregroundStyle(Color("BrandIndigo").gradient)
+                .foregroundStyle(Color.accentColor.gradient)
 
             VStack(spacing: 8) {
                 Text("Welcome to Contact SyncMate")
@@ -109,7 +156,7 @@ private struct OnboardingWelcomeStep: View {
                 FeatureRow(icon: "lock.shield",                text: "100% private — runs entirely on your Mac")
             }
             .padding(16)
-            .background(Color("BrandIndigo").opacity(0.08))
+            .background(Color.accentColor.opacity(0.08))
             .clipShape(RoundedRectangle(cornerRadius: 12))
 
             Spacer()
@@ -156,8 +203,9 @@ private struct OnboardingGoogleStep: View {
             }
 
             if oauth.isAuthenticated, let email = oauth.userEmail {
-                Label(email, systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
+                Label(email, systemImage: AppIcon.statusSuccess)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(Color.appSuccess)
                     .fontWeight(.medium)
             } else {
                 Button(isConnecting ? "Connecting…" : "Connect Google Account") {
@@ -166,7 +214,7 @@ private struct OnboardingGoogleStep: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) { isConnecting = false }
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.red)
+                .tint(Color.appSourceGoogle)
                 .disabled(isConnecting)
             }
 
@@ -192,8 +240,9 @@ private struct OnboardingMacPermissionStep: View {
             Spacer()
 
             Image(systemName: "lock.shield.fill")
+                .symbolRenderingMode(.hierarchical)
                 .font(.system(size: 72))
-                .foregroundStyle(.green.gradient)
+                .foregroundStyle(Color.appSuccess.gradient)
 
             VStack(spacing: 8) {
                 Text("Allow Contacts Access")
@@ -209,14 +258,16 @@ private struct OnboardingMacPermissionStep: View {
 
             switch authStatus {
             case .authorized:
-                Label("Access granted", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
+                Label("Access granted", systemImage: AppIcon.statusSuccess)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(Color.appSuccess)
                     .fontWeight(.medium)
 
             case .denied, .restricted:
                 VStack(spacing: 8) {
-                    Label("Access denied", systemImage: "xmark.circle.fill")
-                        .foregroundStyle(.red)
+                    Label("Access denied", systemImage: AppIcon.statusError)
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(Color.appError)
                     Text("Open System Settings → Privacy & Security → Contacts and enable Contact SyncMate.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -234,7 +285,7 @@ private struct OnboardingMacPermissionStep: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.green)
+                .tint(Color.appAccent)
                 .disabled(isRequesting)
             }
 
@@ -253,19 +304,19 @@ private struct OnboardingSyncStrategyStep: View {
     @StateObject private var settings = AppSettings.shared
 
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 20) {
             Spacer()
 
             Image(systemName: "arrow.triangle.2.circlepath")
-                .font(.system(size: 72))
-                .foregroundStyle(Color("BrandIndigo").gradient)
+                .font(.system(size: 64))
+                .foregroundStyle(Color.accentColor.gradient)
 
-            VStack(spacing: 8) {
-                Text("Choose Sync Strategy")
+            VStack(spacing: 6) {
+                Text("Choose Your Sync Direction")
                     .font(.largeTitle)
                     .fontWeight(.bold)
 
-                Text("How should contacts be synced between Google and Mac?")
+                Text("You can always change this later in Preferences.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -277,13 +328,28 @@ private struct OnboardingSyncStrategyStep: View {
                 Text("Mac → Google").tag(SyncDirection.macToGoogle)
             }
             .pickerStyle(.segmented)
-            .frame(maxWidth: 360)
+            .frame(maxWidth: 380)
 
-            Text(settings.autoSyncDirection.strategySummary)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 360)
+            // Rich description card for selected direction
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: settings.autoSyncDirection.strategyIcon)
+                    .font(.title2)
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 30)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(settings.autoSyncDirection.strategyTitle)
+                        .fontWeight(.semibold)
+                    Text(settings.autoSyncDirection.strategySummary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: 380, alignment: .leading)
+            .background(Color.accentColor.opacity(0.07))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .animation(.easeInOut(duration: 0.2), value: settings.autoSyncDirection)
 
             Spacer()
         }
@@ -291,14 +357,33 @@ private struct OnboardingSyncStrategyStep: View {
     }
 }
 
-// MARK: - SyncDirection Helpers
+// MARK: - SyncDirection Helpers (Onboarding)
 
 private extension SyncDirection {
+    var strategyTitle: String {
+        switch self {
+        case .twoWay:      return "2-Way Sync (Recommended)"
+        case .googleToMac: return "Google is the master"
+        case .macToGoogle: return "Mac is the master"
+        }
+    }
+
+    var strategyIcon: String {
+        switch self {
+        case .twoWay:      return "arrow.triangle.2.circlepath"
+        case .googleToMac: return "arrow.right.circle.fill"
+        case .macToGoogle: return "arrow.left.circle.fill"
+        }
+    }
+
     var strategySummary: String {
         switch self {
-        case .twoWay:      return "Changes on either side are merged and synced in both directions."
-        case .googleToMac: return "Google Contacts are the master copy. Mac contacts are kept in sync."
-        case .macToGoogle: return "Mac Contacts are the master copy. Google contacts are kept in sync."
+        case .twoWay:
+            return "Additions, edits and deletions on either side are merged and kept in sync. Best for most people."
+        case .googleToMac:
+            return "Google Contacts are the source of truth. Changes you make in Google flow to Mac; Mac-only changes are not propagated back."
+        case .macToGoogle:
+            return "Mac Contacts are the source of truth. Changes you make on Mac flow to Google; Google-only changes are not propagated back."
         }
     }
 }

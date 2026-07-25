@@ -117,19 +117,19 @@ struct DeduplicationSettingsView: View {
                     ScoreRangeIndicator(
                         range: "\(autoMergeThreshold)–100",
                         label: "Auto-merge",
-                        color: .green
+                        color: .appSuccess
                     )
                     
                     ScoreRangeIndicator(
                         range: "\(confirmationThreshold)–\(autoMergeThreshold-1)",
                         label: "Ask for confirmation",
-                        color: .orange
+                        color: .appWarning
                     )
                     
                     ScoreRangeIndicator(
                         range: "0–\(confirmationThreshold-1)",
                         label: "Keep separate",
-                        color: .gray
+                        color: .appTextTertiary
                     )
                 }
             }
@@ -206,7 +206,8 @@ struct ScoringRuleRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .foregroundColor(.blue)
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.appAccent)
                 .frame(width: 20)
             
             Text(rule)

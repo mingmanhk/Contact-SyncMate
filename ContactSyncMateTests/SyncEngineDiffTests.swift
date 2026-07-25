@@ -30,6 +30,33 @@ extension UnifiedContact {
 
 final class SyncEngineDiffTests: XCTestCase {
 
+    // Diff behaviour depends on user-configurable settings, and unit tests
+    // share the app's UserDefaults domain. Pin every setting the diff logic
+    // reads so tests stay hermetic regardless of what the user changed in
+    // the running app.
+    private var savedConflict: ConflictResolutionDefault!
+    private var savedMerge2Way: Bool!
+    private var savedForceUpdate: Bool!
+
+    override func setUp() {
+        super.setUp()
+        let s = AppSettings.shared
+        savedConflict    = s.defaultConflictResolution
+        savedMerge2Way   = s.mergeContacts2Way
+        savedForceUpdate = s.forceUpdateAll
+        s.defaultConflictResolution = .alwaysAsk
+        s.mergeContacts2Way = true
+        s.forceUpdateAll = false
+    }
+
+    override func tearDown() {
+        let s = AppSettings.shared
+        s.defaultConflictResolution = savedConflict
+        s.mergeContacts2Way = savedMerge2Way
+        s.forceUpdateAll = savedForceUpdate
+        super.tearDown()
+    }
+
     private func makeEngine() -> SyncEngine {
         SyncEngine(
             googleConnector: GoogleContactsConnector(),

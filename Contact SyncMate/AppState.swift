@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Combine
+import Contacts
 
 /// Central app state observable object
 class AppState: ObservableObject {
@@ -14,22 +15,40 @@ class AppState: ObservableObject {
     @Published var lastSyncDate: Date?
     @Published var lastSyncResult: SyncResult?
     @Published var syncProgress: SyncProgress?
-    
+
     // Account connection states
     @Published var isGoogleConnected = false
     @Published var isMacContactsAuthorized = false
-    
+
     // Current sync session
     @Published var currentSyncSession: SyncSession?
-    
+
+    // Auto-sync scheduling
+    @Published var nextScheduledSync: Date?
+
+    private var cancellables = Set<AnyCancellable>()
+
     init() {
-        // Check authorization states on init
-        checkAuthorizations()
-    }
-    
-    private func checkAuthorizations() {
-        // TODO: Check Mac Contacts authorization
-        // TODO: Check Google OAuth status
+        // Seed initial values
+        isMacContactsAuthorized = CNContactStore.authorizationStatus(for: .contacts) == .authorized
+        isGoogleConnected = GoogleOAuthManager.shared.isAuthenticated
+
+        // Keep isGoogleConnected in sync with the OAuth manager for the lifetime of
+        // the app — sign-in, token refresh, and sign-out all update this automatically.
+        GoogleOAuthManager.shared.$isAuthenticated
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.isGoogleConnected, on: self)
+            .store(in: &cancellables)
+
+        // Re-check Contacts authorisation whenever the app becomes active
+        // (user may have changed it in System Settings while the app was running).
+        NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.isMacContactsAuthorized =
+                    CNContactStore.authorizationStatus(for: .contacts) == .authorized
+            }
+            .store(in: &cancellables)
     }
 }
 
@@ -81,6 +100,7 @@ struct SyncError: Identifiable {
 
 struct SyncSession: Identifiable {
     let id = UUID()
+    var syncSessionId: String?  // Reference for backup linkage
     var mode: SyncMode
     var direction: SyncDirection
     var startTime: Date

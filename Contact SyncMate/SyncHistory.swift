@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 public struct SyncEvent: Codable, Identifiable {
     public let id: UUID
@@ -25,6 +26,39 @@ public final class SyncHistory {
 
     private init() {
         loadFromDisk()
+        // Apply the retention window on startup so stale events from a
+        // previous run are pruned even if the user never logs a new event.
+        queue.async(flags: .barrier) { [weak self] in
+            guard let self else { return }
+            self._events = Self.prune(self._events,
+                                      retentionDays: Self.retentionDays(),
+                                      maxCount: self.maxEvents)
+            self.saveToDisk()
+        }
+    }
+
+    // MARK: - Retention
+
+    /// Reads Settings → General → "Keep history for". `0` means forever.
+    static func retentionDays() -> Int {
+        UserDefaults.standard.object(forKey: "historyRetentionDays") as? Int ?? 30
+    }
+
+    /// Pure pruning function — trims by age first (retentionDays; 0 = keep
+    /// all ages), then by count (keep the most recent `maxCount`).
+    /// Static and side-effect-free so it is directly unit-testable.
+    static func prune(_ events: [SyncEvent], retentionDays: Int, maxCount: Int) -> [SyncEvent] {
+        var result = events
+        if retentionDays > 0 {
+            let cutoff = Calendar.current.date(byAdding: .day,
+                                               value: -retentionDays,
+                                               to: Date()) ?? .distantPast
+            result = result.filter { $0.timestamp >= cutoff }
+        }
+        if result.count > maxCount {
+            result.removeFirst(result.count - maxCount)
+        }
+        return result
     }
 
     // MARK: - Public API
@@ -35,9 +69,9 @@ public final class SyncHistory {
         queue.async(flags: .barrier) { [weak self] in
             guard let self = self else { return }
             self._events.append(event)
-            if self._events.count > self.maxEvents {
-                self._events.removeFirst(self._events.count - self.maxEvents)
-            }
+            self._events = Self.prune(self._events,
+                                      retentionDays: Self.retentionDays(),
+                                      maxCount: self.maxEvents)
             self.saveToDisk()
         }
         return event
@@ -66,7 +100,7 @@ public final class SyncHistory {
         if let appSupport = try? fm.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true) {
             let bundleID = Bundle.main.bundleIdentifier ?? "ContactSync"
             let dir = appSupport.appendingPathComponent(bundleID, isDirectory: true)
-            if ((try? dir.checkResourceIsReachable()) == nil) ?? true {
+            if (try? dir.checkResourceIsReachable()) != true {
                 try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
             }
             return dir

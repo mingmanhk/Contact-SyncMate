@@ -113,14 +113,18 @@ struct ContactDiffView: View {
                     .fontWeight(.semibold)
                 Divider()
                 HStack {
-                    Image(systemName: "g.circle.fill").foregroundStyle(.red)
+                    Image(systemName: AppIcon.sourceGoogle)
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(Color.appSourceGoogle)
                     Text("Google")
                 }
                 .frame(maxWidth: .infinity)
                 .fontWeight(.semibold)
                 Divider()
                 HStack {
-                    Image(systemName: "desktopcomputer").foregroundStyle(.blue)
+                    Image(systemName: AppIcon.sourceApple)
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(Color.appSourceApple)
                     Text("Mac")
                 }
                 .frame(maxWidth: .infinity)
@@ -148,7 +152,7 @@ struct ContactDiffView: View {
                             .font(.subheadline)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 8)
-                            .foregroundStyle(isConflict ? Color.orange : .primary)
+                            .foregroundStyle(isConflict ? Color.appWarning : .primary)
 
                         Divider()
 
@@ -156,10 +160,10 @@ struct ContactDiffView: View {
                             .font(.subheadline)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 8)
-                            .foregroundStyle(isConflict ? Color.orange : .primary)
+                            .foregroundStyle(isConflict ? Color.appWarning : .primary)
                     }
                     .listRowInsets(EdgeInsets(top: 6, leading: 24, bottom: 6, trailing: 24))
-                    .background(isConflict ? Color.orange.opacity(0.06) : .clear)
+                    .background(isConflict ? Color.appWarning.opacity(0.08) : .clear)
                 }
             }
             .listStyle(.plain)
@@ -186,15 +190,23 @@ struct ContactDiffView: View {
             // Navigation + apply
             HStack {
                 // Prev / Next
-                HStack(spacing: 8) {
-                    Button("← Prev") {
+                HStack(spacing: 4) {
+                    Button {
                         if currentIndex > 0 { currentIndex -= 1 }
+                    } label: {
+                        Label("Previous", systemImage: "chevron.left")
+                            .labelStyle(.iconOnly)
                     }
+                    .buttonStyle(.bordered)
                     .disabled(currentIndex == 0)
 
-                    Button("Next →") {
+                    Button {
                         if currentIndex < conflicts.count - 1 { currentIndex += 1 }
+                    } label: {
+                        Label("Next", systemImage: "chevron.right")
+                            .labelStyle(.iconOnly)
                     }
+                    .buttonStyle(.bordered)
                     .disabled(currentIndex >= conflicts.count - 1)
                 }
 
@@ -210,7 +222,7 @@ struct ContactDiffView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(Color("BrandIndigo"))
+                .tint(Color.accentColor)
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 16)

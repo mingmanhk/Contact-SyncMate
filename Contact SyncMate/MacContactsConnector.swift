@@ -259,12 +259,13 @@ class MacContactsConnector: ObservableObject {
             CNContactPostalAddressesKey as CNKeyDescriptor,
             CNContactUrlAddressesKey as CNKeyDescriptor,
             CNContactBirthdayKey as CNKeyDescriptor,
-            CNContactNoteKey as CNKeyDescriptor,
+            // CNContactNoteKey requires com.apple.developer.contacts.notes entitlement (restricted by Apple)
             CNContactImageDataKey as CNKeyDescriptor,
             CNContactImageDataAvailableKey as CNKeyDescriptor,
             CNContactDatesKey as CNKeyDescriptor,
             CNContactSocialProfilesKey as CNKeyDescriptor,
-            CNContactInstantMessageAddressesKey as CNKeyDescriptor
+            CNContactInstantMessageAddressesKey as CNKeyDescriptor,
+            CNContactFormatter.descriptorForRequiredKeys(for: .fullName)
         ]
     }
     
@@ -275,6 +276,23 @@ class MacContactsConnector: ObservableObject {
         // Return nil to skip Me-card filtering when unavailable.
         return nil
     }
+
+    // MARK: - Notes Field Availability
+    //
+    // Reading and writing the Contacts `note` field requires the special
+    // `com.apple.developer.contacts.notes` entitlement, which must be
+    // granted by Apple in the developer portal. Without it the API returns
+    // an empty string and writes silently fail.
+    //
+    // This flag is checked at runtime by:
+    //   • SyncEngine → skips the notes field in diff + apply when false.
+    //   • SettingsView → Sync Fields → Notes toggle is disabled with an
+    //     explanatory footer.
+    //
+    // To re-enable Notes sync: get the entitlement approved, re-add the
+    // key to the .entitlements file, and change this to `true` (or make
+    // it read the entitlement at runtime).
+    static let notesFieldAvailable: Bool = false
     
     // MARK: - Deduplication Support
     

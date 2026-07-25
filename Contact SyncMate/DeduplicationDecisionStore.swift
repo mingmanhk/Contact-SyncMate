@@ -32,7 +32,7 @@ class DeduplicationDecisionStore: ObservableObject {
         let directory = (appSupport ?? fm.temporaryDirectory)
             .appendingPathComponent(bundleID, isDirectory: true)
         
-        if ((try? directory.checkResourceIsReachable()) == nil) ?? true {
+        if (try? directory.checkResourceIsReachable()) != true {
             try? fm.createDirectory(at: directory, withIntermediateDirectories: true)
         }
         

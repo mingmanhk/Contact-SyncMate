@@ -285,9 +285,9 @@ class MacContactsExporter: ObservableObject {
                 addCell("")
             }
             
-            // Notes
-            addCell(contact.note)
-            
+            // Notes (requires restricted entitlement — safely skip if unavailable)
+            addCell(contact.isKeyAvailable(CNContactNoteKey) ? contact.note : "")
+
             // Contact identifier
             addCell(contact.identifier)
             
@@ -517,9 +517,9 @@ class MacContactsExporter: ObservableObject {
                 row.append("")
             }
             
-            // Notes
-            row.append(contact.note)
-            
+            // Notes (requires restricted entitlement — safely skip if unavailable)
+            row.append(contact.isKeyAvailable(CNContactNoteKey) ? contact.note : "")
+
             // Contact identifier
             row.append(contact.identifier)
             

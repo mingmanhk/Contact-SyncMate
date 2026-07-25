@@ -59,7 +59,7 @@ struct DeduplicationConfirmationView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundColor(.orange)
+                    .foregroundStyle(Color.appWarning)
                     .font(.title2)
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -67,7 +67,7 @@ struct DeduplicationConfirmationView: View {
                         .font(.headline)
                     Text("\(duplicateGroups.count) group\(duplicateGroups.count == 1 ? "" : "s") found")
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 }
                 
                 Spacer()
@@ -75,7 +75,7 @@ struct DeduplicationConfirmationView: View {
             
             Text("These contacts appear to be the same person. Please confirm how to handle them.")
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
         }
         .padding()
         .background(Color(NSColor.controlBackgroundColor))
@@ -85,7 +85,7 @@ struct DeduplicationConfirmationView: View {
         VStack(spacing: 16) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 60))
-                .foregroundColor(.green)
+                .foregroundStyle(Color.appSuccess)
             
             Text("No Duplicates Found")
                 .font(.title2)
@@ -93,7 +93,7 @@ struct DeduplicationConfirmationView: View {
             
             Text("All contacts appear to be unique.")
                 .font(.body)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -141,7 +141,7 @@ struct DeduplicationConfirmationView: View {
             
             Text("\(decisionsMadeCount) of \(duplicateGroups.count) decided")
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
             
             Button("Apply Decisions") {
                 onDecisionsMade(decisions)
@@ -175,25 +175,73 @@ struct DuplicateGroupCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Header with score and type
-            HStack {
+            HStack(alignment: .top) {
                 scoreIndicator
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(group.groupType.description)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(group.groupType.description)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        // AI source badge
+                        if let source = group.aiSourceLabel {
+                            HStack(spacing: 3) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 9))
+                                Text(source)
+                                    .font(.system(size: 10, weight: .medium))
+                            }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.accentColor.opacity(0.12))
+                            .foregroundStyle(Color.accentColor)
+                            .clipShape(Capsule())
+                        }
+                    }
+
                     Text(group.matchReason)
                         .font(.subheadline)
                         .fontWeight(.medium)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    // AI score enhancement indicator
+                    if let aiScore = group.aiEnhancedScore, aiScore != group.matchScore {
+                        HStack(spacing: 4) {
+                            Image(systemName: aiScore > group.matchScore ? "arrow.up.circle.fill" : "arrow.down.circle.fill")
+                                .font(.caption2)
+                                .foregroundStyle(aiScore > group.matchScore ? .green : .orange)
+                            Text("AI adjusted score: \(group.matchScore) → \(aiScore)")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
-                
+
                 Spacer()
-                
-                if group.shouldAutoMerge {
-                    Label("Auto-merge", systemImage: "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(.green)
+
+                VStack(alignment: .trailing, spacing: 4) {
+                    if group.shouldAutoMerge {
+                        Label("Auto-merge", systemImage: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(Color.appSuccess)
+                    }
+
+                    // AI suggested action badge
+                    if let aiAction = group.aiMatchResult?.suggestedAction,
+                       group.userDecision == nil {
+                        HStack(spacing: 3) {
+                            Image(systemName: "lightbulb.fill")
+                                .font(.system(size: 9))
+                            Text("AI: \(aiAction.aiLabel)")
+                                .font(.system(size: 10, weight: .medium))
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(aiActionColor(aiAction).opacity(0.12))
+                        .foregroundStyle(aiActionColor(aiAction))
+                        .clipShape(Capsule())
+                    }
                 }
             }
             
@@ -206,13 +254,56 @@ struct DuplicateGroupCard: View {
                 }
             }
             
+            // AI reasoning block (shown when AI analysis is available)
+            if let ai = group.aiMatchResult, !ai.reasoning.isEmpty {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .font(.caption)
+                        .foregroundStyle(Color.accentColor)
+                        .padding(.top, 1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("AI Analysis")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.accentColor)
+                        Text(ai.reasoning)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        // Signal chips
+                        if !ai.matchSignals.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 4) {
+                                    ForEach(ai.matchSignals) { signal in
+                                        Text(signal.label)
+                                            .font(.system(size: 10))
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(
+                                                (signal.isPositive ? Color.appSuccess : Color.appWarning).opacity(0.12)
+                                            )
+                                            .foregroundStyle(signal.isPositive ? .green : .orange)
+                                            .clipShape(Capsule())
+                                    }
+                                }
+                            }
+                            .padding(.top, 2)
+                        }
+                    }
+                }
+                .padding(8)
+                .background(Color.accentColor.opacity(0.05))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+
             Divider()
-            
+
             // Decision buttons
             VStack(alignment: .leading, spacing: 8) {
                 Text("Your decision:")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
                 
                 HStack(spacing: 8) {
                     ForEach([DuplicateDecision.merge, .keepSeparate, .skip], id: \.self) { dec in
@@ -264,31 +355,37 @@ struct DuplicateGroupCard: View {
                 Circle()
                     .stroke(Color.gray.opacity(0.2), lineWidth: 3)
                     .frame(width: 50, height: 50)
-                
+
                 Circle()
-                    .trim(from: 0, to: CGFloat(group.matchScore) / 100.0)
+                    .trim(from: 0, to: CGFloat(group.effectiveScore) / 100.0)
                     .stroke(scoreColor, lineWidth: 3)
                     .frame(width: 50, height: 50)
                     .rotationEffect(.degrees(-90))
-                
-                Text("\(group.matchScore)")
+                    .animation(.easeOut(duration: 0.4), value: group.effectiveScore)
+
+                Text("\(group.effectiveScore)")
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(scoreColor)
+                    .foregroundStyle(scoreColor)
             }
-            
-            Text("Match")
+
+            Text(group.hasAIAnalysis ? "AI Score" : "Match")
                 .font(.caption2)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
         }
     }
     
     private var scoreColor: Color {
-        if group.matchScore >= 80 {
-            return .green
-        } else if group.matchScore >= 50 {
-            return .orange
-        } else {
-            return .red
+        let score = group.effectiveScore
+        if score >= 80 { return .green }
+        if score >= 50 { return .orange }
+        return .red
+    }
+
+    private func aiActionColor(_ action: DuplicateDecision) -> Color {
+        switch action {
+        case .merge:        return .green
+        case .keepSeparate: return .orange
+        case .skip:         return .gray
         }
     }
 }
@@ -301,7 +398,7 @@ struct ContactCandidateRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: candidate.source == .google ? "g.circle.fill" : "desktopcomputer")
-                .foregroundColor(candidate.source == .google ? .blue : .gray)
+                .foregroundStyle(candidate.source == .google ? .blue : .gray)
                 .font(.title3)
             
             VStack(alignment: .leading, spacing: 2) {
@@ -312,13 +409,13 @@ struct ContactCandidateRow: View {
                 if let email = candidate.primaryEmail {
                     Text(email)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 }
                 
                 if let phone = candidate.primaryPhone {
                     Text(phone)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 }
             }
             
@@ -355,7 +452,7 @@ struct DecisionButton: View {
                     RoundedRectangle(cornerRadius: 6)
                         .fill(isSelected ? buttonColor : Color.gray.opacity(0.1))
                 )
-                .foregroundColor(isSelected ? .white : .primary)
+                .foregroundStyle(isSelected ? .white : .primary)
         }
         .buttonStyle(.plain)
     }
@@ -404,7 +501,7 @@ struct MergePreviewSheet: View {
                                     Label("\(preview.conflictCount) conflict\(preview.conflictCount == 1 ? "" : "s")",
                                           systemImage: "exclamationmark.triangle.fill")
                                         .font(.caption)
-                                        .foregroundColor(.orange)
+                                        .foregroundStyle(Color.appWarning)
                                 }
                             }
                             
@@ -485,7 +582,7 @@ struct MergeChangeRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: change.isConflict ? "exclamationmark.circle.fill" : "arrow.right.circle")
-                .foregroundColor(change.isConflict ? .orange : .blue)
+                .foregroundStyle(change.isConflict ? .orange : .blue)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(change.fieldName)
@@ -496,7 +593,7 @@ struct MergeChangeRow: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Values found:")
                             .font(.caption2)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
                         
                         ForEach(change.values, id: \.self) { value in
                             Text("• \(value)")
@@ -505,12 +602,12 @@ struct MergeChangeRow: View {
                         
                         Text("Chosen: \(change.chosenValue)")
                             .font(.caption2)
-                            .foregroundColor(.green)
+                            .foregroundStyle(Color.appSuccess)
                     }
                 } else {
                     Text(change.chosenValue)
                         .font(.caption2)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 }
             }
             
@@ -519,7 +616,7 @@ struct MergeChangeRow: View {
         .padding(8)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(change.isConflict ? Color.orange.opacity(0.1) : Color(NSColor.controlBackgroundColor))
+                .fill(change.isConflict ? Color.appWarning.opacity(0.10) : Color.appSurface)
         )
     }
 }

@@ -8,6 +8,7 @@
 import Foundation
 import Contacts
 import Combine
+import SwiftUI
 
 // MARK: - String helpers
 
@@ -76,26 +77,43 @@ class SyncEngine: ObservableObject {
             // Fetch contacts from both sides
             let googleContacts = try await googleConnector.fetchAllContacts()
             let macContacts = try macConnector.fetchAllContacts()
-            
+
             // Convert to unified format
             let unifiedGoogleContacts = googleContacts.map { ContactMapper.toUnified(from: $0) }
             let unifiedMacContacts = macContacts.map { ContactMapper.toUnified(from: $0) }
-            
+
+            // Create sync session ID for backup linkage
+            let syncSessionId = UUID().uuidString
+
+            // Create pre-sync backup before any changes — gated on the
+            // user's "Automatic Backups" preference. When disabled the sync
+            // proceeds without a snapshot. Default is enabled (recommended).
+            if AppSettings.shared.autoBackupEnabled {
+                _ = try await ContactBackupManager.shared.createPreSyncBackup(
+                    googleContacts: unifiedGoogleContacts,
+                    macContacts: unifiedMacContacts,
+                    syncSessionId: syncSessionId,
+                    syncDirection: "\(direction)",
+                    syncMode: "manual"
+                )
+            }
+
             // Compute differences
             let changes = computeChanges(
                 googleContacts: unifiedGoogleContacts,
                 macContacts: unifiedMacContacts,
                 direction: direction
             )
-            
-            // Create session
-            let session = SyncSession(
+
+            // Create session with backup reference
+            var session = SyncSession(
                 mode: .manual,
                 direction: direction,
                 startTime: Date(),
                 contactChanges: changes
             )
-            
+            session.syncSessionId = syncSessionId
+
             return session
             
         } catch {
@@ -155,21 +173,36 @@ class SyncEngine: ObservableObject {
                 case .add:
                     try await performAdd(change: change, direction: session.direction)
                     added += 1
-                    
+
                 case .update:
                     try await performUpdate(change: change, direction: session.direction)
                     updated += 1
-                    
+
                 case .delete:
                     try await performDelete(change: change, direction: session.direction)
                     deleted += 1
-                    
+
                 case .merge:
                     try await performMerge(change: change, direction: session.direction)
                     merged += 1
-                    
+
                 case .skip:
                     skipped += 1
+                }
+
+                // Per-change audit trail: every applied change is recorded
+                // with contact, action, direction, field summary, and the
+                // sync-session ID that links it to its pre/post backups —
+                // so any individual change can be traced and rolled back
+                // via the backup version history.
+                if action != .skip {
+                    SyncHistory.shared.log(
+                        source: "SyncEngine",
+                        action: "change.\(action.rawValue.lowercased())",
+                        details: "\(change.contactName) [\(change.direction)] " +
+                                 "session=\(session.syncSessionId ?? "-") " +
+                                 "fields=\(change.changes.joined(separator: "; "))"
+                    )
                 }
             } catch {
                 errors.append(SyncError(
@@ -177,11 +210,16 @@ class SyncEngine: ObservableObject {
                     message: error.localizedDescription,
                     timestamp: Date()
                 ))
+                SyncHistory.shared.log(
+                    source: "SyncEngine",
+                    action: "change.failed",
+                    details: "\(change.contactName) [\(action.rawValue)]: \(error.localizedDescription)"
+                )
             }
         }
         
         let endTime = Date()
-        
+
         // Create result
         let result = SyncResult(
             mode: session.mode,
@@ -195,10 +233,33 @@ class SyncEngine: ObservableObject {
             skipped: skipped,
             errors: errors
         )
-        
+
+        // Create post-sync backup with actual final state.
+        // Gated on AppSettings.autoBackupEnabled — same as the pre-sync snapshot.
+        if AppSettings.shared.autoBackupEnabled, let syncSessionId = session.syncSessionId {
+            do {
+                let googleContacts = try await googleConnector.fetchAllContacts()
+                let macContacts = try macConnector.fetchAllContacts()
+
+                _ = try await ContactBackupManager.shared.createPostSyncBackup(
+                    googleContacts: googleContacts.map { ContactMapper.toUnified(from: $0) },
+                    macContacts: macContacts.map { ContactMapper.toUnified(from: $0) },
+                    syncSessionId: syncSessionId,
+                    changesSummary: "Added: \(added), Updated: \(updated), Deleted: \(deleted), Merged: \(merged)"
+                )
+            } catch {
+                // Log but don't fail the sync if backup fails
+                SyncHistory.shared.log(
+                    source: "SyncEngine",
+                    action: "postSyncBackup.failed",
+                    details: error.localizedDescription
+                )
+            }
+        }
+
         // Save to history
         try? await saveToHistory(result: result)
-        
+
         return result
     }
     
@@ -207,16 +268,41 @@ class SyncEngine: ObservableObject {
         guard settings.autoSyncEnabled else {
             throw SyncEngineError.autoSyncDisabled
         }
-        
+
         // Check conditions
         if !checkAutoSyncConditions() {
             throw SyncEngineError.conditionsNotMet
         }
-        
-        // Use incremental sync with sync tokens
+
+        // Use incremental sync with sync tokens.
         let direction = settings.autoSyncDirection
-        let session = try await prepareManualSync(direction: direction)
-        
+        var session = try await prepareManualSync(direction: direction)
+        session.mode = .automatic
+
+        // Run deduplication scan if enabled
+        if settings.detectGoogleDuplicates {
+            let dedupCoordinator = DeduplicationCoordinator()
+            let googleContacts = session.contactChanges.compactMap { $0.sourceContact }.filter { $0.googleResourceName != nil }
+            let macContacts = session.contactChanges.compactMap { $0.targetContact }.filter { $0.macContactIdentifier != nil }
+            if !googleContacts.isEmpty || !macContacts.isEmpty {
+                let result = await dedupCoordinator.scanForDuplicates(
+                    googleContacts: googleContacts,
+                    macContacts: macContacts,
+                    existingMappings: mappingStore.getAllMappings(),
+                    // Silent auto-merge is opt-in (Settings → General →
+                    // Confirmations). When off, every merge goes to review.
+                    autoApplyIfSafe: settings.allowSilentAutoMerge
+                )
+                if result.needsUserConfirmation {
+                    SyncHistory.shared.log(
+                        source: "SyncEngine",
+                        action: "autoSync.dedupDeferred",
+                        details: "\(result.groupsNeedingConfirmation.count) duplicate groups need user review"
+                    )
+                }
+            }
+        }
+
         // Auto-execute without user preview
         return try await executeSync(session: session)
     }
@@ -286,9 +372,6 @@ class SyncEngine: ObservableObject {
         var changes: [ContactChange] = []
 
         // Build lookup maps from mappings
-        let mappingByGoogle = Dictionary(uniqueKeysWithValues: mappings.map { ($0.googleResourceName, $0) })
-        let mappingByMac    = Dictionary(uniqueKeysWithValues: mappings.map { ($0.macContactIdentifier, $0) })
-
         var processedGoogle = Set<String>()
         var processedMac    = Set<String>()
 
@@ -334,11 +417,30 @@ class SyncEngine: ObservableObject {
                 let mChanged  = mModified > syncedAt
 
                 if gChanged && mChanged {
-                    changes.append(ContactChange(
-                        contactName: g.displayName, action: .merge,
-                        direction: .twoWay,
-                        changes: fieldDiffs + ["⚠️ Conflict: both sides changed since last sync"],
-                        sourceContact: g, targetContact: m))
+                    // Both sides changed since last sync — check conflict resolution preference
+                    switch settings.defaultConflictResolution {
+                    case .alwaysAsk:
+                        // Present as a merge/conflict for the user to resolve
+                        changes.append(ContactChange(
+                            contactName: g.displayName, action: .merge,
+                            direction: .twoWay,
+                            changes: fieldDiffs + ["⚠️ Conflict: both sides changed since last sync"],
+                            sourceContact: g, targetContact: m))
+                    case .preferGoogle:
+                        // Auto-resolve: Google wins, push to Mac silently
+                        changes.append(ContactChange(
+                            contactName: g.displayName, action: .update,
+                            direction: .googleToMac,
+                            changes: fieldDiffs + ["Auto-resolved: Google preferred"],
+                            sourceContact: g, targetContact: m))
+                    case .preferMac:
+                        // Auto-resolve: Mac wins, push to Google silently
+                        changes.append(ContactChange(
+                            contactName: m.displayName, action: .update,
+                            direction: .macToGoogle,
+                            changes: fieldDiffs + ["Auto-resolved: Mac preferred"],
+                            sourceContact: m, targetContact: g))
+                    }
                 } else if gChanged {
                     changes.append(ContactChange(
                         contactName: g.displayName, action: .update,
@@ -442,7 +544,8 @@ class SyncEngine: ObservableObject {
 
     // MARK: - Field Diff
 
-    /// Returns human-readable list of changed fields between two contacts
+    /// Returns human-readable list of changed fields between two contacts.
+    /// Only includes fields that are enabled in the user's per-field sync settings.
     private func diffFields(_ a: UnifiedContact, _ b: UnifiedContact) -> [String] {
         var diffs: [String] = []
 
@@ -450,13 +553,18 @@ class SyncEngine: ObservableObject {
             if lhs != rhs { diffs.append("\(label) changed") }
         }
 
-        check("First name",   a.givenName,       b.givenName)
-        check("Last name",    a.familyName,       b.familyName)
-        check("Middle name",  a.middleName,       b.middleName)
-        check("Company",      a.organizationName, b.organizationName)
-        check("Job title",    a.jobTitle,         b.jobTitle)
-        check("Note",         a.note,             b.note)
+        // Core name / identity fields are always diffed
+        check("First name",  a.givenName,       b.givenName)
+        check("Last name",   a.familyName,       b.familyName)
+        check("Middle name", a.middleName,       b.middleName)
+        check("Company",     a.organizationName, b.organizationName)
 
+        // Per-field toggles from Settings → Common Sync → Fields to Sync
+        if settings.syncJobTitle  { check("Job title", a.jobTitle, b.jobTitle) }
+        if settings.syncNotes     { check("Note",      a.note,     b.note)     }
+        if settings.syncBirthday  { check("Birthday",  a.birthday, b.birthday) }
+
+        // Multi-value fields: compare as sets so ordering doesn't cause false positives
         let aPhones = Set(a.phoneNumbers.map(\.value))
         let bPhones = Set(b.phoneNumbers.map(\.value))
         if aPhones != bPhones { diffs.append("Phone numbers changed") }
@@ -465,11 +573,47 @@ class SyncEngine: ObservableObject {
         let bEmails = Set(b.emailAddresses.map { $0.value.lowercased() })
         if aEmails != bEmails { diffs.append("Email addresses changed") }
 
+        if settings.syncAddresses {
+            let aAddr = Set(a.postalAddresses.map { $0.formattedAddress })
+            let bAddr = Set(b.postalAddresses.map { $0.formattedAddress })
+            if aAddr != bAddr { diffs.append("Addresses changed") }
+        }
+
+        if settings.syncWebsites {
+            let aUrls = Set(a.urls.map(\.value))
+            let bUrls = Set(b.urls.map(\.value))
+            if aUrls != bUrls { diffs.append("Websites changed") }
+        }
+
         if settings.syncPhotos {
             if (a.photoData == nil) != (b.photoData == nil) { diffs.append("Photo changed") }
         }
 
         return diffs
+    }
+
+    /// Strip fields that the user has disabled in Settings → Common Sync → Fields to Sync
+    /// from a unified contact before it is written to either side.
+    /// This ensures we never overwrite a field on the target that the user opted out of syncing.
+    ///
+    /// Also applies the user's opt-in name casing convention
+    /// (Settings → Sync Fields → Name Formatting). Formatting happens at
+    /// write time only — reads and diff comparisons are unaffected, so a
+    /// name that differs only in casing does not create spurious diffs
+    /// (ContactNormalizer already compares case-insensitively).
+    private func applyFieldSettings(to contact: UnifiedContact) -> UnifiedContact {
+        var c = contact
+        if !settings.syncNotes     { c.note           = nil }
+        if !settings.syncBirthday  { c.birthday        = nil }
+        if !settings.syncWebsites  { c.urls            = []  }
+        if !settings.syncAddresses { c.postalAddresses = []  }
+        if !settings.syncJobTitle  { c.jobTitle        = nil }
+        if !settings.syncPhotos    { c.photoData       = nil }
+
+        if settings.nameFormattingEnabled {
+            NameFormattingEngine.applyToContact(&c, convention: settings.nameCasingConvention)
+        }
+        return c
     }
 
     // MARK: - Fuzzy Match
@@ -502,9 +646,11 @@ class SyncEngine: ObservableObject {
     // MARK: - Apply Changes
 
     private func performAdd(change: ContactChange, direction: SyncDirection) async throws {
-        guard let source = change.sourceContact else {
+        guard let rawSource = change.sourceContact else {
             throw SyncEngineError.missingContactData(change.contactName)
         }
+        // Strip any fields the user has turned off before writing to either side
+        let source = applyFieldSettings(to: rawSource)
 
         switch direction {
         case .googleToMac:
@@ -546,9 +692,11 @@ class SyncEngine: ObservableObject {
     }
 
     private func performUpdate(change: ContactChange, direction: SyncDirection) async throws {
-        guard let source = change.sourceContact else {
+        guard let rawSource = change.sourceContact else {
             throw SyncEngineError.missingContactData(change.contactName)
         }
+        // Strip any fields the user has turned off before writing to either side
+        let source = applyFieldSettings(to: rawSource)
 
         switch direction {
         case .googleToMac:
@@ -564,10 +712,9 @@ class SyncEngine: ObservableObject {
                 lastSyncedAt: Date()))
 
         case .macToGoogle:
-            // Update Google contact with Mac data
+            // Update Google contact with Mac data, preserving the existing resource name
             guard let gID = change.targetContact?.googleResourceName else { return }
-            var googleContact = ContactMapper.toGoogle(from: source)
-            googleContact = GoogleContact(id: gID) // preserve resource name
+            var googleContact = GoogleContact(id: gID)
             ContactMapper.applyToGoogle(from: source, to: &googleContact)
             _ = try await googleConnector.updateContact(googleContact)
             if let mID = source.macContactIdentifier {
@@ -625,16 +772,160 @@ class SyncEngine: ObservableObject {
     }
 
     private func performMerge(change: ContactChange, direction: SyncDirection) async throws {
-        // Merge is a user-guided operation — by the time executeSync runs,
-        // the user should have resolved conflicts (userOverride set to .add/.update/.skip).
-        // If it reaches here unresolved, treat as skip and flag for review.
-        SyncHistory.shared.log(source: "SyncEngine", action: "merge.deferred",
-            details: "\(change.contactName) — needs user review")
+        // If the user has chosen an override action, execute that instead
+        if let override = change.userOverride {
+            switch override {
+            case .add:
+                try await performAdd(change: change, direction: direction)
+                return
+            case .update:
+                try await performUpdate(change: change, direction: direction)
+                return
+            case .skip:
+                SyncHistory.shared.log(source: "SyncEngine", action: "merge.skipped",
+                    details: "\(change.contactName) — user chose to skip")
+                return
+            case .delete:
+                try await performDelete(change: change, direction: direction)
+                return
+            case .merge:
+                break // fall through to merge logic below
+            }
+        }
+
+        // Merge: combine data from both source and target, then write to both sides
+        guard let source = change.sourceContact,
+              let target = change.targetContact else {
+            SyncHistory.shared.log(source: "SyncEngine", action: "merge.deferred",
+                details: "\(change.contactName) — missing contact data for merge")
+            return
+        }
+
+        // Build a merged contact: prefer source for non-empty fields, keep target's extras
+        let merged = mergeContacts(primary: source, secondary: target)
+        let finalMerged = applyFieldSettings(to: merged)
+
+        // Write merged result to Mac side
+        if let mID = target.macContactIdentifier ?? source.macContactIdentifier {
+            if let existing = try macConnector.fetchContact(withIdentifier: mID) {
+                let mutable = existing.mutableCopy() as! CNMutableContact
+                ContactMapper.applyToMac(from: finalMerged, to: mutable)
+                try macConnector.updateContact(mutable)
+            }
+        }
+
+        // Write merged result to Google side
+        if let gID = target.googleResourceName ?? source.googleResourceName {
+            var googleContact = GoogleContact(id: gID)
+            ContactMapper.applyToGoogle(from: finalMerged, to: &googleContact)
+            _ = try await googleConnector.updateContact(googleContact)
+        }
+
+        // Save mapping
+        if let gID = source.googleResourceName ?? target.googleResourceName,
+           let mID = source.macContactIdentifier ?? target.macContactIdentifier {
+            mappingStore.saveMapping(ContactMapping(
+                googleResourceName: gID,
+                macContactIdentifier: mID,
+                lastSyncedAt: Date()))
+        }
+
+        SyncHistory.shared.log(source: "SyncEngine", action: "merge",
+            details: "\(change.contactName) — merged from both sources")
+    }
+
+    /// Merge two contacts: primary wins for non-empty fields, secondary fills gaps
+    private func mergeContacts(primary: UnifiedContact, secondary: UnifiedContact) -> UnifiedContact {
+        UnifiedContact(
+            id: primary.id,
+            googleResourceName: primary.googleResourceName ?? secondary.googleResourceName,
+            macContactIdentifier: primary.macContactIdentifier ?? secondary.macContactIdentifier,
+            givenName: primary.givenName?.isEmpty == false ? primary.givenName : secondary.givenName,
+            middleName: primary.middleName?.isEmpty == false ? primary.middleName : secondary.middleName,
+            familyName: primary.familyName?.isEmpty == false ? primary.familyName : secondary.familyName,
+            namePrefix: primary.namePrefix?.isEmpty == false ? primary.namePrefix : secondary.namePrefix,
+            nameSuffix: primary.nameSuffix?.isEmpty == false ? primary.nameSuffix : secondary.nameSuffix,
+            nickname: primary.nickname?.isEmpty == false ? primary.nickname : secondary.nickname,
+            phoneticGivenName: primary.phoneticGivenName ?? secondary.phoneticGivenName,
+            phoneticMiddleName: primary.phoneticMiddleName ?? secondary.phoneticMiddleName,
+            phoneticFamilyName: primary.phoneticFamilyName ?? secondary.phoneticFamilyName,
+            organizationName: primary.organizationName?.isEmpty == false ? primary.organizationName : secondary.organizationName,
+            department: primary.department?.isEmpty == false ? primary.department : secondary.department,
+            jobTitle: primary.jobTitle?.isEmpty == false ? primary.jobTitle : secondary.jobTitle,
+            // Merge lists: combine unique entries
+            phoneNumbers: mergePhoneNumbers(primary.phoneNumbers, secondary.phoneNumbers),
+            emailAddresses: mergeEmails(primary.emailAddresses, secondary.emailAddresses),
+            postalAddresses: mergeAddresses(primary.postalAddresses, secondary.postalAddresses),
+            urls: mergeURLs(primary.urls, secondary.urls),
+            birthday: primary.birthday ?? secondary.birthday,
+            note: mergeNotes(primary.note, secondary.note),
+            photoData: primary.photoData ?? secondary.photoData,
+            lastModified: Date()
+        )
+    }
+
+    private func mergePhoneNumbers(_ a: [UnifiedContact.PhoneNumber], _ b: [UnifiedContact.PhoneNumber]) -> [UnifiedContact.PhoneNumber] {
+        var result = a
+        let existingValues = Set(a.map { $0.value.filter(\.isNumber) })
+        for phone in b where !existingValues.contains(phone.value.filter(\.isNumber)) {
+            result.append(phone)
+        }
+        return result
+    }
+
+    private func mergeEmails(_ a: [UnifiedContact.EmailAddress], _ b: [UnifiedContact.EmailAddress]) -> [UnifiedContact.EmailAddress] {
+        var result = a
+        let existing = Set(a.map { $0.value.lowercased() })
+        for email in b where !existing.contains(email.value.lowercased()) {
+            result.append(email)
+        }
+        return result
+    }
+
+    private func mergeAddresses(_ a: [UnifiedContact.PostalAddress], _ b: [UnifiedContact.PostalAddress]) -> [UnifiedContact.PostalAddress] {
+        // Keep all from primary; add from secondary only if street differs
+        var result = a
+        let existingStreets = Set(a.compactMap { $0.street?.lowercased() })
+        for addr in b {
+            if let street = addr.street?.lowercased(), !existingStreets.contains(street) {
+                result.append(addr)
+            }
+        }
+        return result
+    }
+
+    private func mergeURLs(_ a: [UnifiedContact.Url], _ b: [UnifiedContact.Url]) -> [UnifiedContact.Url] {
+        var result = a
+        let existing = Set(a.map { $0.value.lowercased() })
+        for url in b where !existing.contains(url.value.lowercased()) {
+            result.append(url)
+        }
+        return result
+    }
+
+    private func mergeNotes(_ a: String?, _ b: String?) -> String? {
+        switch (a, b) {
+        case (nil, nil): return nil
+        case (let v?, nil): return v
+        case (nil, let v?): return v
+        case (let v1?, let v2?):
+            if v1 == v2 { return v1 }
+            return v1 + "\n---\n" + v2
+        }
     }
 
     private func checkAutoSyncConditions() -> Bool {
-        // Network check
-        // (Full Reachability implementation can be added; for now always allow)
+        let settings = AppSettings.shared
+
+        // Check power condition
+        if settings.autoSyncOnlyOnPower {
+            let info = ProcessInfo.processInfo
+            if info.isLowPowerModeEnabled { return false }
+        }
+
+        // Check that both accounts are connected
+        if !GoogleOAuthManager.shared.isAuthenticated { return false }
+
         return true
     }
 
@@ -767,8 +1058,10 @@ enum ContactMapper {
         // Birthday
         unified.birthday = macContact.birthday
         
-        // Note
-        unified.note = macContact.note
+        // Note (requires com.apple.developer.contacts.notes entitlement since macOS 13)
+        if macContact.isKeyAvailable(CNContactNoteKey) {
+            unified.note = macContact.note
+        }
         
         // Photo
         unified.photoData = macContact.imageData
@@ -1081,6 +1374,7 @@ enum SyncEngineError: LocalizedError {
     case conditionsNotMet
     case notImplemented
     case missingContactData(String)
+    case backupNotFound
 
     var errorDescription: String? {
         switch self {
@@ -1094,6 +1388,8 @@ enum SyncEngineError: LocalizedError {
             return "This feature is not yet implemented."
         case .missingContactData(let name):
             return "Missing contact data for: \(name)"
+        case .backupNotFound:
+            return "Backup session not found."
         }
     }
 }

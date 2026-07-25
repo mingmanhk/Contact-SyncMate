@@ -2,28 +2,29 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Network access for Google API -->
+	<!--
+	  com.apple.developer.contacts.notes is a *managed capability* that must be
+	  granted by Apple in the developer portal. If your request has been denied
+	  (or you don't want to depend on it), leave the key out — the app still
+	  builds, ships, and syncs every other contact field. Notes sync is
+	  gracefully disabled at runtime; see AppSettings.syncNotes and the
+	  `notesFieldAvailable` runtime probe in MacContactsConnector.
+
+	  To re-enable Notes sync in the future:
+	    1. Get the entitlement approved by Apple (developer.apple.com → Account
+	       → Membership → Additional Capabilities → "Contact Notes Field Access").
+	    2. Re-add:  <key>com.apple.developer.contacts.notes</key><true/>
+	    3. Rebuild — the runtime probe will detect the entitlement and
+	       automatically re-enable the "Notes" toggle in Settings.
+	-->
+
 	<key>com.apple.security.network.client</key>
 	<true/>
-	<key>com.apple.security.network.server</key>
-	<true/>
-	
-	<!-- Contacts access -->
 	<key>com.apple.security.personal-information.addressbook</key>
 	<true/>
-	
-	<!-- Keychain access for storing OAuth tokens -->
 	<key>keychain-access-groups</key>
 	<array>
 		<string>$(AppIdentifierPrefix)com.victorlam.ContactSyncMate</string>
 	</array>
-	
-	<!-- If you plan to sandbox the app, you may need these: -->
-	<!-- 
-	<key>com.apple.security.app-sandbox</key>
-	<true/>
-	<key>com.apple.security.files.user-selected.read-write</key>
-	<true/>
-	-->
 </dict>
 </plist>

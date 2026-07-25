@@ -15,10 +15,10 @@ struct SyncSummaryBadges: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            badge(icon: "plus",           count: added,     color: .green,  label: "Added")
-            badge(icon: "pencil",         count: updated,   color: .blue,   label: "Updated")
-            badge(icon: "minus",          count: deleted,   color: .red,    label: "Deleted")
-            badge(icon: "exclamationmark",count: conflicts, color: .orange, label: "Conflicts")
+            badge(icon: AppIcon.added,    count: added,     color: .appSuccess, label: "Added")
+            badge(icon: AppIcon.updated,  count: updated,   color: .appInfo,    label: "Updated")
+            badge(icon: AppIcon.deleted,  count: deleted,   color: .appError,   label: "Deleted")
+            badge(icon: AppIcon.conflict, count: conflicts, color: .appWarning, label: "Conflicts")
         }
     }
 
@@ -26,10 +26,13 @@ struct SyncSummaryBadges: View {
     private func badge(icon: String, count: Int, color: Color, label: String) -> some View {
         VStack(spacing: 4) {
             HStack(spacing: 4) {
-                Image(systemName: icon + ".circle.fill")
+                Image(systemName: icon)
+                    .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(color)
+                    .accessibilityHidden(true)
                 Text("\(count)")
                     .fontWeight(.semibold)
+                    .monospacedDigit()
             }
             .font(.subheadline)
 
@@ -40,8 +43,10 @@ struct SyncSummaryBadges: View {
         .frame(minWidth: 56)
         .padding(.vertical, 8)
         .padding(.horizontal, 12)
-        .background(color.opacity(0.08))
+        .background(color.opacity(0.10))
         .clipShape(RoundedRectangle(cornerRadius: 10))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label) \(count)")
     }
 }
 

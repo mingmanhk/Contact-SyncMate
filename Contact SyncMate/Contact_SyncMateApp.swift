@@ -6,6 +6,7 @@
 import SwiftUI
 import AppKit
 import Combine
+import ServiceManagement
 
 @main
 struct Contact_SyncMateApp: App {
@@ -16,10 +17,11 @@ struct Contact_SyncMateApp: App {
         WindowGroup(id: "settings") {
             SettingsView()
                 .environmentObject(appDelegate.appState)
-                .frame(width: 600, height: 500)
+                .frame(minWidth: 720, idealWidth: 780,
+                       minHeight: 520, idealHeight: 620)
         }
         .windowStyle(.hiddenTitleBar)
-        .windowResizability(.contentSize)
+        .windowResizability(.contentMinSize)
         .commands {
             CommandGroup(replacing: .appSettings) {
                 Button("Settings...") {
@@ -45,14 +47,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var historyWindow:    NSWindow?
     private var settingsWindow:   NSWindow?
 
+    // Auto-sync scheduler — owns the repeating timer
+    private var autoSyncScheduler: AutoSyncScheduler?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // OAuth URL handling
-        NSAppleEventManager.shared().setEventHandler(
-            self,
-            andSelector: #selector(handleURLEvent(_:withReplyEvent:)),
-            forEventClass: AEEventClass(kInternetEventClass),
-            andEventID: AEEventID(kAEGetURL)
-        )
+        // OAuth callback is handled directly inside `ASWebAuthenticationSession`
+        // by `GoogleOAuthManager.signIn()` — there is no need for a separate
+        // AppleEvent URL handler. The legacy handler that previously lived
+        // here only `print()`d the callback URL and was dead code.
 
         // Settings notification
         NotificationCenter.default.addObserver(
@@ -73,6 +75,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupStatusItem()
         setupPopover()
         updateActivationPolicy()
+        setupLaunchAtLogin()
+        setupAutoSyncScheduler()
+        setupAppearanceOverride()
 
         // Show onboarding on first launch (via dashboard/content window)
         if !AppSettings.shared.hasCompletedOnboarding {
@@ -80,16 +85,65 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // MARK: - Auto-Sync Scheduler
+
+    private func setupAutoSyncScheduler() {
+        let scheduler = AutoSyncScheduler(appState: appState)
+        scheduler.triggerSync = { [weak self] in
+            guard let self else { return }
+
+            // Single execution path: route through the shared SyncCoordinator
+            // so that AppState.isSyncing, the menu bar icon, and history all
+            // stay consistent regardless of whether the sync was triggered
+            // by the user (Sync Now) or by the auto-sync timer.
+            await MainActor.run {
+                guard SyncCoordinator.shared.phase.isActive == false else {
+                    SyncHistory.shared.log(source: "AutoSyncScheduler", action: "skipped",
+                                           details: "sync already in progress")
+                    return
+                }
+                guard self.appState.isGoogleConnected, self.appState.isMacContactsAuthorized else {
+                    SyncHistory.shared.log(source: "AutoSyncScheduler", action: "skipped",
+                                           details: "accounts not connected")
+                    return
+                }
+                SyncHistory.shared.log(
+                    source: "AutoSyncScheduler",
+                    action: "timerFired",
+                    details: "interval=\(AppSettings.shared.autoSyncInterval)s"
+                )
+                Task { await SyncCoordinator.shared.runSync() }
+            }
+        }
+        autoSyncScheduler = scheduler
+    }
+
     // MARK: - Status Item
 
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+
+        // Wire coordinator to appState BEFORE first icon draw
+        SyncCoordinator.shared.appState = appState
+
         updateStatusItemIcon()
         statusItem?.button?.action = #selector(menuBarIconClicked)
         statusItem?.button?.target = self
 
-        // Keep icon in sync with sync state
-        appState.$isSyncing
+        // React to SyncCoordinator phase changes (syncing, error, completed, idle)
+        SyncCoordinator.shared.$phase
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateStatusItemIcon() }
+            .store(in: &cancellables)
+
+        // Live progress percentage in the menu bar during a sync
+        SyncCoordinator.shared.$progress
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateStatusItemIcon() }
+            .store(in: &cancellables)
+
+        // Also react to lastSyncResult so the error badge persists after phase resets
+        appState.$lastSyncResult
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateStatusItemIcon() }
             .store(in: &cancellables)
@@ -98,16 +152,44 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var cancellables = Set<AnyCancellable>()
 
     private func updateStatusItemIcon() {
-        let name: String
-        if appState.isSyncing {
-            name = "arrow.triangle.2.circlepath"
-        } else if let result = appState.lastSyncResult, !result.successful {
-            name = "exclamationmark.circle"
-        } else {
-            name = "person.2.circle"
+        let coordinator = SyncCoordinator.shared
+        let phase = coordinator.phase
+        let symbolName: String
+        var title = ""   // text shown next to the icon (progress % during sync)
+
+        switch phase {
+        case .preparing:
+            symbolName = "arrow.triangle.2.circlepath"
+            title = " …"
+        case .syncing(let fraction):
+            symbolName = "arrow.triangle.2.circlepath"
+            title = " \(Int(fraction * 100))%"
+        case .failed:
+            symbolName = "exclamationmark.circle.fill"
+        case .completed(let r) where !r.successful:
+            symbolName = "exclamationmark.triangle.fill"
+        default:
+            // Idle / post-success — show persistent error badge if last result had errors
+            if let result = appState.lastSyncResult, !result.successful {
+                symbolName = "exclamationmark.circle"
+            } else {
+                symbolName = "person.2.circle"
+            }
         }
-        statusItem?.button?.image = NSImage(systemSymbolName: name,
-                                            accessibilityDescription: "Contact SyncMate")
+
+        let image = NSImage(systemSymbolName: symbolName,
+                            accessibilityDescription: "Contact SyncMate — \(phase.label)")
+        image?.isTemplate = true  // Adapts to light/dark menu bar automatically
+
+        guard let button = statusItem?.button else { return }
+        button.image = image
+        button.imagePosition = .imageLeft
+        // Small monospaced-digit font so "42%" doesn't jiggle as it counts
+        button.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+        button.title = title
+
+        // Hover tooltip so the icon is identifiable among other status items
+        button.toolTip = "Contact SyncMate — \(phase.label). Click to open."
     }
 
     // MARK: - Popover
@@ -202,27 +284,94 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let controller = NSHostingController(rootView: contentView)
         let window = NSWindow(contentViewController: controller)
         window.title = "Settings"
-        window.styleMask = [.titled, .closable, .miniaturizable]
-        window.setContentSize(NSSize(width: 600, height: 500))
+        // Resizable is required: SettingsView's NavigationSplitView needs
+        // minWidth 720 (sidebar + detail Form). A fixed 600-pt window
+        // clipped the detail pane on the right.
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.setContentSize(NSSize(width: 780, height: 620))
+        window.minSize = NSSize(width: 720, height: 520)
         window.center()
         window.isReleasedWhenClosed = false
         settingsWindow = window
         window.makeKeyAndOrderFront(nil)
     }
 
+    // MARK: - Launch at Login (SMAppService, macOS 13+)
+
+    /// Call once at startup to sync the SMAppService registration status with the stored
+    /// `launchAtLogin` preference, and then observe future changes.
+    private func setupLaunchAtLogin() {
+        // Sync the current setting → system on cold start
+        applyLaunchAtLogin(AppSettings.shared.launchAtLogin)
+
+        // Observe future toggle changes
+        AppSettings.shared.$launchAtLogin
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                self?.applyLaunchAtLogin(enabled)
+            }
+            .store(in: &cancellables)
+    }
+
+    private func applyLaunchAtLogin(_ enable: Bool) {
+        if #available(macOS 13.0, *) {
+            let service = SMAppService.mainApp
+            do {
+                if enable {
+                    if service.status != .enabled { try service.register() }
+                } else {
+                    if service.status == .enabled { try service.unregister() }
+                }
+            } catch {
+                SyncHistory.shared.log(
+                    source: "LaunchAtLogin",
+                    action: enable ? "register.failed" : "unregister.failed",
+                    details: error.localizedDescription
+                )
+            }
+        }
+        // macOS 12 and earlier: requires a LoginItems helper bundle target.
+        // SMLoginItemSetEnabled can be used there if that target is added.
+    }
+
+    // MARK: - Appearance Override (user customisation)
+
+    /// Applies the user's light/dark/system preference app-wide and keeps
+    /// following changes made in Settings → General → Appearance.
+    private func setupAppearanceOverride() {
+        applyAppearanceOverride()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(applyAppearanceOverride),
+            name: .appearanceModeChanged,
+            object: nil
+        )
+    }
+
+    @objc private func applyAppearanceOverride() {
+        NSApp.appearance = AppSettings.shared.preferredAppearance.nsAppearance
+    }
+
     // MARK: - Activation Policy
 
     @objc private func updateActivationPolicy() {
-        NSApp.setActivationPolicy(AppSettings.shared.attachToMenuBar ? .accessory : .regular)
+        if AppSettings.shared.attachToMenuBar {
+            // Only switch to .accessory if no visible windows are open.
+            // Otherwise the app appears to "crash" / vanish while the
+            // user is still interacting with it.
+            let hasVisibleWindow = NSApp.windows.contains { $0.isVisible && $0.level == .normal }
+            if !hasVisibleWindow {
+                NSApp.setActivationPolicy(.accessory)
+            }
+        } else {
+            NSApp.setActivationPolicy(.regular)
+        }
     }
 
-    // MARK: - URL Handling
-
-    @objc func handleURLEvent(_ event: NSAppleEventDescriptor, withReplyEvent replyEvent: NSAppleEventDescriptor) {
-        guard let urlString = event.paramDescriptor(forKeyword: AEKeyword(keyDirectObject))?.stringValue,
-              let url = URL(string: urlString) else { return }
-        print("Received OAuth callback: \(url)")
-    }
+    // OAuth URL handling intentionally removed — see comment in
+    // `applicationDidFinishLaunching`. ASWebAuthenticationSession handles
+    // the callback inside `GoogleOAuthManager`.
 }
 
 // MARK: - Notifications

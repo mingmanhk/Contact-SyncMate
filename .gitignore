@@ -1,1 +1,87 @@
+# ═══════════════════════════════════════════════════════════════════════
+# .gitignore — macOS / Xcode / Swift project
+# Reusable template for any macOS app. Project-specific entries at the top.
+# ═══════════════════════════════════════════════════════════════════════
+
+# ── Project-specific: secrets — NEVER commit ───────────────────────────
 Contact SyncMate/GoogleOAuthConfig.swift
+Contact SyncMate/GoogleOAuthConfig.json
+# Any future secret configs
+*.secrets.json
+*_credentials.json
+.env
+.env.*
+
+# ── Xcode user state ───────────────────────────────────────────────────
+xcuserdata/
+*.xcuserdatad/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+*.moved-aside
+
+# ── Xcode build products ───────────────────────────────────────────────
+build/
+DerivedData/
+*.o
+*.LinkFileList
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# NOTE: *.xcworkspace was previously ignored — WRONG for projects that use
+# SPM or shared workspace settings. Ignore only user data inside it:
+*.xcworkspace/xcuserdata/
+
+# ── Swift Package Manager ──────────────────────────────────────────────
+.build/
+.swiftpm/
+# Keep Package.resolved committed for apps (reproducible builds).
+
+# ── CocoaPods (if adopted) ─────────────────────────────────────────────
+Pods/
+
+# ── Carthage (if adopted) ──────────────────────────────────────────────
+Carthage/Build/
+Carthage/Checkouts/
+
+# ── Fastlane (if adopted) ──────────────────────────────────────────────
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# ── Test / coverage output ─────────────────────────────────────────────
+*.xcresult
+coverage/
+*.profraw
+*.profdata
+
+# ── Archives / distribution ────────────────────────────────────────────
+*.xcarchive
+*.dmg
+*.pkg
+
+# ── macOS system files ─────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+.fuse_hidden*
+
+# ── Logs / caches / temp ───────────────────────────────────────────────
+*.log
+*.tmp
+tmp/
+.cache/
+
+# ── AI / editor tooling state ──────────────────────────────────────────
+.claude/
+.cursor/
+.vscode/
+.idea/

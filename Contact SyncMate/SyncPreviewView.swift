@@ -41,12 +41,22 @@ struct SyncPreviewView: View {
         return base.filter { $0.action == action }
     }
 
-    private var pendingCount: Int { session.contactChanges.filter { !skipped.contains($0.id) }.count }
-
+    private var pendingCount:  Int { session.contactChanges.filter { !skipped.contains($0.id) }.count }
     private var addedCount:    Int { session.contactChanges.filter { $0.action == .add    }.count }
     private var updatedCount:  Int { session.contactChanges.filter { $0.action == .update }.count }
     private var deletedCount:  Int { session.contactChanges.filter { $0.action == .delete }.count }
     private var conflictCount: Int { session.contactChanges.filter { $0.action == .merge  }.count }
+
+    private func count(for filter: ChangeFilter) -> Int {
+        let base = session.contactChanges.filter { !skipped.contains($0.id) }
+        switch filter {
+        case .all:      return base.count
+        case .add:      return base.filter { $0.action == .add    }.count
+        case .update:   return base.filter { $0.action == .update }.count
+        case .delete:   return base.filter { $0.action == .delete }.count
+        case .conflict: return base.filter { $0.action == .merge  }.count
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -79,12 +89,18 @@ struct SyncPreviewView: View {
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
 
-            // Filter bar
+            // Filter bar — includes per-filter counts so users know what to expect
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(ChangeFilter.allCases, id: \.self) { filter in
-                        FilterChip(title: filter.rawValue, isSelected: activeFilter == filter) {
-                            activeFilter = filter
+                        let n = count(for: filter)
+                        FilterChip(
+                            title: filter.rawValue,
+                            count: filter == .all ? nil : n,
+                            isSelected: activeFilter == filter,
+                            isDisabled: n == 0 && filter != .all
+                        ) {
+                            if n > 0 || filter == .all { activeFilter = filter }
                         }
                     }
                 }
@@ -97,8 +113,19 @@ struct SyncPreviewView: View {
             // Changes list
             if filteredChanges.isEmpty {
                 Spacer()
-                Text("No changes matching this filter.")
-                    .foregroundStyle(.secondary)
+                VStack(spacing: 8) {
+                    Image(systemName: activeFilter == .all ? "checkmark.circle" : "line.3.horizontal.decrease.circle")
+                        .font(.largeTitle)
+                        .foregroundStyle(.tertiary)
+                    Text(activeFilter == .all ? "All changes skipped" : "No \(activeFilter.rawValue.lowercased()) changes")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    if activeFilter != .all {
+                        Text("Switch to \"All\" to see other pending changes.")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
                 Spacer()
             } else {
                 List(filteredChanges) { change in
@@ -115,21 +142,51 @@ struct SyncPreviewView: View {
             Divider()
 
             // Footer
-            HStack {
-                Button("Cancel") { isPresented = false }
-
-                Spacer()
-
-                Button("Apply \(pendingCount) Change\(pendingCount == 1 ? "" : "s")") {
-                    // TODO: feed into SyncEngine
-                    isPresented = false
+            VStack(spacing: 8) {
+                // Conflict warning banner
+                if conflictCount > 0 {
+                    HStack(spacing: 8) {
+                        Image(systemName: AppIcon.statusWarning)
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(Color.appWarning)
+                        Text("\(conflictCount) conflict\(conflictCount == 1 ? "" : "s") need review — tap Details on each highlighted row.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 4)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(Color("BrandIndigo"))
-                .disabled(pendingCount == 0)
+
+                HStack {
+                    Button("Cancel") { isPresented = false }
+                        .keyboardShortcut(.escape)
+
+                    Spacer()
+
+                    if skipped.count > 0 {
+                        Text("\(skipped.count) skipped")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .padding(.trailing, 4)
+                    }
+
+                    Button {
+                        // TODO: feed into SyncEngine
+                        isPresented = false
+                    } label: {
+                        Label(
+                            pendingCount == 0 ? "Nothing to Apply" : "Apply \(pendingCount) Change\(pendingCount == 1 ? "" : "s")",
+                            systemImage: "checkmark"
+                        )
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color.accentColor)
+                    .disabled(pendingCount == 0)
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 16)
         }
         .frame(width: 640, height: 520)
         .sheet(item: $showingDiff) { change in
@@ -148,21 +205,34 @@ struct SyncPreviewView: View {
 
 private struct FilterChip: View {
     let title: String
+    var count: Int? = nil
     let isSelected: Bool
+    var isDisabled: Bool = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(.subheadline)
-                .fontWeight(isSelected ? .semibold : .regular)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 6)
-                .background(isSelected ? Color("BrandIndigo") : Color.secondary.opacity(0.1))
-                .foregroundStyle(isSelected ? .white : .primary)
-                .clipShape(Capsule())
+            HStack(spacing: 5) {
+                Text(title)
+                    .fontWeight(isSelected ? .semibold : .regular)
+                if let n = count {
+                    Text("\(n)")
+                        .fontWeight(.semibold)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(isSelected ? Color.appTextInverse.opacity(0.25) : Color.appSurfaceTinted)
+                        .clipShape(Capsule())
+                }
+            }
+            .font(.subheadline)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .background(isSelected ? Color.accentColor : Color.secondary.opacity(0.1))
+            .foregroundStyle(isDisabled ? Color.appTextTertiary : (isSelected ? Color.appTextInverse : Color.primary))
+            .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+        .disabled(isDisabled)
         .animation(.easeInOut(duration: 0.15), value: isSelected)
     }
 }

@@ -1,4 +1,3 @@
-import Contacts
 //
 //  SyncEngineDeduplicationIntegration.swift
 //  Contact SyncMate
@@ -9,6 +8,8 @@ import Contacts
 //
 
 import Foundation
+import Contacts
+import Combine
 
 // MARK: - Integration Example
 
@@ -212,7 +213,7 @@ extension SyncEngine {
         }
         
         // Convert to CNMutableContact and update
-        let mutableContact = ContactMapper.toMac(from: merged)
+        _ = ContactMapper.toMac(from: merged)
         
         do {
             // Update the first contact
@@ -290,7 +291,7 @@ extension SyncResult {
         base: SyncResult,
         deduplicationStats: DeduplicationStats
     ) -> SyncResult {
-        var result = base
+        let result = base
         // Add dedup info to result if model supports it
         return result
     }

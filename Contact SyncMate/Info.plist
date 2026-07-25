@@ -15,17 +15,19 @@
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
-	<key>NSContactsUsageDescription</key>
-	<string>Contact SyncMate needs access to your contacts to synchronize them with Google Contacts.</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.utilities</string>
+
+	<!-- Contacts privacy description (required for CNContactStore access) -->
 	<key>NSContactsUsageDescription</key>
-	<string>Contact SyncMate needs access to your contacts to sync them with Google Contacts.</string>
+	<string>Contact SyncMate needs access to your contacts to synchronize them with Google Contacts.</string>
+
+	<!-- OAuth redirect URL scheme (Google sign-in callback) -->
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
