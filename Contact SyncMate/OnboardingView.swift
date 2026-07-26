@@ -218,6 +218,19 @@ private struct OnboardingGoogleStep: View {
                 .disabled(isConnecting)
             }
 
+            // A failed bind used to be completely silent here: the consent
+            // screen closed and the button simply went back to its idle state.
+            if !oauth.isAuthenticated, let failure = oauth.signInError {
+                Label(failure, systemImage: AppIcon.statusError)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(Color.appError)
+                    .font(.callout)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 380)
+                    .textSelection(.enabled)
+                    .accessibilityLabel("Sign-in failed: \(failure)")
+            }
+
             Text("Your contacts stay on your device. No third-party servers are involved.")
                 .font(.caption)
                 .foregroundStyle(.secondary)

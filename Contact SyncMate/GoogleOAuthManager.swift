@@ -76,7 +76,13 @@ class GoogleOAuthManager: NSObject, ObservableObject {
     
     @Published var isAuthenticated = false
     @Published var userEmail: String?
-    
+
+    /// Human-readable reason the last sign-in attempt failed, or `nil` if the
+    /// last attempt succeeded / none has been made. Shown in Accounts and in
+    /// Onboarding so a failed bind is never silent.
+    @Published var signInError: String?
+
+
     private var authSession: ASWebAuthenticationSession?
     
     // MARK: - Keychain Keys
@@ -128,6 +134,21 @@ class GoogleOAuthManager: NSObject, ObservableObject {
             return fromConfig
         }
         return ""
+    }
+
+    /// Turn Google's JSON error payload into one readable line.
+    /// Never echoes the request body, so no secret can leak into a log or the UI.
+    static func googleErrorSummary(from body: String, status: Int) -> String {
+        guard let data = body.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else {
+            return "HTTP \(status)"
+        }
+        let code = json["error"] as? String ?? "HTTP \(status)"
+        if let description = json["error_description"] as? String, !description.isEmpty {
+            return "\(code): \(description)"
+        }
+        return code
     }
 
     /// Manually store a client secret in the Keychain (e.g. from Settings UI).
@@ -247,12 +268,22 @@ class GoogleOAuthManager: NSObject, ObservableObject {
         // Ensure the app is properly activated before showing OAuth
         NSApp.activate(ignoringOtherApps: true)
 
+        signInError = nil
+
         Task { [weak self] in
             do {
                 try await self?.signIn()
-                print("Google sign-in succeeded")
+                await MainActor.run { self?.signInError = nil }
+                SyncHistory.shared.log(source: "GoogleOAuth", action: "signIn.succeeded", details: "")
             } catch {
-                print("Google sign-in failed: \(error)")
+                // A silent failure here is what made this bug so hard to see:
+                // the consent screen completes, then nothing happens. Publish
+                // the reason so Accounts and Onboarding can both show it.
+                let message = error.localizedDescription
+                await MainActor.run { self?.signInError = message }
+                SyncHistory.shared.log(source: "GoogleOAuth",
+                                       action: "signIn.failed",
+                                       details: message)
             }
         }
     }
@@ -341,12 +372,19 @@ class GoogleOAuthManager: NSObject, ObservableObject {
             .data(using: String.Encoding.utf8)
         
         let (data, response) = try await URLSession.shared.data(for: request)
-        
+
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
-            throw GoogleOAuthError.tokenExchangeFailed
+            // Surface Google's own diagnosis. `invalid_client` means the client
+            // secret is wrong or missing; `redirect_uri_mismatch` means the URI
+            // registered in Cloud Console does not match `redirectURI`. Guessing
+            // between those without the payload wastes hours.
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            let body = String(data: data, encoding: .utf8) ?? ""
+            let detail = Self.googleErrorSummary(from: body, status: status)
+            throw GoogleOAuthError.tokenExchangeFailed(detail)
         }
-        
+
         let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
         
         // Store tokens
@@ -636,7 +674,10 @@ enum GoogleOAuthError: LocalizedError {
     case invalidCallback
     case authError(String)
     case noAuthCode
-    case tokenExchangeFailed
+    /// Carries Google's own error payload (e.g. `invalid_client`,
+    /// `redirect_uri_mismatch`). Without it the user sees a generic failure
+    /// and has nothing actionable to go on.
+    case tokenExchangeFailed(String)
     case tokenRefreshFailed
     case noRefreshToken
     case keychainError(OSStatus)
@@ -658,8 +699,10 @@ enum GoogleOAuthError: LocalizedError {
             return "Authentication error: \(error)"
         case .noAuthCode:
             return "No authorization code received."
-        case .tokenExchangeFailed:
-            return "Failed to exchange code for tokens."
+        case .tokenExchangeFailed(let detail):
+            return detail.isEmpty
+                ? "Failed to exchange code for tokens."
+                : "Failed to exchange code for tokens — \(detail)"
         case .tokenRefreshFailed:
             return "Failed to refresh access token."
         case .noRefreshToken:

@@ -158,6 +158,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
+        // A stable autosave name gives the item a persistent identity, so macOS
+        // remembers where the user dragged it instead of re-inserting it at the
+        // far left on every launch.
+        statusItem?.autosaveName = "ContactSyncMateStatusItem"
+
+        // Command-dragging a status item off the menu bar makes macOS persist
+        // `isVisible = false` — permanently, with no in-app way back. The app
+        // then looks like it failed to launch. Menu bar presence is this app's
+        // only always-on surface, so assert it on every launch.
+        statusItem?.isVisible = true
+
         // Wire coordinator to appState BEFORE first icon draw
         SyncCoordinator.shared.appState = appState
 
