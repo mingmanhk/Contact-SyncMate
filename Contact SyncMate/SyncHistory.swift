@@ -120,8 +120,19 @@ public final class SyncHistory: @unchecked Sendable {
         return fm.temporaryDirectory
     }
 
+    /// True when running inside XCTest.
+    ///
+    /// The test bundle is injected into the app process, so tests share this
+    /// singleton, its container, and its history file. A test run was therefore
+    /// overwriting the user's real sync history — which destroyed the diagnostic
+    /// log at exactly the moment it was needed to explain a failed sync.
+    private static var isRunningTests: Bool {
+        NSClassFromString("XCTestCase") != nil
+    }
+
     private var historyFileURL: URL {
-        appSupportURL().appendingPathComponent("sync_history.json")
+        let name = Self.isRunningTests ? "sync_history.tests.json" : "sync_history.json"
+        return appSupportURL().appendingPathComponent(name)
     }
 
     private func saveToDisk() {

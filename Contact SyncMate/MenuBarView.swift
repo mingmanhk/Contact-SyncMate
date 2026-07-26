@@ -4,7 +4,6 @@
 //
 
 import SwiftUI
-import Combine
 
 // MARK: - Menu Bar Popover View
 

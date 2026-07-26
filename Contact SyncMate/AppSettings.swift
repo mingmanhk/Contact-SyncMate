@@ -7,6 +7,8 @@
 
 import SwiftUI
 import AppKit
+// Required, not redundant: newer SDKs no longer have SwiftUI re-export Combine,
+// so @Published's initialiser is unavailable without this.
 import Combine
 
 /// Centralized app settings using UserDefaults

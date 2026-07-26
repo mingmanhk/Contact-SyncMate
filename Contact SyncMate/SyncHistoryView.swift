@@ -5,7 +5,6 @@
 
 import SwiftUI
 import UniformTypeIdentifiers  // UTType.json for the export panel
-import Combine
 
 // MARK: - History Filter
 

@@ -8,7 +8,6 @@
 import Foundation
 @preconcurrency import Contacts
 import Combine
-import SwiftUI
 
 // MARK: - String helpers
 
@@ -66,11 +65,15 @@ class SyncEngine: ObservableObject {
             progress = SyncProgress(currentStep: "Fetching contacts...", completedItems: 0, totalItems: 0)
         }
         
+        // Released synchronously, not via `Task { @MainActor in … }`.
+        // SyncEngine is main-actor isolated, so a deferred Task can only run once
+        // the actor yields — but SyncCoordinator calls prepareManualSync and then
+        // executeSync with no guaranteed suspension between them. The second call
+        // would find isRunning still true and throw "A sync is already in
+        // progress" for the sync the user just started.
         defer {
-            Task { @MainActor in
-                isRunning = false
-                progress = nil
-            }
+            isRunning = false
+            progress = nil
         }
         
         do {
@@ -142,11 +145,15 @@ class SyncEngine: ObservableObject {
             )
         }
         
+        // Released synchronously, not via `Task { @MainActor in … }`.
+        // SyncEngine is main-actor isolated, so a deferred Task can only run once
+        // the actor yields — but SyncCoordinator calls prepareManualSync and then
+        // executeSync with no guaranteed suspension between them. The second call
+        // would find isRunning still true and throw "A sync is already in
+        // progress" for the sync the user just started.
         defer {
-            Task { @MainActor in
-                isRunning = false
-                progress = nil
-            }
+            isRunning = false
+            progress = nil
         }
         
         let startTime = Date()
@@ -170,23 +177,40 @@ class SyncEngine: ObservableObject {
             
             // Use override if set, otherwise use planned action
             let action = change.userOverride ?? change.action
-            
+
+            // Dry run: count what would happen, write nothing.
+            //
+            // Settings promises "no changes will be saved" when this is on, but
+            // nothing enforced it — the setting was stored and never read, so a
+            // user who enabled it as a safety net still had both address books
+            // rewritten. The counters and history still run so the report is
+            // identical to a real sync, minus the writes.
+            let isDryRun = settings.dryRunMode
+
             do {
                 switch action {
                 case .add:
-                    try await performAdd(change: change, direction: session.direction)
+                    if !isDryRun {
+                        try await performAdd(change: change, direction: session.direction)
+                    }
                     added += 1
 
                 case .update:
-                    try await performUpdate(change: change, direction: session.direction)
+                    if !isDryRun {
+                        try await performUpdate(change: change, direction: session.direction)
+                    }
                     updated += 1
 
                 case .delete:
-                    try await performDelete(change: change, direction: session.direction)
+                    if !isDryRun {
+                        try await performDelete(change: change, direction: session.direction)
+                    }
                     deleted += 1
 
                 case .merge:
-                    try await performMerge(change: change, direction: session.direction)
+                    if !isDryRun {
+                        try await performMerge(change: change, direction: session.direction)
+                    }
                     merged += 1
 
                 case .skip:
@@ -202,7 +226,8 @@ class SyncEngine: ObservableObject {
                     SyncHistory.shared.log(
                         source: "SyncEngine",
                         action: "change.\(action.rawValue.lowercased())",
-                        details: "\(change.contactName) [\(change.direction)] " +
+                        details: "\(isDryRun ? "[DRY RUN] " : "")" +
+                                 "\(change.contactName) [\(change.direction)] " +
                                  "session=\(session.syncSessionId ?? "-") " +
                                  "fields=\(change.changes.joined(separator: "; "))"
                     )
@@ -504,15 +529,23 @@ class SyncEngine: ObservableObject {
         // Build source→target ID lookup from mappings
         let sourceToTargetMap: [String: String]
         let direction: SyncDirection
+        // `uniquingKeysWith`, not `uniqueKeysWithValues`: the mapping store is
+        // keyed by googleResourceName, so macContactIdentifier is NOT unique —
+        // two Google contacts pointing at one Mac contact is the normal shape
+        // after a fuzzy match or a dedup merge. `uniqueKeysWithValues` traps on
+        // a duplicate key, so a Mac → Google sync could hard-crash on perfectly
+        // ordinary data. Last mapping wins, matching the store's own semantics.
         if sourceToTarget {
-            sourceToTargetMap = Dictionary(uniqueKeysWithValues: mappings.map {
-                ($0.googleResourceName, $0.macContactIdentifier)
-            })
+            sourceToTargetMap = Dictionary(
+                mappings.map { ($0.googleResourceName, $0.macContactIdentifier) },
+                uniquingKeysWith: { _, latest in latest }
+            )
             direction = .googleToMac
         } else {
-            sourceToTargetMap = Dictionary(uniqueKeysWithValues: mappings.map {
-                ($0.macContactIdentifier, $0.googleResourceName)
-            })
+            sourceToTargetMap = Dictionary(
+                mappings.map { ($0.macContactIdentifier, $0.googleResourceName) },
+                uniquingKeysWith: { _, latest in latest }
+            )
             direction = .macToGoogle
         }
 

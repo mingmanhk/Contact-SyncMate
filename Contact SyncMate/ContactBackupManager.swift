@@ -9,9 +9,9 @@
 
 import Foundation
 import Contacts
+import UniformTypeIdentifiers  // UTType.json for the backup export panel
 import Combine
 import AppKit
-import UniformTypeIdentifiers
 
 // MARK: - Data Models
 
