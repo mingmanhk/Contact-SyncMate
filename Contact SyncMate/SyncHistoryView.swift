@@ -8,11 +8,13 @@ import Combine
 
 // MARK: - History Filter
 
+/// Three buckets, not four. "Success" and "Warnings" split the log along a line
+/// nobody actually searches on — the real questions are "what did it do to my
+/// contacts?" and "what went wrong?".
 private enum HistoryFilter: String, CaseIterable {
-    case all      = "All"
-    case success  = "Success"
-    case warnings = "Warnings"
-    case errors   = "Errors"
+    case all     = "All"
+    case changes = "Changes"
+    case errors  = "Errors"
 }
 
 // MARK: - Sync History View
@@ -35,10 +37,25 @@ struct SyncHistoryView: View {
             }
         }
         switch activeFilter {
-        case .all:      break
-        case .success:  events = events.filter { !$0.action.lowercased().contains("error") && !$0.action.lowercased().contains("warn") }
-        case .warnings: events = events.filter { $0.action.lowercased().contains("warn") }
-        case .errors:   events = events.filter { $0.action.lowercased().contains("error") }
+        case .all:
+            break
+        case .changes:
+            // Only entries that actually mutated a contact — SyncEngine logs
+            // those under the `change.*` namespace, plus the merge decisions
+            // the user made by hand.
+            events = events.filter {
+                let action = $0.action.lowercased()
+                return action.hasPrefix("change.")
+                    || ["add", "update", "delete", "automerge", "usermerge", "keepseparate"]
+                        .contains(action)
+            }
+        case .errors:
+            events = events.filter {
+                let action = $0.action.lowercased()
+                return action.contains("error")
+                    || action.contains("fail")
+                    || action.contains("warn")
+            }
         }
         return events.reversed()
     }
@@ -94,13 +111,17 @@ struct SyncHistoryView: View {
                 .background(Color.secondary.opacity(0.1))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(HistoryFilter.allCases, id: \.self) { filter in
-                            filterChip(filter)
-                        }
+                // Segmented control rather than custom chips: three mutually
+                // exclusive views of one list is exactly what NSSegmentedControl
+                // is for, and it picks up keyboard focus and VoiceOver for free.
+                Picker("Filter history", selection: $activeFilter) {
+                    ForEach(HistoryFilter.allCases, id: \.self) { filter in
+                        Text(filter.rawValue).tag(filter)
                     }
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .accessibilityLabel("Filter history")
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 12)
@@ -193,20 +214,6 @@ struct SyncHistoryView: View {
     }
 
     // MARK: - Filter Chip
-
-    private func filterChip(_ filter: HistoryFilter) -> some View {
-        let selected = activeFilter == filter
-        return Button(filter.rawValue) { activeFilter = filter }
-            .buttonStyle(.plain)
-            .font(.subheadline)
-            .fontWeight(selected ? .semibold : .regular)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 6)
-            .background(selected ? Color.accentColor : Color.secondary.opacity(0.1))
-            .foregroundStyle(selected ? Color.white : Color.primary)
-            .clipShape(Capsule())
-            .animation(.easeInOut(duration: 0.15), value: selected)
-    }
 
     // MARK: - Helpers
 

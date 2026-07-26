@@ -16,6 +16,15 @@ struct OnboardingView: View {
     @Binding var isPresented: Bool
     @StateObject private var settings = AppSettings.shared
     @State private var currentStep = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Completed steps stay tinted so progress reads as cumulative, not as a
+    /// single dot travelling along an empty track.
+    private func segmentColor(for step: Int) -> Color {
+        if step == currentStep { return Color.accentColor }
+        if step < currentStep  { return Color.accentColor.opacity(0.45) }
+        return Color.secondary.opacity(0.15)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -41,21 +50,26 @@ struct OnboardingView: View {
             .padding(.top, 20)
             .padding(.bottom, 8)
 
-            // Progress bar
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.secondary.opacity(0.15))
-                        .frame(height: 4)
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.accentColor)
-                        .frame(width: geo.size.width * (Double(currentStep + 1) / Double(kTotalSteps)), height: 4)
-                        .animation(.spring(response: 0.4), value: currentStep)
+            // Step indicator. One segment per step rather than a single filled
+            // bar: the user can see how many steps remain, and the current
+            // segment widens so position is legible without reading the counter.
+            HStack(spacing: 6) {
+                ForEach(0..<kTotalSteps, id: \.self) { step in
+                    Capsule()
+                        .fill(segmentColor(for: step))
+                        .frame(width: step == currentStep ? 28 : 14, height: 4)
+                        .animation(reduceMotion
+                                   ? .none
+                                   : .spring(response: 0.35, dampingFraction: 0.75),
+                                   value: currentStep)
                 }
+                Spacer(minLength: 0)
             }
             .frame(height: 4)
             .padding(.horizontal, 32)
             .padding(.bottom, 4)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Step \(currentStep + 1) of \(kTotalSteps)")
 
             // Step content
             TabView(selection: $currentStep) {

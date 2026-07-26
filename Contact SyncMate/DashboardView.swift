@@ -97,6 +97,23 @@ struct DashboardView: View {
             }
         }
         .frame(minWidth: 640, minHeight: 480)
+        // Sync Now also lives in the toolbar so it stays reachable when the
+        // user has scrolled down to Recent Activity — the primary action of a
+        // window should never scroll out of view (HIG).
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    triggerSync()
+                } label: {
+                    Label(sync.phase.isActive ? sync.phase.label : "Sync Now",
+                          systemImage: "arrow.triangle.2.circlepath")
+                }
+                .disabled(!canSync)
+                // No keyboardShortcut here: the app's Sync menu already owns
+                // ⌘R, and binding it twice makes the shortcut ambiguous.
+                .help(syncButtonTooltip)
+            }
+        }
         .animation(.easeInOut(duration: 0.25), value: syncResultBanner != nil)
         .animation(.easeInOut(duration: 0.25), value: syncErrorMessage != nil)
         .animation(.easeInOut(duration: 0.2), value: appState.isSyncing)
