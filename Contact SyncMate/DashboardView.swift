@@ -109,7 +109,7 @@ struct DashboardView: View {
             SyncHistoryAndBackupView()
         }
         .onAppear {
-            recentEvents = Array(SyncHistory.shared.events().suffix(5).reversed())
+            recentEvents = Self.interestingEvents(from: SyncHistory.shared.events())
             // Give the coordinator a handle to AppState so it can update isSyncing etc.
             sync.appState = appState
         }
@@ -128,7 +128,7 @@ struct DashboardView: View {
                         detail: r.summary
                     )
                 }
-                recentEvents = Array(SyncHistory.shared.events().suffix(5).reversed())
+                recentEvents = Self.interestingEvents(from: SyncHistory.shared.events())
             case .failed(let msg):
                 withAnimation {
                     syncResultBanner = nil
@@ -472,10 +472,25 @@ struct DashboardView: View {
 
     // MARK: - Recent Activity
 
+    /// Actions worth showing on the dashboard: per-contact changes, sync
+    /// outcomes, restores. Filters out internal plumbing noise
+    /// (fetchAllContacts.begin, timer logs, container discovery, …) so the
+    /// user sees WHAT the app did to their contacts.
+    static func interestingEvents(from all: [SyncEvent], limit: Int = 8) -> [SyncEvent] {
+        let interesting: (SyncEvent) -> Bool = { e in
+            e.action.hasPrefix("change.") ||
+            e.action.hasPrefix("sync.") ||
+            e.action.hasPrefix("restore") ||
+            e.action.hasPrefix("rollback") ||
+            e.action == "userDecision"
+        }
+        return Array(all.filter(interesting).suffix(limit).reversed())
+    }
+
     private var recentActivitySection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Recent Activity")
+                Text("Recent Changes")
                     .font(.headline)
                 Spacer()
                 Button("View History & Backups") {
@@ -697,9 +712,17 @@ struct DashboardView: View {
     private func friendlyLabel(for action: String) -> String {
         switch action {
         case "sync.complete":           return "Sync completed"
+        case "sync.failed":             return "Sync failed"
         case "sync.start", "scanForDuplicates.start": return "Sync started"
         case "sync.preview":            return "Sync preview prepared"
         case "sync.error":              return "Sync failed"
+        case "change.add":              return "Contact added"
+        case "change.update":           return "Contact updated"
+        case "change.delete":           return "Contact deleted"
+        case "change.merge":            return "Contacts merged"
+        case "change.failed":           return "Change failed"
+        case "restore.success", "rollback.success":  return "Backup restored"
+        case "restore.partial", "rollback.partial":  return "Backup partially restored"
         case "add":                     return "Contact added"
         case "update":                  return "Contact updated"
         case "delete":                  return "Contact deleted"
@@ -723,14 +746,19 @@ struct DashboardView: View {
             return ("xmark.circle.fill", .red)
         }
         switch action {
-        case "sync.complete":         return ("checkmark.circle.fill", .green)
-        case "sync.start", "scanForDuplicates.start": return ("arrow.triangle.2.circlepath", Color.accentColor)
-        case "sync.preview":          return ("eye.circle.fill", .blue)
-        case "add":                   return ("plus.circle.fill", .green)
-        case "update":                return ("pencil.circle.fill", .blue)
-        case "delete":                return ("minus.circle.fill", .red)
-        case "merge.deferred":        return ("exclamationmark.triangle.fill", .orange)
-        case "autoMerge", "userMerge": return ("arrow.triangle.merge", .purple)
+        case "sync.complete":         return (AppIcon.statusSuccess, .appSuccess)
+        case "sync.failed":           return (AppIcon.statusError, .appError)
+        case "sync.start", "scanForDuplicates.start": return (AppIcon.statusSyncing, Color.appAccent)
+        case "sync.preview":          return ("eye.circle.fill", .appInfo)
+        case "change.add", "add":     return (AppIcon.added, .appSuccess)
+        case "change.update", "update": return (AppIcon.updated, .appInfo)
+        case "change.delete", "delete": return (AppIcon.deleted, .appError)
+        case "change.merge":          return ("arrow.triangle.merge", .appBrand)
+        case "change.failed":         return (AppIcon.statusWarning, .appWarning)
+        case "restore.success", "rollback.success": return (AppIcon.restore, .appSuccess)
+        case "restore.partial", "rollback.partial": return (AppIcon.restore, .appWarning)
+        case "merge.deferred":        return (AppIcon.statusWarning, .appWarning)
+        case "autoMerge", "userMerge": return ("arrow.triangle.merge", .appBrand)
         default:                      return ("clock.fill", .secondary)
         }
     }

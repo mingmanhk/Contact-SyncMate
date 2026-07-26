@@ -1229,7 +1229,10 @@ struct AccountsSettingsView: View {
     private func refreshMacContactCount() {
         guard appState.isMacContactsAuthorized else { return }
         isLoadingMacContactCount = true
-        Task {
+        // Task.detached: CNContactStore calls are synchronous XPC to contactsd
+        // (background QoS). Running them on the main actor causes a
+        // priority-inversion hang risk — always hop off main first.
+        Task.detached(priority: .userInitiated) {
             do {
                 let connector = MacContactsConnector()
                 let contacts = try connector.fetchAllContacts()
@@ -1275,7 +1278,7 @@ struct AccountsSettingsView: View {
     }
 
     private func testMacContactsConnection() {
-        Task {
+        Task.detached(priority: .userInitiated) {
             do {
                 let connector = MacContactsConnector()
                 let contacts = try connector.fetchAllContacts()
@@ -1904,11 +1907,12 @@ struct BackupAndRecoverySettingsView: View {
     private func createManualBackup() {
         isCreatingManualBackup = true
         backupResult = nil
-        Task {
+        // Detached: Mac Contacts fetch is synchronous XPC — keep off main.
+        Task.detached(priority: .userInitiated) {
             do {
                 // Fetch actual contacts from Mac Contacts (if authorized)
                 var macContacts: [UnifiedContact] = []
-                if appState.isMacContactsAuthorized {
+                if await appState.isMacContactsAuthorized {
                     let connector = MacContactsConnector()
                     let cnContacts = try connector.fetchAllContacts()
                     macContacts = cnContacts.map { ContactMapper.toUnified(from: $0) }
@@ -1968,9 +1972,9 @@ struct BackupAndRecoverySettingsView: View {
     }
 
     private func exportMac(excel: Bool) {
-        Task {
+        Task.detached(priority: .userInitiated) {
             do {
-                let containerID = settings.macAccountMode == .specific
+                let containerID = await settings.macAccountMode == .specific
                     ? settings.selectedMacAccountIdentifier : nil
                 let fileURL = excel
                     ? try await macExporter.exportToExcel(from: containerID)

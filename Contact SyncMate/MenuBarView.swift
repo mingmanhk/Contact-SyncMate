@@ -99,12 +99,24 @@ struct MenuBarView: View {
                     VStack(spacing: 4) {
                         ProgressView(value: sync.progress)
                             .progressViewStyle(.linear)
-                        Text(sync.stepLabel)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        HStack {
+                            Text(sync.stepLabel)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                            Spacer()
+                            // Item counter: "12 / 240"
+                            if let p = appState.syncProgress, p.totalItems > 0 {
+                                Text("\(p.completedItems) / \(p.totalItems)")
+                                    .font(.caption2)
+                                    .monospacedDigit()
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Sync progress")
+                    .accessibilityValue(Text("\(Int(sync.progress * 100)) percent"))
                 }
 
                 syncNowButton
