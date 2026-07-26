@@ -38,6 +38,12 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
+				README.md,
+				CHANGELOG.md,
+				PRIVACY_POLICY.md,
+				TERMS_OF_SERVICE.md,
+				GoogleOAuthConfig.example.json,
+				GoogleOAuthConfig.swift.template,
 			);
 			target = 992B71C52EBFDF2A00F9355F /* Contact SyncMate */;
 		};
