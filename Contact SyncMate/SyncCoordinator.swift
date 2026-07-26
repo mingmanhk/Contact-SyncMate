@@ -129,6 +129,18 @@ final class SyncCoordinator: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] p in
                 guard let self, let p else { return }
+
+                // `receive(on:)` hops to the main queue, so a value emitted just
+                // before the sync finished can be delivered *after* the phase was
+                // set to .completed — cancelling the subscription does not recall
+                // a block already enqueued. That late write put the coordinator
+                // back into .syncing with a stale step, leaving the UI reading
+                // "AI matching… 0%" forever while nothing was running.
+                //
+                // Progress is only ever meaningful while a sync is active, so
+                // ignoring it otherwise closes the race at the source.
+                guard self.isRunning else { return }
+
                 let frac = p.totalItems > 0
                     ? Double(p.completedItems) / Double(p.totalItems)
                     : 0
@@ -243,12 +255,55 @@ final class SyncCoordinator: ObservableObject {
         stepLabel = step
         progress  = pg
         appState?.isSyncing = p.isActive
+
+        // An active phase is a claim that work is in flight. If that claim ever
+        // outlives the work — a swallowed error, a cancelled task, a delivery
+        // race — the UI shows a frozen progress bar and `guard !isRunning` in
+        // runSync() refuses every subsequent sync, so the app is stuck until
+        // relaunch. The watchdog makes that state self-healing instead.
+        if p.isActive {
+            startWatchdog()
+        } else {
+            watchdogTask?.cancel()
+            watchdogTask = nil
+        }
+    }
+
+    /// How long an active phase may go without any phase update before it is
+    /// treated as abandoned. Generous: a large address book legitimately spends
+    /// minutes inside a single step.
+    private static let watchdogTimeout: TimeInterval = 300
+
+    private var watchdogTask: Task<Void, Never>?
+
+    private func startWatchdog() {
+        // Restarted on every phase update, so the timeout measures silence rather
+        // than total sync duration.
+        watchdogTask?.cancel()
+        watchdogTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(Self.watchdogTimeout))
+            guard !Task.isCancelled, let self, self.isRunning else { return }
+
+            SyncHistory.shared.log(
+                source: "SyncCoordinator",
+                action: "sync.abandoned",
+                details: "No progress for \(Int(Self.watchdogTimeout))s — releasing the stuck phase"
+            )
+            self.setFailed("Sync stopped responding and was cancelled. Please try again.")
+            self.appState?.isSyncing = false
+            self.appState?.syncProgress = nil
+            self.scheduleIdleReset(after: 12)
+        }
     }
 
     private func setFailed(_ message: String) {
         phase     = .failed(message)
         stepLabel = message
         progress  = 0
+        // .failed is not an active phase, so the watchdog has nothing left to
+        // guard — and leaving it armed would fire spuriously later.
+        watchdogTask?.cancel()
+        watchdogTask = nil
     }
 
     private func scheduleIdleReset(after seconds: TimeInterval) {

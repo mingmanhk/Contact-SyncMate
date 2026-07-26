@@ -200,7 +200,7 @@ class MacContactsConnector: ObservableObject {
                   fallback.identifier != store.defaultContainerIdentifier()
             else {
                 history.log(source: "MacContacts", action: "saveContact.failed",
-                            details: "\(targetContainerName): \(error.localizedDescription)")
+                            details: "\(targetContainerName): \(Self.diagnose(error))")
                 throw error
             }
 
@@ -214,6 +214,44 @@ class MacContactsConnector: ObservableObject {
             retry.add(contact, toContainerWithIdentifier: fallback.identifier)
             try store.execute(retry)
         }
+    }
+
+    /// Expand a Contacts error into something diagnosable.
+    ///
+    /// `localizedDescription` for a rejected save is just "The operation couldn't
+    /// be completed. (Cocoa error 134092.)" — it names neither the field nor the
+    /// reason, which made a 100%-reproducible write failure impossible to pin
+    /// down from logs alone. Contacts does report the offending key paths, but
+    /// only in `userInfo` under `CNErrorUserInfoKeyPaths`.
+    static func diagnose(_ error: Error) -> String {
+        let nsError = error as NSError
+        var parts = ["\(nsError.domain) \(nsError.code)"]
+
+        // Enumerated generically rather than reading named Contacts constants:
+        // the useful ones (offending key paths, validation errors, affected
+        // records) are spelled differently across SDK versions, and guessing a
+        // name wrong costs another whole reproduce-and-export cycle. Whatever
+        // Contacts chose to attach, we log.
+        for key in nsError.userInfo.keys.sorted() where key != NSLocalizedDescriptionKey {
+            let value = nsError.userInfo[key]
+
+            let rendered: String
+            switch value {
+            case let underlying as NSError:
+                rendered = "\(underlying.domain) \(underlying.code)"
+            case let list as [Any]:
+                rendered = "[\(list.count)] " + list.prefix(4).map { "\($0)" }.joined(separator: ",")
+            case let some?:
+                rendered = "\(some)"
+            default:
+                rendered = "nil"
+            }
+
+            parts.append("\(key)=\(rendered.prefix(160))")
+        }
+
+        parts.append(nsError.localizedDescription)
+        return parts.joined(separator: " · ")
     }
 
     /// A container that accepts new contacts.
@@ -240,10 +278,16 @@ class MacContactsConnector: ObservableObject {
         
         let saveRequest = CNSaveRequest()
         saveRequest.update(contact)
-        
+
         history.log(source: "MacContacts", action: "updateContact", details: SyncHistoryFormatters.contactSummary(id: nil, name: "\(contact.givenName) \(contact.familyName)"))
-        
-        try store.execute(saveRequest)
+
+        do {
+            try store.execute(saveRequest)
+        } catch {
+            history.log(source: "MacContacts", action: "updateContact.failed",
+                        details: Self.diagnose(error))
+            throw error
+        }
     }
     
     func deleteContact(withIdentifier identifier: String) throws {

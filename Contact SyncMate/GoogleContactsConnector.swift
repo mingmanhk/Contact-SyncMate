@@ -42,6 +42,17 @@ class GoogleContactsConnector: ObservableObject {
     
     // MARK: - API Request Helper
     
+    /// Fields `people.updateContact` accepts in its update mask.
+    ///
+    /// Deliberately a single constant used by both the single and batch update
+    /// paths — they previously carried duplicate literals, and the invalid
+    /// `photos` entry had to be removed from both.
+    ///
+    /// Photos are excluded because the API handles them through
+    /// `people.updateContactPhoto`; passing them here is rejected outright.
+    private static let updatablePersonFields =
+        "names,emailAddresses,phoneNumbers,addresses,organizations,birthdays,urls,nicknames"
+
     /// How many times a request is retried before the error is surfaced.
     ///
     /// Google's People API applies a **per-minute** quota, so a sync touching a
@@ -303,7 +314,12 @@ class GoogleContactsConnector: ObservableObject {
     }
 
     private func performUpdate(_ contact: GoogleContact) async throws -> GoogleContact {
-        let updateFields = "names,emailAddresses,phoneNumbers,addresses,organizations,photos,birthdays,urls,nicknames"
+        // `photos` is NOT a valid updatePersonFields path — People API rejects the
+        // whole request with
+        //   400 "Invalid updatePersonFields mask path: \"photos\""
+        // because photos are written through people.updateContactPhoto instead.
+        // Including it here failed every single update, whatever else changed.
+        let updateFields = Self.updatablePersonFields
 
         var components = URLComponents(string: "\(baseURL)/\(contact.resourceName):updateContact")!
         components.queryItems = [
@@ -394,7 +410,12 @@ class GoogleContactsConnector: ObservableObject {
     private func batchUpdateChunk(_ contacts: [GoogleContact]) async throws -> [GoogleContact] {
         let url = URL(string: "\(baseURL)/people:batchUpdateContacts")!
         
-        let updateFields = "names,emailAddresses,phoneNumbers,addresses,organizations,photos,birthdays,urls,nicknames"
+        // `photos` is NOT a valid updatePersonFields path — People API rejects the
+        // whole request with
+        //   400 "Invalid updatePersonFields mask path: \"photos\""
+        // because photos are written through people.updateContactPhoto instead.
+        // Including it here failed every single update, whatever else changed.
+        let updateFields = Self.updatablePersonFields
         
         let requests = contacts.map { contact -> [String: Any] in
             let person = convertToAPIPerson(contact)
