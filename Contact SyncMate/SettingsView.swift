@@ -228,6 +228,8 @@ struct GeneralSettingsView: View {
     @StateObject private var sync = SyncCoordinator.shared
     @EnvironmentObject private var appState: AppState
     @State private var showingResetConfirmation = false
+    @State private var pendingLanguageRelaunch = false
+    @State private var recentChanges: [SyncEvent] = []
 
     /// Sync Mode used to be selectable here with no way to act on the choice —
     /// picking "Manual Sync…" set a preference and then left the user with
@@ -237,6 +239,43 @@ struct GeneralSettingsView: View {
         appState.isGoogleConnected
             && appState.isMacContactsAuthorized
             && !sync.isRunning
+    }
+
+    /// The last handful of contact-level writes, newest first.
+    ///
+    /// Cached in `@State` rather than computed in the body: `SyncHistory.events()`
+    /// takes a lock and copies the whole event array, and SwiftUI re-evaluates a
+    /// body far more often than this data changes. Refreshed on appear and when a
+    /// sync finishes — the only two moments it can differ.
+    private static func loadRecentChanges() -> [SyncEvent] {
+        SyncHistory.shared.events()
+            .reversed()
+            // `change.*` is the namespace SyncEngine uses for actual mutations,
+            // so lifecycle noise like `sync.start` never crowds out the thing
+            // the user wants to see.
+            .filter { $0.action.lowercased().hasPrefix("change.") }
+            .prefix(5)
+            .map { $0 }
+    }
+
+    private func changeIcon(for action: String) -> String {
+        switch action.lowercased() {
+        case let a where a.contains("add"):    return "plus.circle.fill"
+        case let a where a.contains("update"): return "pencil.circle.fill"
+        case let a where a.contains("delete"): return "minus.circle.fill"
+        case let a where a.contains("merge"):  return "arrow.triangle.merge"
+        case let a where a.contains("fail"):   return "xmark.circle.fill"
+        default:                                return "circle.fill"
+        }
+    }
+
+    private func changeTint(for action: String) -> Color {
+        switch action.lowercased() {
+        case let a where a.contains("fail"):   return Color.appError
+        case let a where a.contains("delete"): return Color.appWarning
+        case let a where a.contains("add"):    return Color.appSuccess
+        default:                                return Color.appInfo
+        }
     }
 
     private var statusIcon: String {
@@ -302,6 +341,44 @@ struct GeneralSettingsView: View {
                         .help(canSync
                               ? "Run a sync now using the mode selected below"
                               : "Connect a Google account and grant Contacts access first")
+                    }
+
+                    // "Last synced 5 minutes ago" says nothing about what moved.
+                    // These are the actual per-contact writes, so the summary
+                    // becomes auditable at a glance instead of requiring a trip
+                    // to the History window.
+                    if !recentChanges.isEmpty {
+                        Divider()
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(recentChanges) { event in
+                                HStack(spacing: 6) {
+                                    Image(systemName: changeIcon(for: event.action))
+                                        .symbolRenderingMode(.hierarchical)
+                                        .foregroundStyle(changeTint(for: event.action))
+                                        .frame(width: 14)
+
+                                    Text(event.details ?? event.action)
+                                        .font(.caption)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+
+                                    Spacer(minLength: 8)
+
+                                    Text(event.timestamp, style: .time)
+                                        .font(.caption2)
+                                        .monospacedDigit()
+                                        .foregroundStyle(.tertiary)
+                                }
+                            }
+
+                            Button("View History & Backups") {
+                                NotificationCenter.default.post(name: .openHistoryWindow, object: nil)
+                            }
+                            .buttonStyle(.link)
+                            .font(.caption)
+                            .padding(.top, 2)
+                        }
                     }
                 }
             } header: {
@@ -434,11 +511,25 @@ struct GeneralSettingsView: View {
             Section {
                 Picker("Interface language", selection: $settings.selectedLanguage) {
                     Text("System Default").tag("system")
-                    Text("English").tag("en")
-                    Text("简体中文").tag("zh-Hans")
-                    Text("繁體中文").tag("zh-Hant")
+                    Text(verbatim: "English").tag("en")
+                    Text(verbatim: "繁體中文").tag("zh-Hant")
+                    // Simplified Chinese is intentionally absent: the catalog
+                    // has no zh-Hans translations, so offering it would silently
+                    // fall back to English — the same dead-control problem the
+                    // Language section itself used to have.
                 }
-                .help("Restart the app after changing the language")
+                .onChange(of: settings.selectedLanguage) { _, newValue in
+                    // macOS resolves the localization table when the bundle
+                    // loads, so the running view tree cannot be re-bound in
+                    // place — see LanguageManager for why swizzling is worse.
+                    if LanguageManager.shared.apply(newValue) {
+                        pendingLanguageRelaunch = true
+                    }
+                }
+
+                Text("The interface language changes after the app restarts.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             } header: {
                 Label("Language", systemImage: "globe")
             }
@@ -475,6 +566,17 @@ struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear { recentChanges = Self.loadRecentChanges() }
+        .onChange(of: sync.phase) { _, phase in
+            // Only a finished sync can have written new change entries.
+            if case .completed = phase { recentChanges = Self.loadRecentChanges() }
+        }
+        .alert("Restart to change the language?", isPresented: $pendingLanguageRelaunch) {
+            Button("Restart Now") { LanguageManager.shared.relaunch() }
+            Button("Later", role: .cancel) {}
+        } message: {
+            Text("Contact SyncMate needs to restart before the interface appears in the language you picked. Your settings are already saved. A sync in progress will be interrupted.")
+        }
     }
 
     // MARK: Helpers

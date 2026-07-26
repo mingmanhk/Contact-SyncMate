@@ -482,11 +482,14 @@ enum AppearanceMode: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// These return plain `String`, not `LocalizedStringKey`, so SwiftUI cannot
+    /// localize them automatically the way it does a `Text("…")` literal — the
+    /// lookup has to be explicit.
     var displayName: String {
         switch self {
-        case .system: return "System"
-        case .light:  return "Light"
-        case .dark:   return "Dark"
+        case .system: return String(localized: "System")
+        case .light:  return String(localized: "Light")
+        case .dark:   return String(localized: "Dark")
         }
     }
 
@@ -524,13 +527,13 @@ enum AccentColorChoice: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .system:   return "System"
-        case .indigo:   return "Indigo"
-        case .teal:     return "Teal"
-        case .green:    return "Green"
-        case .orange:   return "Orange"
-        case .pink:     return "Pink"
-        case .graphite: return "Graphite"
+        case .system:   return String(localized: "System")
+        case .indigo:   return String(localized: "Indigo")
+        case .teal:     return String(localized: "Teal")
+        case .green:    return String(localized: "Green")
+        case .orange:   return String(localized: "Orange")
+        case .pink:     return String(localized: "Pink")
+        case .graphite: return String(localized: "Graphite")
         }
     }
 
@@ -565,26 +568,26 @@ enum SyncType: String, CaseIterable, Codable {
     var displayName: String {
         switch self {
         case .twoWay:
-            return "2-Way Sync"
+            return String(localized: "2-Way Sync")
         case .googleToMac:
-            return "Google → Mac"
+            return String(localized: "Google → Mac")
         case .macToGoogle:
-            return "Mac → Google"
+            return String(localized: "Mac → Google")
         case .manual:
-            return "Manual Sync…"
+            return String(localized: "Manual Sync…")
         }
     }
-    
+
     var description: String {
         switch self {
         case .twoWay:
-            return "Sync changes in both directions automatically"
+            return String(localized: "Sync changes in both directions automatically")
         case .googleToMac:
-            return "Google contacts are the master, changes sync to Mac only"
+            return String(localized: "Google contacts are the master, changes sync to Mac only")
         case .macToGoogle:
-            return "Mac contacts are the master, changes sync to Google only"
+            return String(localized: "Mac contacts are the master, changes sync to Google only")
         case .manual:
-            return "Preview and approve each change before syncing"
+            return String(localized: "Preview and approve each change before syncing")
         }
     }
 }

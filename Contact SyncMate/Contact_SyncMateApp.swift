@@ -107,6 +107,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil
         )
 
+        // Keep AppleLanguages in step with the stored preference. Needed because
+        // resetToDefaults() and a fresh install can leave the two disagreeing;
+        // this only affects the *next* launch, which is the contract the
+        // Language setting advertises.
+        LanguageManager.shared.applyStoredSelectionAtLaunch()
+
         setupStatusItem()
         setupPopover()
         updateActivationPolicy()
@@ -319,7 +325,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func showStatusItemContextMenu() {
         let menu = NSMenu()
 
-        let syncItem = NSMenuItem(title: "Sync Now",
+        // NSMenuItem titles are plain Strings — AppKit does no automatic
+        // localization, unlike a SwiftUI Text literal.
+        let syncItem = NSMenuItem(title: String(localized: "Sync Now"),
                                   action: #selector(contextSyncNow),
                                   keyEquivalent: "")
         syncItem.target = self
@@ -328,19 +336,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(.separator())
 
-        let dashItem = NSMenuItem(title: "Open Dashboard",
+        let dashItem = NSMenuItem(title: String(localized: "Open Dashboard"),
                                   action: #selector(handleOpenDashboardWindow),
                                   keyEquivalent: "")
         dashItem.target = self
         menu.addItem(dashItem)
 
-        let histItem = NSMenuItem(title: "Sync History",
+        let histItem = NSMenuItem(title: String(localized: "Sync History"),
                                   action: #selector(handleOpenHistoryWindow),
                                   keyEquivalent: "")
         histItem.target = self
         menu.addItem(histItem)
 
-        let prefItem = NSMenuItem(title: "Settings…",
+        let prefItem = NSMenuItem(title: String(localized: "Settings…"),
                                   action: #selector(handleOpenSettingsWindow),
                                   keyEquivalent: "")
         prefItem.target = self
@@ -348,7 +356,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(.separator())
 
-        let quitItem = NSMenuItem(title: "Quit Contact SyncMate",
+        let quitItem = NSMenuItem(title: String(localized: "Quit Contact SyncMate"),
                                   action: #selector(NSApplication.terminate(_:)),
                                   keyEquivalent: "q")
         menu.addItem(quitItem)

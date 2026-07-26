@@ -85,3 +85,5 @@ tmp/
 .cursor/
 .vscode/
 .idea/
+.l10n_keys.txt
+.l10n_untranslated.txt

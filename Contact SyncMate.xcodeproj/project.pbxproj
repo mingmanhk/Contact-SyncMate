@@ -37,13 +37,13 @@
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* Exceptions for "Contact SyncMate" folder in "Contact SyncMate" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Info.plist,
-				README.md,
 				CHANGELOG.md,
-				PRIVACY_POLICY.md,
-				TERMS_OF_SERVICE.md,
 				GoogleOAuthConfig.example.json,
 				GoogleOAuthConfig.swift.template,
+				Info.plist,
+				PRIVACY_POLICY.md,
+				README.md,
+				TERMS_OF_SERVICE.md,
 			);
 			target = 992B71C52EBFDF2A00F9355F /* Contact SyncMate */;
 		};
@@ -187,6 +187,7 @@
 			knownRegions = (
 				en,
 				Base,
+				"zh-Hant",
 			);
 			mainGroup = 992B71BD2EBFDF2A00F9355F;
 			minimizedProjectReferenceProxies = 1;

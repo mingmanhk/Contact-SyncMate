@@ -1,0 +1,4523 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "": {},
+    "%@ %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ %2$lld"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ %2$lld"
+          }
+        }
+      }
+    },
+    "%@ • %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ • %2$@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ • %2$@"
+          }
+        }
+      }
+    },
+    "%@: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@: %2$@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@：%2$@"
+          }
+        }
+      }
+    },
+    "%lld": {},
+    "%lld / %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$lld / %2$lld"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld / %2$lld"
+          }
+        }
+      }
+    },
+    "%lld Google": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google %lld 筆"
+          }
+        }
+      }
+    },
+    "%lld Mac": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac %lld 筆"
+          }
+        }
+      }
+    },
+    "%lld account%@ available": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$lld account%2$@ available"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有 %1$lld 個帳號可用%2$@"
+          }
+        }
+      }
+    },
+    "%lld backups": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 份備份"
+          }
+        }
+      }
+    },
+    "%lld change%@ pending": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$lld change%2$@ pending"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld 項待處理變更%2$@"
+          }
+        }
+      }
+    },
+    "%lld conflict%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$lld conflict%2$@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld 個衝突%2$@"
+          }
+        }
+      }
+    },
+    "%lld conflict%@ need review — tap Details on each highlighted row.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$lld conflict%2$@ need review — tap Details on each highlighted row."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有 %1$lld 個衝突需要檢視%2$@ — 請點選標示列的「詳細資料」。"
+          }
+        }
+      }
+    },
+    "%lld contact%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$lld contact%2$@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld 位聯絡人%2$@"
+          }
+        }
+      }
+    },
+    "%lld contacts": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 位聯絡人"
+          }
+        }
+      }
+    },
+    "%lld group%@ found": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$lld group%2$@ found"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找到 %1$lld 個群組%2$@"
+          }
+        }
+      }
+    },
+    "%lld of %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$lld of %2$lld"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld / %2$lld"
+          }
+        }
+      }
+    },
+    "%lld of %lld conflict%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$lld of %2$lld conflict%3$@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld / %2$lld 個衝突%3$@"
+          }
+        }
+      }
+    },
+    "%lld of %lld decided": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$lld of %2$lld decided"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已決定 %1$lld / %2$lld"
+          }
+        }
+      }
+    },
+    "%lld percent": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "百分之 %lld"
+          }
+        }
+      }
+    },
+    "%lld selected": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已選取 %lld 項"
+          }
+        }
+      }
+    },
+    "%lld skipped": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已略過 %lld 項"
+          }
+        }
+      }
+    },
+    "%lld%%": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld%%"
+          }
+        }
+      }
+    },
+    "+ %lld more": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "還有 %lld 項"
+          }
+        }
+      }
+    },
+    "+%lld": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "+%lld"
+          }
+        }
+      }
+    },
+    "14 days": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "14 天"
+          }
+        }
+      }
+    },
+    "2-Way": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "雙向"
+          }
+        }
+      }
+    },
+    "2-Way Sync": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "雙向同步"
+          }
+        }
+      }
+    },
+    "30 days": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 天"
+          }
+        }
+      }
+    },
+    "7 days": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 天"
+          }
+        }
+      }
+    },
+    "90 days": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "90 天"
+          }
+        }
+      }
+    },
+    "A sync is already in progress.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已有同步作業正在進行。"
+          }
+        }
+      }
+    },
+    "AI Analysis": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 分析"
+          }
+        }
+      }
+    },
+    "AI Matching": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 配對"
+          }
+        }
+      }
+    },
+    "AI Score": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 評分"
+          }
+        }
+      }
+    },
+    "AI adjusted score: %lld → %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "AI adjusted score: %1$lld → %2$lld"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 調整後評分：%1$lld → %2$lld"
+          }
+        }
+      }
+    },
+    "AI-Powered Matching": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 智慧配對"
+          }
+        }
+      }
+    },
+    "AI: %@": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI：%@"
+          }
+        }
+      }
+    },
+    "Accent colour": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "強調色"
+          }
+        }
+      }
+    },
+    "Access denied": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已拒絕權限"
+          }
+        }
+      }
+    },
+    "Access granted": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已授予權限"
+          }
+        }
+      }
+    },
+    "Access required": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要取用權限"
+          }
+        }
+      }
+    },
+    "Account mode:": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "帳號模式："
+          }
+        }
+      }
+    },
+    "Advanced": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "進階"
+          }
+        }
+      }
+    },
+    "All changes skipped": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已略過所有變更"
+          }
+        }
+      }
+    },
+    "All contacts appear to be unique.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有聯絡人看起來都沒有重複。"
+          }
+        }
+      }
+    },
+    "All preferences will return to defaults. Your Google account connection will not be affected.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有偏好設定會回到預設值。你的 Google 帳號連線不會受影響。"
+          }
+        }
+      }
+    },
+    "Allow Access": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允許取用"
+          }
+        }
+      }
+    },
+    "Allow Contacts Access": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允許取用聯絡人"
+          }
+        }
+      }
+    },
+    "Allow silent auto-merge of duplicates": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允許靜默自動合併重複項"
+          }
+        }
+      }
+    },
+    "Anthropic API Key": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anthropic API 密鑰"
+          }
+        }
+      }
+    },
+    "Appearance": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "外觀"
+          }
+        }
+      }
+    },
+    "Applied on next sync": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下次同步時生效"
+          }
+        }
+      }
+    },
+    "Apply %lld Change%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Apply %1$lld Change%2$@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "套用 %1$lld 項變更%2$@"
+          }
+        }
+      }
+    },
+    "Apply Decision": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "套用決定"
+          }
+        }
+      }
+    },
+    "Apply Decisions": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "套用決定"
+          }
+        }
+      }
+    },
+    "Apply a consistent casing convention to names as they are written": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "寫入姓名時套用一致的大小寫慣例"
+          }
+        }
+      }
+    },
+    "Apply high-confidence duplicate merges without asking. Off = always review.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不詢問即套用高信心的重複項合併。關閉 = 一律人工檢視。"
+          }
+        }
+      }
+    },
+    "Ask before Sync Now": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "執行「立即同步」前先詢問"
+          }
+        }
+      }
+    },
+    "Ask before deleting contacts": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刪除聯絡人前先詢問"
+          }
+        }
+      }
+    },
+    "Ask before restoring a backup": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "還原備份前先詢問"
+          }
+        }
+      }
+    },
+    "Authenticating…": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在驗證…"
+          }
+        }
+      }
+    },
+    "Auto sync will be skipped when any active condition is not met.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "任一啟用的條件不符合時,就會略過自動同步。"
+          }
+        }
+      }
+    },
+    "Auto-merge": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動合併"
+          }
+        }
+      }
+    },
+    "Auto-merge patterns": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動合併模式"
+          }
+        }
+      }
+    },
+    "Auto-merge threshold:": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動合併門檻："
+          }
+        }
+      }
+    },
+    "Auto-sync": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動同步"
+          }
+        }
+      }
+    },
+    "Automatic Backups": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動備份"
+          }
+        }
+      }
+    },
+    "Automatic Merging": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動合併"
+          }
+        }
+      }
+    },
+    "Automatically create a snapshot before every sync": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每次同步前自動建立快照"
+          }
+        }
+      }
+    },
+    "Automatically merge contacts with score ≥ %lld": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動合併評分 ≥ %lld 的聯絡人"
+          }
+        }
+      }
+    },
+    "Automation": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動化"
+          }
+        }
+      }
+    },
+    "Back": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一步"
+          }
+        }
+      }
+    },
+    "Backed up %lld contacts successfully": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已成功備份 %lld 位聯絡人"
+          }
+        }
+      }
+    },
+    "Backing Up…": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在備份…"
+          }
+        }
+      }
+    },
+    "Backup Details": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "備份詳細資料"
+          }
+        }
+      }
+    },
+    "Backup Information": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "備份資訊"
+          }
+        }
+      }
+    },
+    "Backup Location": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "備份位置"
+          }
+        }
+      }
+    },
+    "Backup Status": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "備份狀態"
+          }
+        }
+      }
+    },
+    "Backup Summary": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "備份摘要"
+          }
+        }
+      }
+    },
+    "Backup Timeline": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "備份時間軸"
+          }
+        }
+      }
+    },
+    "Backup storage exceeds 1 GB": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "備份佔用空間已超過 1 GB"
+          }
+        }
+      }
+    },
+    "Backups": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "備份"
+          }
+        }
+      }
+    },
+    "Backups will be created automatically during syncs": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步過程中會自動建立備份"
+          }
+        }
+      }
+    },
+    "Batch Google API updates": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "批次處理 Google API 更新"
+          }
+        }
+      }
+    },
+    "CSV…": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CSV…"
+          }
+        }
+      }
+    },
+    "Call API for rule scores in range: %lld – %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Call API for rule scores in range: %1$lld – %2$lld"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在此規則評分範圍內呼叫 API：%1$lld – %2$lld"
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消"
+          }
+        }
+      }
+    },
+    "Catch duplicates that rule-based scoring misses — nicknames, name initials, transposed names, phonetic variants, and phone-number format differences.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找出規則式評分會漏掉的重複項 — 暱稱、姓名縮寫、姓名顛倒、發音變體,以及電話號碼格式差異。"
+          }
+        }
+      }
+    },
+    "Change": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "變更"
+          }
+        }
+      }
+    },
+    "Change Location…": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "變更位置…"
+          }
+        }
+      }
+    },
+    "Changes & Conflicts": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "變更與衝突"
+          }
+        }
+      }
+    },
+    "Choose Your Sync Direction": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選擇同步方向"
+          }
+        }
+      }
+    },
+    "Choose a different folder for backups": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "為備份選擇其他資料夾"
+          }
+        }
+      }
+    },
+    "Choose which Mac Contacts account to use for syncing with Google": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選擇要與 Google 同步的 Mac 聯絡人帳號"
+          }
+        }
+      }
+    },
+    "Choose which actions ask for confirmation. Safer defaults are pre-selected; skip confirmations you find repetitive.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選擇哪些動作需要確認。預設已選較安全的選項;覺得重複的確認可以關閉。"
+          }
+        }
+      }
+    },
+    "Chosen: %@": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已選：%@"
+          }
+        }
+      }
+    },
+    "Clear": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除"
+          }
+        }
+      }
+    },
+    "Clear All Saved Patterns": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除所有已儲存的模式"
+          }
+        }
+      }
+    },
+    "Clear All Saved Patterns?": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要清除所有已儲存的模式嗎？"
+          }
+        }
+      }
+    },
+    "Close": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "關閉"
+          }
+        }
+      }
+    },
+    "Closes Contact SyncMate.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "結束 Contact SyncMate。"
+          }
+        }
+      }
+    },
+    "Cloud AI (Anthropic API)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "雲端 AI(Anthropic API)"
+          }
+        }
+      }
+    },
+    "Combine fields from both sides rather than overwriting": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "合併兩邊的欄位,而非直接覆寫"
+          }
+        }
+      }
+    },
+    "Confirm pending deletions": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確認待刪除項目"
+          }
+        }
+      }
+    },
+    "Confirmation threshold:": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確認門檻："
+          }
+        }
+      }
+    },
+    "Confirmations": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確認提示"
+          }
+        }
+      }
+    },
+    "Conflict": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "衝突"
+          }
+        }
+      }
+    },
+    "Conflicts need review": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有衝突需要檢視"
+          }
+        }
+      }
+    },
+    "Connect": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "連接"
+          }
+        }
+      }
+    },
+    "Connect Google Account": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "連接 Google 帳號"
+          }
+        }
+      }
+    },
+    "Connect a Google account and grant Contacts access first": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請先連接 Google 帳號並授予聯絡人取用權限"
+          }
+        }
+      }
+    },
+    "Connect both accounts to sync": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請連接兩邊帳號才能同步"
+          }
+        }
+      }
+    },
+    "Connect your Google account and grant Contacts access to start syncing.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "連接你的 Google 帳號並授予聯絡人取用權限即可開始同步。"
+          }
+        }
+      }
+    },
+    "Connected": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已連接"
+          }
+        }
+      }
+    },
+    "Connecting…": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在連接…"
+          }
+        }
+      }
+    },
+    "Consider cleaning up old backups (>50 total)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "建議清理舊備份(總數已超過 50)"
+          }
+        }
+      }
+    },
+    "Contact SyncMate": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contact SyncMate"
+          }
+        }
+      }
+    },
+    "Contact SyncMate needs access to your Mac contacts to sync them.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contact SyncMate 需要取用你的 Mac 聯絡人才能進行同步。"
+          }
+        }
+      }
+    },
+    "Contact SyncMate needs permission to read and write your Mac contacts.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contact SyncMate 需要讀取及寫入你的 Mac 聯絡人的權限。"
+          }
+        }
+      }
+    },
+    "Contact SyncMate needs to restart before the interface appears in the language you picked. Your settings are already saved. A sync in progress will be interrupted.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contact SyncMate 需要重新啟動,介面才會以你選擇的語言顯示。你的設定已儲存。正在進行的同步會被中斷。"
+          }
+        }
+      }
+    },
+    "Contacts in Backup": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "備份中的聯絡人"
+          }
+        }
+      }
+    },
+    "Contacts with score %lld-%lld will prompt for confirmation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Contacts with score %1$lld-%2$lld will prompt for confirmation"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "評分 %1$lld-%2$lld 的聯絡人會要求確認"
+          }
+        }
+      }
+    },
+    "Continue": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "繼續"
+          }
+        }
+      }
+    },
+    "Convention": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "慣例"
+          }
+        }
+      }
+    },
+    "Create Backup Now": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "立即建立備份"
+          }
+        }
+      }
+    },
+    "Created": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "建立時間"
+          }
+        }
+      }
+    },
+    "Creates a safety backup before every sync operation. Recommended.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在每次同步作業前建立安全備份。建議啟用。"
+          }
+        }
+      }
+    },
+    "Current contacts will be replaced. Make sure you want to continue.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目前的聯絡人將被取代。請確認你要繼續。"
+          }
+        }
+      }
+    },
+    "Dashboard / History / Preferences links in the popover": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "彈出視窗中的儀表板／記錄／設定連結"
+          }
+        }
+      }
+    },
+    "Data & History": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "資料與記錄"
+          }
+        }
+      }
+    },
+    "Deduplication Settings": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重複項處理設定"
+          }
+        }
+      }
+    },
+    "Default Conflict Resolution": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "預設衝突解決方式"
+          }
+        }
+      }
+    },
+    "Deselected fields are left untouched on both sides during every sync.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未選取的欄位在每次同步時,兩邊都不會被變更。"
+          }
+        }
+      }
+    },
+    "Details": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "詳細資料"
+          }
+        }
+      }
+    },
+    "Detect duplicates before sync": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步前偵測重複項"
+          }
+        }
+      }
+    },
+    "Detection Sensitivity": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "偵測靈敏度"
+          }
+        }
+      }
+    },
+    "Direction": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "方向"
+          }
+        }
+      }
+    },
+    "Direction: %@. You can turn off this confirmation in Settings → General → Confirmations.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "方向：%@。你可以在「設定 → 一般 → 確認提示」中關閉此確認。"
+          }
+        }
+      }
+    },
+    "Display a badge count on the menu bar icon for pending changes": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在選單列圖像上顯示待處理變更的數量標記"
+          }
+        }
+      }
+    },
+    "Display a monochrome icon in the menu bar": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在選單列顯示單色圖像"
+          }
+        }
+      }
+    },
+    "Done": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成"
+          }
+        }
+      }
+    },
+    "Dry run is active — no changes will be saved.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "試執行已啟用 — 不會儲存任何變更。"
+          }
+        }
+      }
+    },
+    "Dry run mode": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "試執行模式"
+          }
+        }
+      }
+    },
+    "Enable AI matching": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "啟用 AI 配對"
+          }
+        }
+      }
+    },
+    "Enable auto-merge for high-confidence matches": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "對高信心配對啟用自動合併"
+          }
+        }
+      }
+    },
+    "Enable automatic sync": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "啟用自動同步"
+          }
+        }
+      }
+    },
+    "English": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "English"
+          }
+        }
+      }
+    },
+    "Even high-confidence matches need manual confirmation on first sync": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "即使是高信心配對,首次同步時仍需人工確認"
+          }
+        }
+      }
+    },
+    "Events older than this are removed automatically": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "超過此期限的事件會自動移除"
+          }
+        }
+      }
+    },
+    "Excel…": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Excel…"
+          }
+        }
+      }
+    },
+    "Export": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "匯出"
+          }
+        }
+      }
+    },
+    "Export Log": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "匯出記錄"
+          }
+        }
+      }
+    },
+    "Export to File": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "匯出到檔案"
+          }
+        }
+      }
+    },
+    "Field": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "欄位"
+          }
+        }
+      }
+    },
+    "Fields to Sync": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要同步的欄位"
+          }
+        }
+      }
+    },
+    "Filter history": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "篩選記錄"
+          }
+        }
+      }
+    },
+    "Filter sync by groups / labels": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "依群組／標籤篩選同步範圍"
+          }
+        }
+      }
+    },
+    "Filters": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "篩選"
+          }
+        }
+      }
+    },
+    "Finish setting up Contact SyncMate": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成 Contact SyncMate 設定"
+          }
+        }
+      }
+    },
+    "Follow the system, or force light / dark mode for Contact SyncMate only": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跟隨系統,或僅為 Contact SyncMate 強制使用淺色／深色模式"
+          }
+        }
+      }
+    },
+    "Force update all contacts": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "強制更新所有聯絡人"
+          }
+        }
+      }
+    },
+    "Force update is useful after fixing data corruption. Dry run is useful for auditing what a sync will do.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "修復資料損毀後適合使用強制更新;想稽核同步會做什麼時適合使用試執行。"
+          }
+        }
+      }
+    },
+    "Forever": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "永久保留"
+          }
+        }
+      }
+    },
+    "Generating preview...": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在產生預覽…"
+          }
+        }
+      }
+    },
+    "Get Last Sync Status": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取得最近同步狀態"
+          }
+        }
+      }
+    },
+    "Get Started": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開始使用"
+          }
+        }
+      }
+    },
+    "Get a key at console.anthropic.com — stored securely in the macOS Keychain": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可於 console.anthropic.com 取得密鑰 — 會安全儲存在 macOS 鑰匙串中"
+          }
+        }
+      }
+    },
+    "Google": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google"
+          }
+        }
+      }
+    },
+    "Google Account": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 帳號"
+          }
+        }
+      }
+    },
+    "Google Account not connected": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未連接 Google 帳號"
+          }
+        }
+      }
+    },
+    "Google Account:": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 帳號："
+          }
+        }
+      }
+    },
+    "Google Contacts": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 聯絡人"
+          }
+        }
+      }
+    },
+    "Google account is not connected. Open Contact SyncMate → Settings → Accounts to sign in.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未連接 Google 帳號。請開啟 Contact SyncMate → 設定 → 帳號 進行登入。"
+          }
+        }
+      }
+    },
+    "Google account not connected — open Settings → Accounts to sign in.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未連接 Google 帳號 — 請開啟「設定 → 帳號」登入。"
+          }
+        }
+      }
+    },
+    "Google and Mac account rows in the menu bar popover": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選單列彈出視窗中的 Google 與 Mac 帳號列"
+          }
+        }
+      }
+    },
+    "Google → Mac": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google → Mac"
+          }
+        }
+      }
+    },
+    "Grant Access": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "授予權限"
+          }
+        }
+      }
+    },
+    "Grant Contacts access (Accounts tab) to export Mac contacts.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請先授予聯絡人權限(帳號頁籤)才能匯出 Mac 聯絡人。"
+          }
+        }
+      }
+    },
+    "Granted": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已授權"
+          }
+        }
+      }
+    },
+    "Groups with more than %lld contacts always need confirmation": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "超過 %lld 位聯絡人的群組一律需要確認"
+          }
+        }
+      }
+    },
+    "Help": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "說明"
+          }
+        }
+      }
+    },
+    "Hide API key": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隱藏 API 密鑰"
+          }
+        }
+      }
+    },
+    "How scoring works": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "評分機制說明"
+          }
+        }
+      }
+    },
+    "Important": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重要"
+          }
+        }
+      }
+    },
+    "Interface language": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "介面語言"
+          }
+        }
+      }
+    },
+    "Interval": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "間隔"
+          }
+        }
+      }
+    },
+    "Keep app in menu bar only": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只在選單列中顯示"
+          }
+        }
+      }
+    },
+    "Keep at most": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最多保留"
+          }
+        }
+      }
+    },
+    "Keep history for": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記錄保留期限"
+          }
+        }
+      }
+    },
+    "Keep separate patterns": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保持分開的模式"
+          }
+        }
+      }
+    },
+    "Keep your Google and Mac contacts in perfect sync — privately, on your device.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "讓你的 Google 與 Mac 聯絡人保持一致 — 全程在你的裝置上進行,不外傳。"
+          }
+        }
+      }
+    },
+    "Language": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "語言"
+          }
+        }
+      }
+    },
+    "Last Backup": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近備份"
+          }
+        }
+      }
+    },
+    "Later": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "稍後"
+          }
+        }
+      }
+    },
+    "Launch at login": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登入時啟動"
+          }
+        }
+      }
+    },
+    "Learn from your choices to auto-apply decisions for similar duplicate patterns": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "從你的選擇中學習,自動套用到類似的重複模式"
+          }
+        }
+      }
+    },
+    "Loading accounts…": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在載入帳號…"
+          }
+        }
+      }
+    },
+    "Loading statistics...": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在載入統計資料…"
+          }
+        }
+      }
+    },
+    "Loading…": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在載入…"
+          }
+        }
+      }
+    },
+    "Local NLP Signals (always active)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本機 NLP 訊號(永久啟用)"
+          }
+        }
+      }
+    },
+    "Mac": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac"
+          }
+        }
+      }
+    },
+    "Mac Contacts": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac 聯絡人"
+          }
+        }
+      }
+    },
+    "Mac Contacts Access": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac 聯絡人取用權限"
+          }
+        }
+      }
+    },
+    "Mac Contacts access not granted — open Settings → Accounts to authorize.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未取得 Mac 聯絡人權限 — 請開啟「設定 → 帳號」授權。"
+          }
+        }
+      }
+    },
+    "Mac → Google": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac → Google"
+          }
+        }
+      }
+    },
+    "Manage": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "管理"
+          }
+        }
+      }
+    },
+    "Manual Backup": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "手動備份"
+          }
+        }
+      }
+    },
+    "Match": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配對"
+          }
+        }
+      }
+    },
+    "Max group size for auto-merge:": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動合併的群組上限："
+          }
+        }
+      }
+    },
+    "Menu Bar Popover": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選單列彈出視窗"
+          }
+        }
+      }
+    },
+    "Merge Behaviour": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "合併行為"
+          }
+        }
+      }
+    },
+    "Merge Preview": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "合併預覽"
+          }
+        }
+      }
+    },
+    "Merge during 1-way sync": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "單向同步時合併欄位"
+          }
+        }
+      }
+    },
+    "Merge during 2-way sync": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "雙向同步時合併欄位"
+          }
+        }
+      }
+    },
+    "Merge fields during 1-way sync instead of full replacement": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "單向同步時合併欄位,而非整筆取代"
+          }
+        }
+      }
+    },
+    "Merged Result": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "合併結果"
+          }
+        }
+      }
+    },
+    "Model": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型"
+          }
+        }
+      }
+    },
+    "Name Formatting": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "姓名格式"
+          }
+        }
+      }
+    },
+    "Never": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "永不"
+          }
+        }
+      }
+    },
+    "Newest Backup": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最新備份"
+          }
+        }
+      }
+    },
+    "Next": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一步"
+          }
+        }
+      }
+    },
+    "Next sync ": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下次同步 "
+          }
+        }
+      }
+    },
+    "Next sync will run after current interval elapses.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下次同步會在目前間隔結束後執行。"
+          }
+        }
+      }
+    },
+    "No %@ changes": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有 %@ 變更"
+          }
+        }
+      }
+    },
+    "No Backups": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有備份"
+          }
+        }
+      }
+    },
+    "No Contacts Accounts Found": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到聯絡人帳號"
+          }
+        }
+      }
+    },
+    "No Duplicates Found": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到重複項"
+          }
+        }
+      }
+    },
+    "No Sync History": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有同步記錄"
+          }
+        }
+      }
+    },
+    "No Version History": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有版本記錄"
+          }
+        }
+      }
+    },
+    "No account selected": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未選擇帳號"
+          }
+        }
+      }
+    },
+    "No backup files yet": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚無備份檔案"
+          }
+        }
+      }
+    },
+    "No backups yet - run a sync to create backups": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚無備份 — 執行同步即會建立備份"
+          }
+        }
+      }
+    },
+    "No changes": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有變更"
+          }
+        }
+      }
+    },
+    "No conditions set — auto sync will run unconditionally at the chosen interval.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未設定任何條件 — 自動同步會依所選間隔無條件執行。"
+          }
+        }
+      }
+    },
+    "No groups selected — the filter matches nothing. Select at least one group or label, or turn filtering off.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未選取任何群組 — 篩選條件不會符合任何項目。請至少選一個群組或標籤,或關閉篩選。"
+          }
+        }
+      }
+    },
+    "No results for \"%@\"": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到「%@」的結果"
+          }
+        }
+      }
+    },
+    "No sync history yet": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚無同步記錄"
+          }
+        }
+      }
+    },
+    "Normalise name formatting during sync": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步時標準化姓名格式"
+          }
+        }
+      }
+    },
+    "Normalise postal country codes": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "標準化郵遞國碼"
+          }
+        }
+      }
+    },
+    "Not connected": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未連接"
+          }
+        }
+      }
+    },
+    "Notes": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "備註"
+          }
+        }
+      }
+    },
+    "Notes sync is unavailable in this build — Apple restricts the Contacts note field to apps with an approved entitlement.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此版本無法同步備註欄位 — Apple 限制只有取得核准權限的 App 才能存取聯絡人備註。"
+          }
+        }
+      }
+    },
+    "Nothing to Apply": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有可套用的項目"
+          }
+        }
+      }
+    },
+    "Notifications": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知"
+          }
+        }
+      }
+    },
+    "Notify when a sync fails": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步失敗時通知"
+          }
+        }
+      }
+    },
+    "Notify when a sync finishes successfully": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步成功完成時通知"
+          }
+        }
+      }
+    },
+    "Notify when conflicts need your attention": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有衝突需要你處理時通知"
+          }
+        }
+      }
+    },
+    "Off by default — your names are never rewritten unless you opt in. Chinese, Japanese, and Korean names are always left unchanged. Title Case handles \"van der Berg\", \"McDonald\", and \"O'Brien\" correctly.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "預設關閉 — 除非你主動開啟,姓名不會被改寫。中文、日文、韓文姓名一律保持原樣。首字母大寫模式能正確處理「van der Berg」、「McDonald」與「O'Brien」。"
+          }
+        }
+      }
+    },
+    "Off — turn on for background sync": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已關閉 — 開啟即可背景同步"
+          }
+        }
+      }
+    },
+    "Older backups are pruned automatically once this limit is reached": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "達到此上限後,較舊的備份會自動清除"
+          }
+        }
+      }
+    },
+    "Oldest Backup": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最舊備份"
+          }
+        }
+      }
+    },
+    "One-off spreadsheet exports for archiving or importing elsewhere. Snapshots above are the app's own restore format.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一次性的試算表匯出,適合封存或匯入其他工具。上方的快照才是 App 自己的還原格式。"
+          }
+        }
+      }
+    },
+    "Only sync contacts that belong to selected groups or labels": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只同步屬於所選群組或標籤的聯絡人"
+          }
+        }
+      }
+    },
+    "Only when Mac is idle": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "僅在 Mac 閒置時"
+          }
+        }
+      }
+    },
+    "Only when on AC power": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "僅在接上電源時"
+          }
+        }
+      }
+    },
+    "Only when on Wi-Fi": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "僅在使用 Wi-Fi 時"
+          }
+        }
+      }
+    },
+    "Open Accounts Settings": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟帳號設定"
+          }
+        }
+      }
+    },
+    "Open Dashboard": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟儀表板"
+          }
+        }
+      }
+    },
+    "Open Notification Settings…": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟通知設定…"
+          }
+        }
+      }
+    },
+    "Open Preferences": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟設定"
+          }
+        }
+      }
+    },
+    "Open Settings": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟設定"
+          }
+        }
+      }
+    },
+    "Open System Settings → Privacy & Security → Contacts and enable Contact SyncMate.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請開啟「系統設定 → 隱私權與安全性 → 聯絡人」並啟用 Contact SyncMate。"
+          }
+        }
+      }
+    },
+    "Open in Finder": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Finder 中開啟"
+          }
+        }
+      }
+    },
+    "Opens %@.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟 %@。"
+          }
+        }
+      }
+    },
+    "Opens a detailed view of the backup contents.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟備份內容的詳細檢視。"
+          }
+        }
+      }
+    },
+    "Optional. Without a key, only the on-device NLP signals above are used — still effective for most duplicates. With a key, borderline matches (rule score %lld–%lld) are escalated to the selected Claude model.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Optional. Without a key, only the on-device NLP signals above are used — still effective for most duplicates. With a key, borderline matches (rule score %1$lld–%2$lld) are escalated to the selected Claude model."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選用。未填密鑰時只會使用上方的本機 NLP 訊號 — 對多數重複項仍然有效。填入密鑰後,難以判定的配對(規則評分 %1$lld–%2$lld)會交由所選的 Claude 模型判斷。"
+          }
+        }
+      }
+    },
+    "Original Contacts (%lld)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原始聯絡人(%lld)"
+          }
+        }
+      }
+    },
+    "Pattern Memory": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模式記憶"
+          }
+        }
+      }
+    },
+    "Per-contact overrides are always available in the Sync Preview.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你隨時可以在「同步預覽」中逐一覆寫個別聯絡人。"
+          }
+        }
+      }
+    },
+    "Performance": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "效能"
+          }
+        }
+      }
+    },
+    "Permissions": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "權限"
+          }
+        }
+      }
+    },
+    "Possible Duplicates": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可能的重複項"
+          }
+        }
+      }
+    },
+    "Preview Merged Result": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "預覽合併結果"
+          }
+        }
+      }
+    },
+    "Preview what would change without writing anything": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "預覽將會變更的內容,但不寫入任何資料"
+          }
+        }
+      }
+    },
+    "Previous": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一個"
+          }
+        }
+      }
+    },
+    "Propagate deletions across sides": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "將刪除同步到另一邊"
+          }
+        }
+      }
+    },
+    "Quick auto-sync on/off switch in the popover": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "彈出視窗中的自動同步快速開關"
+          }
+        }
+      }
+    },
+    "Quit Contact SyncMate": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "結束 Contact SyncMate"
+          }
+        }
+      }
+    },
+    "Recent Backup Files": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近的備份檔案"
+          }
+        }
+      }
+    },
+    "Recent Changes": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近的變更"
+          }
+        }
+      }
+    },
+    "Recommendations": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "建議"
+          }
+        }
+      }
+    },
+    "Refresh contact count": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新整理聯絡人數量"
+          }
+        }
+      }
+    },
+    "Remember my decisions for similar matches": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記住我對類似配對的決定"
+          }
+        }
+      }
+    },
+    "Remember this choice for similar matches": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記住此選擇並套用於類似配對"
+          }
+        }
+      }
+    },
+    "Replaces your current contacts with the contents of this backup.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "會以此備份的內容取代你目前的聯絡人。"
+          }
+        }
+      }
+    },
+    "Requesting…": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在請求…"
+          }
+        }
+      }
+    },
+    "Require confirmation on first sync": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "首次同步時要求確認"
+          }
+        }
+      }
+    },
+    "Required for syncing contacts with Google Contacts via the People API.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "透過 People API 與 Google 聯絡人同步時必須具備。"
+          }
+        }
+      }
+    },
+    "Reset All Settings to Defaults…": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "將所有設定重設為預設值…"
+          }
+        }
+      }
+    },
+    "Reset Settings": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重設設定"
+          }
+        }
+      }
+    },
+    "Reset all settings?": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要重設所有設定嗎？"
+          }
+        }
+      }
+    },
+    "Reset to Default": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重設為預設值"
+          }
+        }
+      }
+    },
+    "Resolution": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解決方式"
+          }
+        }
+      }
+    },
+    "Restart Now": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "立即重新啟動"
+          }
+        }
+      }
+    },
+    "Restart the app after changing the language": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "變更語言後請重新啟動 App"
+          }
+        }
+      }
+    },
+    "Restart to change the language?": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要重新啟動以變更語言嗎？"
+          }
+        }
+      }
+    },
+    "Restore": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "還原"
+          }
+        }
+      }
+    },
+    "Restore from Backup": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "從備份還原"
+          }
+        }
+      }
+    },
+    "Resume Setup": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "繼續設定"
+          }
+        }
+      }
+    },
+    "Return to the app's default backup folder": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "回到 App 的預設備份資料夾"
+          }
+        }
+      }
+    },
+    "Returns a summary of the most recent contact sync.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "回傳最近一次聯絡人同步的摘要。"
+          }
+        }
+      }
+    },
+    "Reveal backup folder in Finder": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Finder 中顯示備份資料夾"
+          }
+        }
+      }
+    },
+    "Reveal in Finder": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Finder 中顯示"
+          }
+        }
+      }
+    },
+    "Review Possible Duplicates": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "檢視可能的重複項"
+          }
+        }
+      }
+    },
+    "Review…": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "檢視…"
+          }
+        }
+      }
+    },
+    "Run Conditions": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "執行條件"
+          }
+        }
+      }
+    },
+    "Run a sync now using the mode selected below": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以下方選取的模式立即執行同步"
+          }
+        }
+      }
+    },
+    "Run sync automatically in the background": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在背景自動執行同步"
+          }
+        }
+      }
+    },
+    "Run the AI matching pipeline during duplicate detection": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在偵測重複項時執行 AI 配對流程"
+          }
+        }
+      }
+    },
+    "Run your first sync to see activity here.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "執行第一次同步後,這裡就會顯示紀錄。"
+          }
+        }
+      }
+    },
+    "Runs %@": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "執行 %@"
+          }
+        }
+      }
+    },
+    "Runs a contact sync between Google Contacts and Mac Contacts using your configured direction and settings.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "依你設定的方向與選項,在 Google 聯絡人與 Mac 聯絡人之間執行同步。"
+          }
+        }
+      }
+    },
+    "Safety": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安全"
+          }
+        }
+      }
+    },
+    "Scan for duplicate contacts before changes are applied": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在套用變更前掃描重複的聯絡人"
+          }
+        }
+      }
+    },
+    "Schedule": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "排程"
+          }
+        }
+      }
+    },
+    "Score Ranges": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "評分範圍"
+          }
+        }
+      }
+    },
+    "Score must be ≥ %lld for automatic merge": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "評分須 ≥ %lld 才會自動合併"
+          }
+        }
+      }
+    },
+    "Search history": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜尋記錄"
+          }
+        }
+      }
+    },
+    "Select": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選取"
+          }
+        }
+      }
+    },
+    "Select Account…": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選擇帳號…"
+          }
+        }
+      }
+    },
+    "Select a Contacts Account": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選擇聯絡人帳號"
+          }
+        }
+      }
+    },
+    "Selected": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已選取"
+          }
+        }
+      }
+    },
+    "Selected Account:": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已選帳號："
+          }
+        }
+      }
+    },
+    "Send up to 100 changes per API call for faster sync": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每次 API 呼叫最多送出 100 項變更以加快同步"
+          }
+        }
+      }
+    },
+    "Settings…": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定…"
+          }
+        }
+      }
+    },
+    "Setup Required": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要設定"
+          }
+        }
+      }
+    },
+    "Show API key": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顯示 API 密鑰"
+          }
+        }
+      }
+    },
+    "Show a confirmation dialog before a restore rewrites contacts": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "還原覆寫聯絡人前顯示確認對話框"
+          }
+        }
+      }
+    },
+    "Show a confirmation dialog when clicking Sync Now": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "點選「立即同步」時顯示確認對話框"
+          }
+        }
+      }
+    },
+    "Show a confirmation sheet for contacts that will be deleted": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "對即將刪除的聯絡人顯示確認視窗"
+          }
+        }
+      }
+    },
+    "Show account status rows": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顯示帳號狀態列"
+          }
+        }
+      }
+    },
+    "Show auto-sync toggle": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顯示自動同步開關"
+          }
+        }
+      }
+    },
+    "Show navigation shortcuts": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顯示導覽捷徑"
+          }
+        }
+      }
+    },
+    "Show pending deletions for review before they are applied": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在套用前顯示待刪除項目以供檢視"
+          }
+        }
+      }
+    },
+    "Show pending-changes badge on icon": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在圖像上顯示待處理變更標記"
+          }
+        }
+      }
+    },
+    "Show sync result banner": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顯示同步結果橫幅"
+          }
+        }
+      }
+    },
+    "Sign In with Google…": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用 Google 登入…"
+          }
+        }
+      }
+    },
+    "Sign Out": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登出"
+          }
+        }
+      }
+    },
+    "Sign in so Contact SyncMate can access your Google Contacts.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登入後 Contact SyncMate 才能取用你的 Google 聯絡人。"
+          }
+        }
+      }
+    },
+    "Sign in to Google (Accounts tab) to export Google contacts.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請先登入 Google(帳號頁籤)才能匯出 Google 聯絡人。"
+          }
+        }
+      }
+    },
+    "Sign-in failed: %@": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登入失敗：%@"
+          }
+        }
+      }
+    },
+    "Skip": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "略過"
+          }
+        }
+      }
+    },
+    "Skip auto sync on cellular or metered connections": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用行動網路或計量連線時略過自動同步"
+          }
+        }
+      }
+    },
+    "Skip auto sync when running on battery": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用電池時略過自動同步"
+          }
+        }
+      }
+    },
+    "Skip auto sync while you're actively using your Mac": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你正在使用 Mac 時略過自動同步"
+          }
+        }
+      }
+    },
+    "Skip patterns": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "略過的模式"
+          }
+        }
+      }
+    },
+    "Skip setup": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "略過設定"
+          }
+        }
+      }
+    },
+    "Standardise country codes in postal addresses during sync": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步時統一地址中的國碼格式"
+          }
+        }
+      }
+    },
+    "Start Contact SyncMate automatically when you log in": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登入時自動啟動 Contact SyncMate"
+          }
+        }
+      }
+    },
+    "Start sync now?": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要立即開始同步嗎？"
+          }
+        }
+      }
+    },
+    "Start syncing contacts": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開始同步聯絡人"
+          }
+        }
+      }
+    },
+    "Stats": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "統計"
+          }
+        }
+      }
+    },
+    "Step %lld of %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Step %1$lld of %2$lld"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "步驟 %1$lld / %2$lld"
+          }
+        }
+      }
+    },
+    "Step %lld. %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Step %1$lld. %2$@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "步驟 %1$lld。%2$@"
+          }
+        }
+      }
+    },
+    "Storage Used": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已用儲存空間"
+          }
+        }
+      }
+    },
+    "Success/failure banner after each sync": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每次同步後的成功／失敗橫幅"
+          }
+        }
+      }
+    },
+    "Switch to \"All\" to see other pending changes.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切換到「全部」可查看其他待處理變更。"
+          }
+        }
+      }
+    },
+    "Sync": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步"
+          }
+        }
+      }
+    },
+    "Sync Configuration": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步設定"
+          }
+        }
+      }
+    },
+    "Sync Contacts Now": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "立即同步聯絡人"
+          }
+        }
+      }
+    },
+    "Sync Direction": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步方向"
+          }
+        }
+      }
+    },
+    "Sync Failed": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步失敗"
+          }
+        }
+      }
+    },
+    "Sync History": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步記錄"
+          }
+        }
+      }
+    },
+    "Sync History & Backups": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步記錄與備份"
+          }
+        }
+      }
+    },
+    "Sync Mode": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步模式"
+          }
+        }
+      }
+    },
+    "Sync Now": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "立即同步"
+          }
+        }
+      }
+    },
+    "Sync Preview": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步預覽"
+          }
+        }
+      }
+    },
+    "Sync Status": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步狀態"
+          }
+        }
+      }
+    },
+    "Sync completed": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步完成"
+          }
+        }
+      }
+    },
+    "Sync deleted contacts": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步已刪除的聯絡人"
+          }
+        }
+      }
+    },
+    "Sync direction": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步方向"
+          }
+        }
+      }
+    },
+    "Sync errors": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步錯誤"
+          }
+        }
+      }
+    },
+    "Sync finished.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步已結束。"
+          }
+        }
+      }
+    },
+    "Sync history will appear here": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步記錄會顯示在這裡"
+          }
+        }
+      }
+    },
+    "Sync progress": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步進度"
+          }
+        }
+      }
+    },
+    "Sync status": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步狀態"
+          }
+        }
+      }
+    },
+    "Syncing Contacts": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在同步聯絡人"
+          }
+        }
+      }
+    },
+    "System Default": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系統預設"
+          }
+        }
+      }
+    },
+    "Test API Key": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "測試 API 密鑰"
+          }
+        }
+      }
+    },
+    "Test Connection": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "測試連線"
+          }
+        }
+      }
+    },
+    "The cloud tier is called only for ambiguous pairs — never for high-confidence matches or when you're offline.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只有在配對難以判定時才會呼叫雲端 — 高信心配對或離線時都不會呼叫。"
+          }
+        }
+      }
+    },
+    "The interface language changes after the app restarts.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "介面語言會在 App 重新啟動後變更。"
+          }
+        }
+      }
+    },
+    "Theme": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "主題"
+          }
+        }
+      }
+    },
+    "These contacts appear to be the same person. Please confirm how to handle them.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這些聯絡人看起來是同一個人。請確認要如何處理。"
+          }
+        }
+      }
+    },
+    "These run instantly on-device with no network access required.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這些完全在裝置上即時執行,不需要網路。"
+          }
+        }
+      }
+    },
+    "These safeguards are recommended. Disabling them speeds up sync but increases the risk of data loss.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "建議保留這些防護。關閉可加快同步,但會提高資料遺失的風險。"
+          }
+        }
+      }
+    },
+    "This contact has no previous versions": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此聯絡人沒有先前的版本"
+          }
+        }
+      }
+    },
+    "This will remove all saved duplicate resolution patterns. You'll be asked to confirm duplicates again.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這會移除所有已儲存的重複項處理模式,之後系統會再次請你確認重複項。"
+          }
+        }
+      }
+    },
+    "This will restore all contacts to a previous state": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這會將所有聯絡人還原到先前狀態"
+          }
+        }
+      }
+    },
+    "Timeline": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "時間軸"
+          }
+        }
+      }
+    },
+    "Tint for buttons and highlights. System follows your macOS accent colour.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按鈕與標示的色調。「系統」會跟隨你的 macOS 強調色。"
+          }
+        }
+      }
+    },
+    "Total Backups": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "備份總數"
+          }
+        }
+      }
+    },
+    "Total Contacts": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "聯絡人總數"
+          }
+        }
+      }
+    },
+    "Total saved patterns": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已儲存的模式總數"
+          }
+        }
+      }
+    },
+    "Trim the menu bar popover down to just what you use. Sync Now and Quit are always shown.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把選單列彈出視窗精簡到只留你會用到的項目。「立即同步」與「結束」一律顯示。"
+          }
+        }
+      }
+    },
+    "Use monochrome menu bar icon": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用單色選單列圖像"
+          }
+        }
+      }
+    },
+    "User Confirmation": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用者確認"
+          }
+        }
+      }
+    },
+    "Values found:": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找到的值："
+          }
+        }
+      }
+    },
+    "Verify access to Mac Contacts": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "驗證 Mac 聯絡人的取用權限"
+          }
+        }
+      }
+    },
+    "Verify connection to Google Contacts API": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "驗證與 Google 聯絡人 API 的連線"
+          }
+        }
+      }
+    },
+    "Version %lld": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "版本 %lld"
+          }
+        }
+      }
+    },
+    "Version History": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "版本記錄"
+          }
+        }
+      }
+    },
+    "Versions (%lld)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "版本(%lld)"
+          }
+        }
+      }
+    },
+    "View": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "檢視"
+          }
+        }
+      }
+    },
+    "View Full Details": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "檢視完整詳細資料"
+          }
+        }
+      }
+    },
+    "View History & Backups": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "檢視記錄與備份"
+          }
+        }
+      }
+    },
+    "Welcome to Contact SyncMate": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "歡迎使用 Contact SyncMate"
+          }
+        }
+      }
+    },
+    "What will happen": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接下來會發生什麼"
+          }
+        }
+      }
+    },
+    "When enabled, Contact SyncMate won't appear in the Dock": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "啟用後,Contact SyncMate 不會出現在 Dock 中"
+          }
+        }
+      }
+    },
+    "Which Claude model analyses borderline duplicate pairs": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "由哪個 Claude 模型分析難以判定的重複配對"
+          }
+        }
+      }
+    },
+    "Wider range = more API calls and higher accuracy; narrower = fewer calls and lower cost.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "範圍越寬 = API 呼叫越多、準確度越高;越窄 = 呼叫越少、成本越低。"
+          }
+        }
+      }
+    },
+    "Write every contact even if it appears unchanged": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "即使聯絡人看起來沒有變動,也一律寫入"
+          }
+        }
+      }
+    },
+    "You can always change this later in Preferences.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你隨時可以在「設定」中更改。"
+          }
+        }
+      }
+    },
+    "Your Mac doesn't have any contacts accounts configured": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你的 Mac 尚未設定任何聯絡人帳號"
+          }
+        }
+      }
+    },
+    "Your contacts stay on your device. No third-party servers are involved.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你的聯絡人只留在你的裝置上,不經過任何第三方伺服器。"
+          }
+        }
+      }
+    },
+    "Your decision:": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你的決定："
+          }
+        }
+      }
+    },
+    "and %lld more…": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "還有 %lld 項…"
+          }
+        }
+      }
+    },
+    "more": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更多"
+          }
+        }
+      }
+    },
+    "sk-ant-…": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sk-ant-…"
+          }
+        }
+      }
+    },
+    "·": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "·"
+          }
+        }
+      }
+    },
+    "•": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "•"
+          }
+        }
+      }
+    },
+    "• %@": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "• %@"
+          }
+        }
+      }
+    },
+    "简体中文": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "简体中文"
+          }
+        }
+      }
+    },
+    "繁體中文": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "繁體中文"
+          }
+        }
+      }
+    },
+    "Open System Settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟系統設定"
+          }
+        }
+      }
+    },
+    "System": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系統"
+          }
+        }
+      }
+    },
+    "Light": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "淺色"
+          }
+        }
+      }
+    },
+    "Dark": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "深色"
+          }
+        }
+      }
+    },
+    "Indigo": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "靛藍"
+          }
+        }
+      }
+    },
+    "Teal": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "藍綠"
+          }
+        }
+      }
+    },
+    "Green": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "綠色"
+          }
+        }
+      }
+    },
+    "Orange": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "橘色"
+          }
+        }
+      }
+    },
+    "Pink": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "粉紅"
+          }
+        }
+      }
+    },
+    "Graphite": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "石墨灰"
+          }
+        }
+      }
+    },
+    "Manual Sync…": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "手動同步…"
+          }
+        }
+      }
+    },
+    "Sync changes in both directions automatically": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動雙向同步變更"
+          }
+        }
+      }
+    },
+    "Google contacts are the master, changes sync to Mac only": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以 Google 聯絡人為準,變更只同步到 Mac"
+          }
+        }
+      }
+    },
+    "Mac contacts are the master, changes sync to Google only": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以 Mac 聯絡人為準,變更只同步到 Google"
+          }
+        }
+      }
+    },
+    "Preview and approve each change before syncing": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步前逐項預覽並核准變更"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
