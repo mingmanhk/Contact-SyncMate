@@ -92,6 +92,10 @@ class GoogleOAuthManager: NSObject, ObservableObject {
     
     override private init() {
         super.init()
+        // Must run before checkExistingAuth(): tokens minted under a revoked
+        // secret cannot be refreshed, so treating them as valid would leave the
+        // UI claiming "connected" while every API call fails.
+        purgeLegacyCachedClientSecret()
         checkExistingAuth()
     }
     
@@ -117,23 +121,65 @@ class GoogleOAuthManager: NSObject, ObservableObject {
         }
     }
     
-    // MARK: - Client Secret (Keychain-backed)
+    // MARK: - Client Secret
 
-    /// Retrieve the client secret from the Keychain.
-    /// On first launch the secret is migrated from GoogleOAuthConfig.json into the
-    /// Keychain and then the JSON value is no longer needed.
+    /// The client secret used for the token exchange.
+    ///
+    /// Precedence is **config file first, Keychain second** — deliberately, and
+    /// this is the opposite of what it used to be.
+    ///
+    /// The old order cached the config value in the Keychain and then preferred
+    /// the Keychain forever after. That made credential rotation impossible: a
+    /// freshly rotated secret placed in `GoogleOAuthConfig.json` was silently
+    /// ignored in favour of the revoked copy, and Google answered every token
+    /// exchange with `invalid_client`. Nothing in the app could clear it.
+    ///
+    /// The config file ships inside the bundle, so it is the natural home for
+    /// the shipped credential — rotating it means a new build, which is correct.
+    /// The Keychain now only serves a secret the user typed into Settings, used
+    /// when the bundle carries no usable value (e.g. a checkout that only has
+    /// `GoogleOAuthConfig.example.json`).
+    ///
+    /// Note this is not a confidentiality regression: for an installed app,
+    /// Google does not treat the client secret as a secret — PKCE (RFC 7636)
+    /// provides the actual protection, and it is enforced on every sign-in.
     private var clientSecret: String {
-        // Try Keychain first
-        if let stored = getFromKeychain(key: Self.clientSecretKeychainKey) {
-            return stored
-        }
-        // Fall back to config file for first-run migration
         let fromConfig = config.clientSecret
         if !fromConfig.isEmpty && fromConfig != "SET_AT_RUNTIME_OR_CI" {
-            try? saveToKeychain(key: Self.clientSecretKeychainKey, value: fromConfig)
             return fromConfig
         }
-        return ""
+        return getFromKeychain(key: Self.clientSecretKeychainKey) ?? ""
+    }
+
+    /// Remove a client secret cached by an older build.
+    ///
+    /// Without this, a machine that ran a pre-rotation build keeps a revoked
+    /// secret in its Keychain. It is inert under the precedence above, but
+    /// leaving a dead credential on disk is not something to rely on staying
+    /// harmless, and it would resurface the moment the config file is missing.
+    private func purgeLegacyCachedClientSecret() {
+        let fromConfig = config.clientSecret
+        guard !fromConfig.isEmpty, fromConfig != "SET_AT_RUNTIME_OR_CI" else {
+            // No usable config value — whatever is in the Keychain is all we
+            // have, so keep it.
+            return
+        }
+        guard let cached = getFromKeychain(key: Self.clientSecretKeychainKey),
+              cached != fromConfig else { return }
+
+        deleteFromKeychain(key: Self.clientSecretKeychainKey)
+
+        // Any refresh token issued against the superseded secret is dead —
+        // `refresh_token` grants are rejected with `invalid_client` too. Drop
+        // them so the user is asked to sign in once, instead of hitting an
+        // unexplained failure on the next sync.
+        clearTokens()
+
+        SyncHistory.shared.log(
+            source: "GoogleOAuth",
+            action: "clientSecret.purgedStaleCache",
+            details: "Removed a client secret cached by an earlier build; sign-in required once."
+        )
     }
 
     /// Turn Google's JSON error payload into one readable line.
