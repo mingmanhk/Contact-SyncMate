@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" width="900" height="560" role="img" aria-labelledby="dm-t dm-d" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <title id="dm-t">Contact SyncMate data model and field mapping</title>
+  <desc id="dm-d">Google Person objects and Apple CNContact objects are both normalised into a single UnifiedContact model. The mapping table shows how each Google field, unified field, and Apple field correspond. Identity is preserved by storing googleResourceName and macContactIdentifier on every unified record, which the ContactMappingStore persists across runs.</desc>
+
+  <rect x="0" y="0" width="900" height="560" rx="12" fill="#ffffff"/>
+  <rect x="0.5" y="0.5" width="899" height="559" rx="12" fill="none" stroke="#d0d7de"/>
+
+  <defs>
+    <marker id="dm-a" markerWidth="9" markerHeight="9" refX="7.5" refY="4.5" orient="auto">
+      <path d="M0 0 L9 4.5 L0 9 z" fill="#5B51E8"/>
+    </marker>
+  </defs>
+
+  <text x="450" y="34" text-anchor="middle" font-size="15.5" font-weight="700" fill="#1d1d1f">One model, two providers — UnifiedContact</text>
+  <text x="450" y="54" text-anchor="middle" font-size="11.5" fill="#57606a">Both sides are normalised before any comparison, so diffing never depends on provider quirks.</text>
+
+  <!-- Column headers -->
+  <rect x="24"  y="72" width="264" height="34" rx="8" fill="#eef1fb" stroke="#b9c2ee" stroke-width="1.4"/>
+  <text x="156" y="94" text-anchor="middle" font-size="13" font-weight="700" fill="#1d1d1f">Google · Person</text>
+
+  <rect x="318" y="72" width="264" height="34" rx="8" fill="#5B51E8"/>
+  <text x="450" y="94" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">UnifiedContact</text>
+
+  <rect x="612" y="72" width="264" height="34" rx="8" fill="#eef1fb" stroke="#b9c2ee" stroke-width="1.4"/>
+  <text x="744" y="94" text-anchor="middle" font-size="13" font-weight="700" fill="#1d1d1f">Apple · CNContact</text>
+
+  <!-- Rows -->
+  <g font-size="11.5" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+    <!-- row helper: y positions -->
+    <g fill="#57606a">
+      <text x="156" y="132" text-anchor="middle">names[].givenName</text>
+      <text x="156" y="162" text-anchor="middle">names[].familyName</text>
+      <text x="156" y="192" text-anchor="middle">nicknames[].value</text>
+      <text x="156" y="222" text-anchor="middle">organizations[].name</text>
+      <text x="156" y="252" text-anchor="middle">organizations[].title</text>
+      <text x="156" y="282" text-anchor="middle">phoneNumbers[]</text>
+      <text x="156" y="312" text-anchor="middle">emailAddresses[]</text>
+      <text x="156" y="342" text-anchor="middle">addresses[]</text>
+      <text x="156" y="372" text-anchor="middle">urls[]</text>
+      <text x="156" y="402" text-anchor="middle">birthdays[].date</text>
+      <text x="156" y="432" text-anchor="middle">photos[].url</text>
+      <text x="156" y="462" text-anchor="middle">resourceName</text>
+    </g>
+
+    <g fill="#1d1d1f" font-weight="600">
+      <text x="450" y="132" text-anchor="middle">givenName</text>
+      <text x="450" y="162" text-anchor="middle">familyName</text>
+      <text x="450" y="192" text-anchor="middle">nickname</text>
+      <text x="450" y="222" text-anchor="middle">organizationName</text>
+      <text x="450" y="252" text-anchor="middle">jobTitle</text>
+      <text x="450" y="282" text-anchor="middle">phoneNumbers[]</text>
+      <text x="450" y="312" text-anchor="middle">emailAddresses[]</text>
+      <text x="450" y="342" text-anchor="middle">postalAddresses[]</text>
+      <text x="450" y="372" text-anchor="middle">urls[]</text>
+      <text x="450" y="402" text-anchor="middle">birthday</text>
+      <text x="450" y="432" text-anchor="middle">photoData</text>
+      <text x="450" y="462" text-anchor="middle">googleResourceName</text>
+      <text x="450" y="492" text-anchor="middle">macContactIdentifier</text>
+    </g>
+
+    <g fill="#57606a">
+      <text x="744" y="132" text-anchor="middle">givenName</text>
+      <text x="744" y="162" text-anchor="middle">familyName</text>
+      <text x="744" y="192" text-anchor="middle">nickname</text>
+      <text x="744" y="222" text-anchor="middle">organizationName</text>
+      <text x="744" y="252" text-anchor="middle">jobTitle</text>
+      <text x="744" y="282" text-anchor="middle">phoneNumbers[]</text>
+      <text x="744" y="312" text-anchor="middle">emailAddresses[]</text>
+      <text x="744" y="342" text-anchor="middle">postalAddresses[]</text>
+      <text x="744" y="372" text-anchor="middle">urlAddresses[]</text>
+      <text x="744" y="402" text-anchor="middle">birthday</text>
+      <text x="744" y="432" text-anchor="middle">imageData</text>
+      <text x="744" y="492" text-anchor="middle">identifier</text>
+    </g>
+  </g>
+
+  <!-- Connector arrows -->
+  <g stroke="#5B51E8" stroke-width="1.4" opacity=".55">
+    <path d="M262 128 H336"/><path d="M564 128 H638"/>
+    <path d="M262 278 H336"/><path d="M564 278 H638"/>
+    <path d="M262 428 H336"/><path d="M564 428 H638"/>
+  </g>
+
+  <!-- Identity note -->
+  <rect x="24" y="508" width="852" height="38" rx="9" fill="#eaf7ee" stroke="#34a853" stroke-width="1.4"/>
+  <text x="450" y="526" text-anchor="middle" font-size="11.5" font-weight="650" fill="#1a7f3c">Identity is the whole trick: every UnifiedContact carries both provider IDs.</text>
+  <text x="450" y="540" text-anchor="middle" font-size="10.5" fill="#57606a">ContactMappingStore persists these pairs, so the second sync updates records instead of duplicating them.</text>
+
+  <!-- Note about the notes field -->
+  <text x="744" y="462" text-anchor="middle" font-size="10.5" font-style="italic" fill="#a35c00">note — entitlement required, not synced</text>
+</svg>

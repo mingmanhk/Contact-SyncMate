@@ -28,7 +28,10 @@
 - [Why two-way sync is hard](#why-two-way-sync-is-hard)
 - [System architecture](#system-architecture)
 - [The sync pipeline](#the-sync-pipeline)
+- [Data model & field mapping](#data-model--field-mapping)
+- [File formats](#file-formats)
 - [Contact matching model](#contact-matching-model)
+- [Design decisions](#design-decisions)
 - [Privacy architecture](#privacy-architecture)
 - [Feature matrix](#feature-matrix)
 - [Permissions & entitlements](#permissions--entitlements)
@@ -241,6 +244,139 @@ individually unless you disable that safeguard.
 
 ---
 
+## Data model & field mapping
+
+Google's `Person` and Apple's `CNContact` disagree about almost everything —
+nesting, cardinality, label vocabulary, date representation. Diffing them
+directly would mean encoding provider quirks into the comparison logic. Instead
+both sides are normalised into one `UnifiedContact` **before** any comparison
+happens.
+
+<div align="center">
+<img src="docs/assets/data-model.svg" alt="Field mapping table: Google Person fields on the left, UnifiedContact in the centre, Apple CNContact on the right, showing how givenName, familyName, nickname, organizationName, jobTitle, phoneNumbers, emailAddresses, postalAddresses, urls, birthday and photoData correspond. Every UnifiedContact also carries googleResourceName and macContactIdentifier so identity survives across runs." width="100%">
+</div>
+
+### Field mapping
+
+| Google `Person` | `UnifiedContact` | Apple `CNContact` | Synced |
+|---|---|---|:--:|
+| `names[].givenName` | `givenName` | `givenName` | ✅ always |
+| `names[].middleName` | `middleName` | `middleName` | ✅ always |
+| `names[].familyName` | `familyName` | `familyName` | ✅ always |
+| `names[].honorificPrefix` | `namePrefix` | `namePrefix` | ✅ always |
+| `names[].honorificSuffix` | `nameSuffix` | `nameSuffix` | ✅ always |
+| `nicknames[].value` | `nickname` | `nickname` | ✅ always |
+| `organizations[].name` | `organizationName` | `organizationName` | ⚙️ toggle |
+| `organizations[].title` | `jobTitle` | `jobTitle` | ⚙️ toggle |
+| `phoneNumbers[]` | `phoneNumbers[]` | `phoneNumbers[]` | ✅ always |
+| `emailAddresses[]` | `emailAddresses[]` | `emailAddresses[]` | ✅ always |
+| `addresses[]` | `postalAddresses[]` | `postalAddresses[]` | ⚙️ toggle |
+| `urls[]` | `urls[]` | `urlAddresses[]` | ⚙️ toggle |
+| `birthdays[].date` | `birthday` | `birthday` | ⚙️ toggle |
+| `photos[].url` | `photoData` | `imageData` | ⚙️ toggle |
+| `biographies[].value` | `note` | `note` | ❌ entitlement |
+| `resourceName` | `googleResourceName` | — | 🔑 identity |
+| — | `macContactIdentifier` | `identifier` | 🔑 identity |
+| `metadata.sources[].updateTime` | `lastModified` | *derived* | 🕐 change detection |
+
+**Identity is the whole trick.** Every `UnifiedContact` carries *both* provider
+IDs. `ContactMappingStore` persists those pairs, which is what turns the second
+sync into an update rather than a duplicate.
+
+### Normalisation applied before comparison
+
+| Data | Normalisation | Why |
+|---|---|---|
+| Phone | strip formatting; compare last 7+ digits | `+1 (415) 555-0100` ≡ `4155550100` |
+| Email | lower-case; strip `+alias` when matching | `John+Work@X.com` ≡ `john@x.com` |
+| Name | case-fold, trim, collapse whitespace, strip diacritics for matching only | `josé` matches `Jose` without rewriting the stored value |
+| Postal country | optional ISO country-code normalisation | `USA` / `United States` / `US` stop looking like edits |
+| Casing | **opt-in** Title Case / UPPER / lower at write time | never applied unless you turn it on |
+
+Comparison is case-insensitive, so enabling name formatting does **not** produce
+a storm of spurious "changed" records.
+
+---
+
+## File formats
+
+| Format | Direction | Where | Purpose |
+|---|---|---|---|
+| **JSON** — backup snapshot | write + read | backup folder | The app's own restore format. One file per session, plus `backup_index.json`. Written atomically. Contains full `UnifiedContact` records for both sides, `syncSessionId`, timestamps, and per-contact version entries. |
+| **JSON** — sync history | write + read | `~/Library/Application Support/<bundle-id>/sync_history.json` | Append-only audit log of events, pruned by age and count. |
+| **JSON** — dedup decisions | write + read | Application Support | Remembers "keep separate" patterns so a pair is not re-raised. |
+| **JSON** — OAuth config | read | app bundle | `clientId`, `clientSecret`, `redirectURI`. Secret is migrated to Keychain on first launch. |
+| **CSV** (`UTType.commaSeparatedText`) | export | folder you pick | Spreadsheet-friendly export of either address book. UTF-8, header row, one contact per row, multi-value fields joined. |
+| **XLSX** | export | folder you pick | Same content as CSV in a native Excel workbook. |
+
+<details>
+<summary><strong>Backup snapshot structure</strong></summary>
+
+<br>
+
+```jsonc
+{
+  "id": "UUID",                     // this snapshot
+  "timestamp": "2026-07-26T09:15:00Z",
+  "syncSessionId": "UUID",          // ← links pre-sync and post-sync pairs
+  "type": "preSync",                // preSync | postSync | manual | auto
+  "googleContactsCount": 412,
+  "macContactsCount": 398,
+  "contactVersions": [
+    {
+      "id": "UUID",
+      "contactName": "Jane Doe",
+      "source": "google",           // google | mac | merged
+      "versionNumber": 3,
+      "timestamp": "2026-07-26T09:15:00Z",
+      "changesSummary": ["Phone changed", "Job title changed"],
+      "data": { /* full UnifiedContact */ }
+    }
+  ],
+  "metadata": {
+    "appVersion": "1.1",
+    "syncDirection": "twoWay",
+    "syncMode": "manual",
+    "customNotes": "…"
+  }
+}
+```
+
+Because pre-sync and post-sync snapshots share a `syncSessionId`, a single sync
+can be reconstructed — and reversed — from either end.
+
+</details>
+
+<details>
+<summary><strong>CSV / XLSX column layout</strong></summary>
+
+<br>
+
+| Column | Contents |
+|---|---|
+| `Given Name`, `Middle Name`, `Family Name` | Name components |
+| `Name Prefix`, `Name Suffix`, `Nickname` | Honorifics and nickname |
+| `Organization`, `Job Title` | Work |
+| `Phone 1…n` | Each with its label, e.g. `mobile: +1 415 555 0100` |
+| `Email 1…n` | Each with its label |
+| `Address 1…n` | Street, city, state, postcode, country |
+| `Website 1…n` | URLs |
+| `Birthday` | ISO 8601 date |
+| `Source` | `google` or `mac` |
+| `Identifier` | Provider ID, for cross-referencing |
+
+Exports are a **one-way archive format** — the app does not re-import CSV or
+XLSX. Use a backup snapshot to restore.
+
+</details>
+
+> **No vCard (.vcf) support.** Both providers already export vCard, and adding a
+> third round-trip format would multiply the field-fidelity edge cases without
+> improving the core sync. Backups use JSON precisely because it round-trips
+> `UnifiedContact` losslessly.
+
+---
+
 ## Contact matching model
 
 Two records are scored, then routed by confidence. Scoring is deterministic and
@@ -314,6 +450,133 @@ Disabled by default. When you supply **your own** Anthropic API key:
 | Developer involvement | None — the call goes from your Mac to Anthropic under your account |
 | Caching | Content-fingerprinted, so editing a contact invalidates stale verdicts; cleared after each scan |
 | Offline | Silently skipped; on-device matching still runs |
+
+</details>
+
+---
+
+## Design decisions
+
+The non-obvious choices, and what each one is defending against.
+
+<details open>
+<summary><strong>One sync path, enforced</strong></summary>
+
+<br>
+
+`SyncCoordinator.runSync()` is the only function permitted to construct
+`SyncEngine`. The menu bar button, the dashboard button, the auto-sync timer and
+the Shortcuts action all call it.
+
+*Defends against:* an earlier version had the auto-sync timer build its own
+engine. `AppState.isSyncing` was then only updated by the coordinator path, so a
+background sync ran completely invisibly — no progress, no icon change, and a
+manual sync could start on top of it. Collapsing to one path made that class of
+bug unrepresentable.
+
+</details>
+
+<details>
+<summary><strong>Snapshots before <em>and</em> after, sharing a session ID</strong></summary>
+
+<br>
+
+Two snapshots per sync costs disk but buys a property nothing else gives: any
+sync can be reconstructed from either end, and "what exactly did that run change?"
+is answerable months later.
+
+*Defends against:* the classic sync horror story — a bad run silently mangles an
+address book and there is no before-state to compare against.
+
+</details>
+
+<details>
+<summary><strong>Blocking above 500 contacts, exhaustive below</strong></summary>
+
+<br>
+
+Pairwise duplicate comparison is O(n²). At 5,000 contacts that is 12.5 M
+comparisons. Above 500 contacts the app buckets candidates by email, phone
+suffix, and name initials, and only scores pairs sharing a bucket.
+
+*Trade-off, stated openly:* at that scale a pair sharing **only** a transposed
+name — no email, no phone — may not become a candidate. Below 500 the exhaustive
+scan runs and there is no recall loss at all. Documented in `DedupBlockingTests`.
+
+</details>
+
+<details>
+<summary><strong>Never call <code>CNContactStore</code> from the main actor</strong></summary>
+
+<br>
+
+`CNContactStore` calls are synchronous XPC to `contactsd`, which runs at
+background QoS. Calling them from a `@MainActor` context makes a
+user-interactive thread wait on a background one — a priority inversion, which
+macOS reports as a hang risk and users experience as a beachball.
+
+Every call site uses `Task.detached(priority: .userInitiated)` and hops back to
+the main actor only to publish results.
+
+</details>
+
+<details>
+<summary><strong>Security-scoped bookmarks, not paths</strong></summary>
+
+<br>
+
+Under the App Sandbox, the folder access granted by `NSOpenPanel` is revoked
+when the process exits. Storing `url.path` produces an app that backs up
+perfectly until the user quits, then silently fails forever.
+
+`SecurityScopedBookmark` persists the grant, refreshes stale bookmarks when a
+folder moves, and balances `startAccessing`/`stopAccessing` automatically.
+
+</details>
+
+<details>
+<summary><strong>Degrade loudly, never silently</strong></summary>
+
+<br>
+
+Apple declined the Contacts-notes entitlement. Without it, `CNContactNoteKey`
+returns empty strings and writes are dropped on the floor — with no error.
+
+Rather than appear to sync notes, `MacContactsConnector.notesFieldAvailable` is
+`false`, `AppSettings.syncNotes` is forced off regardless of stored value, and
+the Settings toggle is disabled with an explanatory footer. The same principle
+applies to the optional cloud AI tier: no key means on-device matching only, and
+the UI says so.
+
+</details>
+
+<details>
+<summary><strong>Semantic colour tokens, no literals</strong></summary>
+
+<br>
+
+Every colour resolves through an asset-catalog colour set with paired light and
+dark values. No view contains `Color.red`.
+
+*Defends against:* SwiftUI's `.green` is a fluorescent hue in dark mode that
+overpowers the surface, and `Color.secondary.opacity(0.1)` — a common ad-hoc
+"card background" — is nearly invisible against `windowBackgroundColor` in one
+mode or the other. Both bugs were present before the token system landed.
+
+</details>
+
+<details>
+<summary><strong>Tests pin the settings they depend on</strong></summary>
+
+<br>
+
+The app and the test bundle share a `UserDefaults` domain. A diff test that
+depends on `defaultConflictResolution` will start failing the moment the
+developer changes that preference in the running app.
+
+Every affected suite saves, overrides, and restores the settings it reads in
+`setUp` / `tearDown`. This was found the hard way — a green suite went red after
+a UI change with no code change behind it.
 
 </details>
 
