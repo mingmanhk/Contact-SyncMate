@@ -222,6 +222,7 @@ class MacContactsConnector: ObservableObject {
             else {
                 history.log(source: "MacContacts", action: "saveContact.failed",
                             details: "\(targetContainerName): \(Self.diagnose(error))")
+                probeSaveFailure(contact, container: container)
                 throw error
             }
 
@@ -279,6 +280,76 @@ class MacContactsConnector: ObservableObject {
             CNContactPostalAddressesKey, CNContactUrlAddressesKey,
             CNContactBirthdayKey, CNContactImageDataAvailableKey,
         ].map { $0 as CNKeyDescriptor }
+    }
+
+    /// Find which field Contacts is rejecting, by elimination.
+    ///
+    /// Cocoa error 134092 names neither a field nor a reason, and its userInfo
+    /// carries only a nested copy of itself. Reasoning about it from the outside
+    /// has repeatedly produced plausible-but-wrong theories (container, note
+    /// entitlement, cross-store faulting) — each costing a full build-and-retry
+    /// cycle.
+    ///
+    /// So ask Contacts directly: save a name-only copy, then add one field group
+    /// at a time until it breaks. Runs once per sync (`hasProbedSaveFailure`),
+    /// writes nothing that survives — each probe is rolled back by only ever
+    /// being *attempted*, and the first success is deleted again.
+    private static var hasProbedSaveFailure = false
+
+    private func probeSaveFailure(_ contact: CNMutableContact, container: CNContainer?) {
+        guard !Self.hasProbedSaveFailure else { return }
+        Self.hasProbedSaveFailure = true
+
+        let containerID = container?.identifier ?? store.defaultContainerIdentifier()
+
+        // Each step adds one field group to the previous one, so the first
+        // failure names the culprit.
+        let steps: [(String, (CNMutableContact) -> Void)] = [
+            ("name only", { probe in
+                probe.givenName  = contact.givenName
+                probe.familyName = contact.familyName
+            }),
+            ("+ organisation", { probe in
+                probe.organizationName = contact.organizationName
+                probe.jobTitle         = contact.jobTitle
+                probe.departmentName   = contact.departmentName
+            }),
+            ("+ phones",     { $0.phoneNumbers    = contact.phoneNumbers }),
+            ("+ emails",     { $0.emailAddresses  = contact.emailAddresses }),
+            ("+ addresses",  { $0.postalAddresses = contact.postalAddresses }),
+            ("+ urls",       { $0.urlAddresses    = contact.urlAddresses }),
+            ("+ nickname",   { $0.nickname        = contact.nickname }),
+            ("+ birthday",   { $0.birthday        = contact.birthday }),
+            ("+ photo",      { $0.imageData       = contact.imageData }),
+        ]
+
+        let probe = CNMutableContact()
+        var applied: [String] = []
+
+        for (label, apply) in steps {
+            apply(probe)
+            applied.append(label)
+
+            let request = CNSaveRequest()
+            request.add(probe.mutableCopy() as! CNMutableContact,
+                        toContainerWithIdentifier: containerID)
+            do {
+                try store.execute(request)
+            } catch {
+                history.log(
+                    source: "MacContacts",
+                    action: "saveContact.probe",
+                    details: "first rejected at \(label) — accepted: \(applied.dropLast().joined(separator: " ")) · \(Self.diagnose(error))"
+                )
+                return
+            }
+        }
+
+        history.log(
+            source: "MacContacts",
+            action: "saveContact.probe",
+            details: "all field groups accepted individually — the rejection is not field-specific (containerID=\(containerID))"
+        )
     }
 
     /// Expand a Contacts error into something diagnosable.

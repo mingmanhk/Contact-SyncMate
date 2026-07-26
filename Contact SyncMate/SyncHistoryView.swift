@@ -54,6 +54,7 @@ struct SyncHistoryView: View {
     @State private var searchText = ""
     @State private var expandedIDs: Set<UUID> = []
     @State private var exportError: String?
+    @State private var showingClearConfirmation = false
 
     private var filteredEvents: [SyncEvent] {
         var events = allEvents
@@ -122,6 +123,28 @@ struct SyncHistoryView: View {
                     .fontWeight(.semibold)
 
                 Spacer()
+
+                Button("Clear Log…") { showingClearConfirmation = true }
+                    .buttonStyle(.bordered)
+                    .disabled(allEvents.isEmpty)
+                    .confirmationDialog("Clear the sync log?",
+                                        isPresented: $showingClearConfirmation,
+                                        titleVisibility: .visible) {
+                        // Not "Clear Log": the catalog's symbol generator folds it
+                        // together with the "Clear Log…" button title. Naming the
+                        // consequence is clearer for a destructive action anyway.
+                        Button("Delete All Events", role: .destructive) {
+                            SyncHistory.shared.clear()
+                            allEvents = []
+                            expandedIDs = []
+                        }
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        // Worth stating plainly: the log is the only record of what
+                        // a sync did, and backups are a separate thing that this
+                        // does not touch.
+                        Text("All recorded sync events will be deleted. Your contacts and backups are not affected. Export the log first if you might need it for troubleshooting.")
+                    }
 
                 Button("Export Log") { exportLog() }
                     .buttonStyle(.bordered)

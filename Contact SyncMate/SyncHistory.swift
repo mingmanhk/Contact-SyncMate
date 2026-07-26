@@ -85,6 +85,11 @@ public final class SyncHistory {
         return snapshot.sorted { $0.timestamp < $1.timestamp }
     }
 
+    /// Discard every recorded event.
+    ///
+    /// Barriered on the same queue as `log`, so a clear cannot interleave with a
+    /// concurrent append. Writes through to disk immediately — otherwise a crash
+    /// before the next log call would resurrect what the user just cleared.
     public func clear() {
         queue.async(flags: .barrier) { [weak self] in
             guard let self = self else { return }

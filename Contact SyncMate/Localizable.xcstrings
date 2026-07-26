@@ -7536,6 +7536,74 @@
           }
         }
       }
+    },
+    "Clear Log…": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除記錄…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除记录…"
+          }
+        }
+      }
+    },
+    "Clear the sync log?": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要清除同步記錄嗎？"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要清除同步记录吗？"
+          }
+        }
+      }
+    },
+    "All recorded sync events will be deleted. Your contacts and backups are not affected. Export the log first if you might need it for troubleshooting.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有已記錄的同步事件將被刪除。你的聯絡人與備份不受影響。若日後可能需要排查問題,請先匯出記錄。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有已记录的同步事件将被删除。你的联系人与备份不受影响。若日后可能需要排查问题,请先导出记录。"
+          }
+        }
+      }
+    },
+    "Delete All Events": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刪除所有事件"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除所有事件"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

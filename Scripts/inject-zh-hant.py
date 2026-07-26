@@ -610,6 +610,11 @@ T = {
     "OK": "好",
     "%lld failed": "%lld 項失敗",
     "No changes yet.": "尚無變更。",
+    "Clear Log…": "清除記錄…",
+    "Delete All Events": "刪除所有事件",
+    "Clear the sync log?": "要清除同步記錄嗎？",
+    "All recorded sync events will be deleted. Your contacts and backups are not affected. Export the log first if you might need it for troubleshooting.":
+        "所有已記錄的同步事件將被刪除。你的聯絡人與備份不受影響。若日後可能需要排查問題,請先匯出記錄。",
 }
 
 
