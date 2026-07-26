@@ -88,19 +88,23 @@ if files:
         args += ["--stringsdata", f]
     subprocess.run(args, capture_output=True)
 data = json.load(open(catalog))["strings"]
-missing = sorted(
-    k for k, v in data.items()
-    if k.strip() and k.strip() != "%lld"
-    and "zh-Hant" not in v.get("localizations", {})
-)
 total = len([k for k in data if k.strip()])
-if missing:
-    print(f"  \033[33m!\033[0m {len(missing)} of {total} strings lack zh-Hant")
-    for k in missing[:10]:
-        print(f"    - {k!r}")
+gaps = False
+for language in ("zh-Hant", "zh-Hans"):
+    missing = sorted(
+        k for k, v in data.items()
+        if k.strip() and k.strip() != "%lld"
+        and language not in v.get("localizations", {})
+    )
+    if missing:
+        gaps = True
+        print(f"  \033[33m!\033[0m {len(missing)} of {total} strings lack {language}")
+        for k in missing[:8]:
+            print(f"    - {k!r}")
+    else:
+        print(f"  \033[32m✓\033[0m all {total} strings have {language}")
+if gaps:
     print("    fix: python3 Scripts/inject-zh-hant.py")
-else:
-    print(f"  \033[32m✓\033[0m all {total} strings have zh-Hant")
 PY
     else
         info "could not resolve BUILD_DIR — skipped"

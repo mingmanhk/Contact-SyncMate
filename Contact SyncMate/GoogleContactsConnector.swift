@@ -263,24 +263,63 @@ class GoogleContactsConnector: ObservableObject {
         guard isAuthenticated else {
             throw GoogleContactsError.notAuthenticated
         }
-        
+
+        // `updateContact` is rejected with
+        //   400 "Request must set person.etag or person.metadata.sources[].etag"
+        // unless a current etag is supplied — People API uses it for optimistic
+        // concurrency, so it is mandatory, not optional.
+        //
+        // The etag lives on GoogleContact but not on UnifiedContact, so any
+        // update rebuilt from the unified model arrives here with etag == nil and
+        // every Mac → Google write failed. Rather than thread the token through
+        // the whole model (where it would also go stale), fetch it at the point
+        // of use: it is only valid for the version we are about to overwrite.
+        var contact = contact
+        if contact.etag == nil {
+            contact.etag = try await currentETag(for: contact.resourceName)
+        }
+
+        do {
+            return try await performUpdate(contact)
+        } catch GoogleContactsError.apiError(let statusCode, let message)
+                    where statusCode == 400 && message.contains("etag") {
+            // A cached etag goes stale the moment the contact is edited anywhere
+            // else — Gmail, an iPhone, another client. Re-read and retry once so
+            // a concurrent edit costs a round trip instead of a failed sync.
+            SyncHistory.shared.log(source: "GoogleAPI", action: "update.refreshingStaleETag",
+                                   details: contact.resourceName)
+            contact.etag = try await currentETag(for: contact.resourceName)
+            return try await performUpdate(contact)
+        }
+    }
+
+    /// Read the server's current etag for a person.
+    private func currentETag(for resourceName: String) async throws -> String? {
+        var components = URLComponents(string: "\(baseURL)/\(resourceName)")!
+        components.queryItems = [URLQueryItem(name: "personFields", value: "metadata")]
+
+        let (data, _) = try await makeRequest(url: components.url!, method: "GET", body: nil)
+        return try JSONDecoder().decode(PeopleAPIPerson.self, from: data).etag
+    }
+
+    private func performUpdate(_ contact: GoogleContact) async throws -> GoogleContact {
         let updateFields = "names,emailAddresses,phoneNumbers,addresses,organizations,photos,birthdays,urls,nicknames"
-        
+
         var components = URLComponents(string: "\(baseURL)/\(contact.resourceName):updateContact")!
         components.queryItems = [
             URLQueryItem(name: "updatePersonFields", value: updateFields)
         ]
-        
+
         let person = convertToAPIPerson(contact)
         let body = try JSONEncoder().encode(person)
-        
+
         let (data, _) = try await makeRequest(url: components.url!, method: "PATCH", body: body)
         let updatedPerson = try JSONDecoder().decode(PeopleAPIPerson.self, from: data)
-        
+
         guard let updatedContact = convertToPerson(updatedPerson) else {
             throw GoogleContactsError.apiError(statusCode: 500, message: "Failed to parse updated contact")
         }
-        
+
         return updatedContact
     }
     

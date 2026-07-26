@@ -253,6 +253,17 @@ final class SyncEngineDiffTests: XCTestCase {
         XCTAssertEqual(mac.familyName, "User")
         XCTAssertEqual(mac.phoneNumbers.count, 2)
         XCTAssertEqual(mac.emailAddresses.count, 2)
-        XCTAssertEqual(mac.note, "Mac note")
+
+        // `note` must track the entitlement, not the source data. Assigning it
+        // without com.apple.developer.contacts.notes makes CNContactStore reject
+        // the entire save with Cocoa error 134092 rather than dropping the field,
+        // so the mapper deliberately leaves it empty in builds without it.
+        if MacContactsConnector.notesFieldAvailable {
+            XCTAssertEqual(mac.note, "Mac note")
+        } else {
+            XCTAssertEqual(mac.note, "",
+                           "note must stay unset without the notes entitlement, "
+                           + "otherwise every Mac write fails with Cocoa 134092")
+        }
     }
 }

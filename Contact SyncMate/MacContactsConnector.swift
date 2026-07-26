@@ -275,9 +275,39 @@ class MacContactsConnector: ObservableObject {
         )
     }
     
+    /// Coalescing window for store-change notifications.
+    ///
+    /// contactsd posts `CNContactStoreDidChange` per underlying write, so a sync
+    /// that touches a few dozen contacts generates hundreds of notifications —
+    /// an exported log showed 674 of them inside 12 seconds. Because history is
+    /// capped, that storm evicted every genuinely useful entry: the whole 1000-
+    /// event export covered only those 12 seconds and the actual failures were
+    /// already gone. Debouncing keeps the signal.
+    private static let storeChangeCoalescingWindow: TimeInterval = 2.0
+    private var pendingStoreChangeCount = 0
+    private var storeChangeFlushTask: Task<Void, Never>?
+
     @objc private func contactStoreDidChange(_ notification: Notification) {
-        history.log(source: "MacContacts", action: "CNContactStoreDidChange", details: nil)
-        print("Mac Contacts changed")
+        pendingStoreChangeCount += 1
+
+        // Restart the window on each notification so a burst logs once, at the
+        // end, with a count — rather than once per write.
+        storeChangeFlushTask?.cancel()
+        storeChangeFlushTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(Self.storeChangeCoalescingWindow))
+            guard !Task.isCancelled, let self else { return }
+
+            await MainActor.run {
+                let count = self.pendingStoreChangeCount
+                self.pendingStoreChangeCount = 0
+                guard count > 0 else { return }
+                self.history.log(
+                    source: "MacContacts",
+                    action: "cnContactStoreDidChange",
+                    details: count == 1 ? nil : "\(count) changes coalesced"
+                )
+            }
+        }
     }
     
     // MARK: - Helper Methods

@@ -15,6 +15,7 @@ validates this and a mismatch fails the build.
 
 import json
 import pathlib
+import subprocess
 import sys
 
 CATALOG = pathlib.Path("Contact SyncMate/Localizable.xcstrings")
@@ -607,7 +608,102 @@ T = {
     "Saved patterns cleared": "已清除儲存的模式",
     "Couldn't export the log": "無法匯出記錄",
     "OK": "好",
+    "%lld failed": "%lld 項失敗",
+    "No changes yet.": "尚無變更。",
 }
+
+
+# ── Simplified Chinese derivation ───────────────────────────────────────
+#
+# zh-Hans is *derived* from the table above rather than kept as a second
+# hand-written list. Two independent tables drift: someone rewords one and the
+# other silently keeps the stale text. Deriving means each string is authored
+# once, in one place.
+#
+# Two stages, in order:
+#   1. hant-to-hans.swift converts glyphs through ICU (聯絡人 → 联络人)
+#   2. TERMS below fixes mainland vocabulary — an editorial choice ICU has no
+#      opinion about (联络人 → 联系人, 介面 → 界面)
+TERMS = {
+    "联络人": "联系人",
+    "介面": "界面",
+    "档案": "文件",
+    "汇出": "导出",
+    "汇入": "导入",
+    "预设值": "默认值",
+    "预设": "默认",
+    "选单列": "菜单栏",
+    "选单": "菜单",
+    "储存": "保存",
+    "网路": "网络",
+    "资料": "数据",
+    "设定": "设置",
+    "视窗": "窗口",
+    "快取": "缓存",
+    "登入": "登录",
+    "帐号": "账号",
+    "门槛": "阈值",
+    "略过": "跳过",
+    "检视": "查看",
+    "核准": "批准",
+    "讯号": "信号",
+    "邮递": "邮政",
+    "支援": "支持",
+    "作业": "操作",
+    "弹出视窗": "弹出窗口",
+    "新增": "添加",
+    "靛蓝": "藏青",
+    "橘色": "橙色",
+    "粉红": "粉色",
+}
+
+
+def _converter_binary() -> pathlib.Path:
+    """Compile hant-to-hans.swift on demand and cache the binary.
+
+    `swift file.swift` runs in interpreter mode, which both recompiles on every
+    invocation and competes for stdin with the program it is running — the
+    combination hangs when piping input. Compiling once with swiftc avoids both.
+    """
+    source = pathlib.Path("Scripts/hant-to-hans.swift")
+    binary = pathlib.Path("build/hant-to-hans")
+
+    if binary.exists() and binary.stat().st_mtime >= source.stat().st_mtime:
+        return binary
+
+    binary.parent.mkdir(parents=True, exist_ok=True)
+    result = subprocess.run(
+        ["swiftc", "-O", str(source), "-o", str(binary)],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"could not compile {source}: {result.stderr.strip()}")
+    return binary
+
+
+def to_simplified(values: list[str]) -> list[str]:
+    """Glyph-convert through ICU, then apply mainland terminology."""
+    result = subprocess.run(
+        [str(_converter_binary())],
+        input=json.dumps(values, ensure_ascii=False),
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"hant-to-hans failed: {result.stderr.strip()}")
+
+    converted = json.loads(result.stdout)
+
+    # Longest first: without it, "设定" inside "预设值" could be rewritten before
+    # the longer phrase is considered.
+    ordered = sorted(TERMS.items(), key=lambda kv: len(kv[0]), reverse=True)
+
+    out = []
+    for text in converted:
+        for hant, hans in ordered:
+            text = text.replace(hant, hans)
+        out.append(text)
+    return out
 
 
 def main() -> int:
@@ -618,10 +714,20 @@ def main() -> int:
     catalog = json.loads(CATALOG.read_text())
     strings = catalog["strings"]
 
-    added = 0
-    created = []
+    keys = list(T.keys())
+    hant_values = [T[k] for k in keys]
 
-    for key, value in T.items():
+    try:
+        hans_values = to_simplified(hant_values)
+    except RuntimeError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+
+    # A language names itself in its own script, whatever the converter says.
+    self_named = {"繁體中文", "简体中文", "English"}
+
+    created = 0
+    for key, hant, hans in zip(keys, hant_values, hans_values):
         entry = strings.get(key)
         if entry is None:
             # Keys only reachable through String(localized:) are invisible to
@@ -629,26 +735,37 @@ def main() -> int:
             # rather than stale leftovers, so `sync` leaves them alone.
             entry = {"extractionState": "manual"}
             strings[key] = entry
-            created.append(key)
+            created += 1
+
         localizations = entry.setdefault("localizations", {})
         localizations["zh-Hant"] = {
-            "stringUnit": {"state": "translated", "value": value}
+            "stringUnit": {"state": "translated", "value": hant}
         }
-        added += 1
+        localizations["zh-Hans"] = {
+            "stringUnit": {
+                "state": "translated",
+                "value": hant if hant in self_named else hans,
+            }
+        }
 
     CATALOG.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n")
 
-    untranslated = sorted(
-        k for k in strings
-        if k.strip() and "zh-Hant" not in strings[k].get("localizations", {})
-    )
+    def missing(language: str) -> list[str]:
+        return sorted(
+            k for k in strings
+            if k.strip() and k.strip() != "%lld"
+            and language not in strings[k].get("localizations", {})
+        )
 
-    print(f"translated: {added}")
-    print(f"created as manual entries: {len(created)}")
-    print(f"untranslated remaining: {len(untranslated)}")
-    if untranslated:
-        pathlib.Path(".l10n_untranslated.txt").write_text("\n".join(untranslated) + "\n")
-        print("wrote .l10n_untranslated.txt")
+    print(f"translated: {len(keys)} keys × 2 languages")
+    print(f"created as manual entries: {created}")
+    for language in ("zh-Hant", "zh-Hans"):
+        gaps = missing(language)
+        print(f"  {language}: {len(gaps)} untranslated")
+        if gaps:
+            pathlib.Path(f".l10n_untranslated_{language}.txt").write_text(
+                "\n".join(gaps) + "\n"
+            )
     return 0
 
 

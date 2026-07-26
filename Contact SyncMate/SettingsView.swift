@@ -230,6 +230,7 @@ struct GeneralSettingsView: View {
     @State private var showingResetConfirmation = false
     @State private var pendingLanguageRelaunch = false
     @State private var recentChanges: [SyncEvent] = []
+    @State private var isLogExpanded = false
 
     /// Sync Mode used to be selectable here with no way to act on the choice —
     /// picking "Manual Sync…" set a preference and then left the user with
@@ -254,8 +255,80 @@ struct GeneralSettingsView: View {
             // so lifecycle noise like `sync.start` never crowds out the thing
             // the user wants to see.
             .filter { $0.action.lowercased().hasPrefix("change.") }
-            .prefix(5)
+            // 20, not 5: the list only renders inside the expanded disclosure, and
+            // when a sync is going wrong you need enough rows to see the pattern
+            // rather than the last handful.
+            .prefix(20)
             .map { $0 }
+    }
+
+    /// The expandable body — shared by the running and idle states so the log
+    /// looks identical whether you open it mid-sync or afterwards.
+    @ViewBuilder
+    private var changeLogList: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            if recentChanges.isEmpty {
+                Text("No changes yet.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            ForEach(recentChanges) { event in
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: changeIcon(for: event.action))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(changeTint(for: event.action))
+                        .frame(width: 14)
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(event.details ?? event.action)
+                            .font(.caption)
+                            // Failures carry the reason, and a truncated reason is
+                            // useless — that is the whole point of opening this.
+                            .lineLimit(isFailure(event.action) ? 3 : 1)
+                            .truncationMode(.middle)
+                            .textSelection(.enabled)
+
+                        if isFailure(event.action) {
+                            Text(friendlyActionLabel(event.action))
+                                .font(.caption2)
+                                .foregroundStyle(Color.appError)
+                        }
+                    }
+
+                    Spacer(minLength: 8)
+
+                    Text(event.timestamp, style: .time)
+                        .font(.caption2)
+                        .monospacedDigit()
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            Button("View History & Backups") {
+                NotificationCenter.default.post(name: .openHistoryWindow, object: nil)
+            }
+            .buttonStyle(.link)
+            .font(.caption)
+            .padding(.top, 2)
+        }
+        .padding(.top, 2)
+    }
+
+    private func isFailure(_ action: String) -> Bool {
+        let lowered = action.lowercased()
+        return lowered.contains("fail") || lowered.contains("error")
+    }
+
+    private func friendlyActionLabel(_ action: String) -> String {
+        switch action.lowercased() {
+        case "change.failed": return String(localized: "Change failed")
+        default:              return action
+        }
+    }
+
+    private var failureCount: Int {
+        recentChanges.filter { isFailure($0.action) }.count
     }
 
     private func changeIcon(for action: String) -> String {
@@ -318,6 +391,18 @@ struct GeneralSettingsView: View {
                                 .monospacedDigit()
                                 .foregroundStyle(.tertiary)
                         }
+
+                        // A percentage says how far along it is but nothing about
+                        // what it is doing to your address book. Expanding streams
+                        // the per-contact writes as they land, so a failing sync is
+                        // visible while it runs instead of only afterwards.
+                        DisclosureGroup(isExpanded: $isLogExpanded) {
+                            changeLogList
+                        } label: {
+                            Text("Details")
+                                .font(.caption)
+                        }
+                        .padding(.top, 2)
                     }
                     .padding(.vertical, 2)
                 } else {
@@ -344,40 +429,27 @@ struct GeneralSettingsView: View {
                     }
 
                     // "Last synced 5 minutes ago" says nothing about what moved.
-                    // These are the actual per-contact writes, so the summary
-                    // becomes auditable at a glance instead of requiring a trip
-                    // to the History window.
                     if !recentChanges.isEmpty {
                         Divider()
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            ForEach(recentChanges) { event in
-                                HStack(spacing: 6) {
-                                    Image(systemName: changeIcon(for: event.action))
-                                        .symbolRenderingMode(.hierarchical)
-                                        .foregroundStyle(changeTint(for: event.action))
-                                        .frame(width: 14)
-
-                                    Text(event.details ?? event.action)
-                                        .font(.caption)
-                                        .lineLimit(1)
-                                        .truncationMode(.middle)
-
-                                    Spacer(minLength: 8)
-
-                                    Text(event.timestamp, style: .time)
+                        DisclosureGroup(isExpanded: $isLogExpanded) {
+                            changeLogList
+                        } label: {
+                            HStack(spacing: 6) {
+                                Text("Recent Changes")
+                                    .font(.caption)
+                                if failureCount > 0 {
+                                    // Surfaced on the collapsed row: a sync that
+                                    // "completed" while every write failed should
+                                    // not look identical to one that worked.
+                                    Text("\(failureCount) failed")
                                         .font(.caption2)
-                                        .monospacedDigit()
-                                        .foregroundStyle(.tertiary)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 1)
+                                        .background(Color.appError.opacity(0.15))
+                                        .foregroundStyle(Color.appError)
+                                        .clipShape(Capsule())
                                 }
                             }
-
-                            Button("View History & Backups") {
-                                NotificationCenter.default.post(name: .openHistoryWindow, object: nil)
-                            }
-                            .buttonStyle(.link)
-                            .font(.caption)
-                            .padding(.top, 2)
                         }
                     }
                 }
@@ -512,11 +584,10 @@ struct GeneralSettingsView: View {
                 Picker("Interface language", selection: $settings.selectedLanguage) {
                     Text("System Default").tag("system")
                     Text(verbatim: "English").tag("en")
+                    // `verbatim:` so a language's own name is never itself
+                    // translated — 繁體中文 must read 繁體中文 in every locale.
                     Text(verbatim: "繁體中文").tag("zh-Hant")
-                    // Simplified Chinese is intentionally absent: the catalog
-                    // has no zh-Hans translations, so offering it would silently
-                    // fall back to English — the same dead-control problem the
-                    // Language section itself used to have.
+                    Text(verbatim: "简体中文").tag("zh-Hans")
                 }
                 .onChange(of: settings.selectedLanguage) { _, newValue in
                     // macOS resolves the localization table when the bundle
@@ -568,8 +639,17 @@ struct GeneralSettingsView: View {
         .formStyle(.grouped)
         .onAppear { recentChanges = Self.loadRecentChanges() }
         .onChange(of: sync.phase) { _, phase in
-            // Only a finished sync can have written new change entries.
             if case .completed = phase { recentChanges = Self.loadRecentChanges() }
+        }
+        // `sync.progress` ticks per contact, which makes it the natural clock for
+        // streaming the log — no timer to own, and nothing polls while idle.
+        // Guarded on `isLogExpanded` so a collapsed section costs nothing.
+        .onChange(of: sync.progress) { _, _ in
+            guard isLogExpanded, sync.isRunning else { return }
+            recentChanges = Self.loadRecentChanges()
+        }
+        .onChange(of: isLogExpanded) { _, expanded in
+            if expanded { recentChanges = Self.loadRecentChanges() }
         }
         .alert("Restart to change the language?", isPresented: $pendingLanguageRelaunch) {
             Button("Restart Now") { LanguageManager.shared.relaunch() }

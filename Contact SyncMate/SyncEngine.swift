@@ -1174,10 +1174,16 @@ enum ContactMapper {
             mac.birthday = bd
         }
 
-        if let note = unified.note {
+        // Assigning `note` without com.apple.developer.contacts.notes makes
+        // CNContactStore reject the *entire* save with Cocoa error 134092 — not
+        // just drop the field. An exported log showed 47 of 48 writes failing
+        // this way, because Google biographies populate `unified.note` on nearly
+        // every contact. The entitlement gate already existed in Settings and in
+        // `syncNotes`; the write path was the one place that ignored it.
+        if MacContactsConnector.notesFieldAvailable, let note = unified.note {
             mac.note = note
         }
-        
+
         if let photoData = unified.photoData {
             mac.imageData = photoData
         }
