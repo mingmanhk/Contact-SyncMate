@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import Contacts
+@preconcurrency import Contacts
 import Combine
 import os.log
 
@@ -128,6 +128,63 @@ class MacContactsConnector: ObservableObject {
     
     // MARK: - Fetching Contacts
     
+    /// Serial queue for every Contacts write.
+    ///
+    /// Serial rather than concurrent on purpose: `CNSaveRequest` execution against
+    /// one store is not something to parallelise, and keeping all writes on a
+    /// single thread means a `CNMutableContact` is only ever touched from one
+    /// place after it leaves the main actor.
+    ///
+    /// `.userInitiated` — high enough that contactsd does not deprioritise us,
+    /// low enough that we are not a user-interactive thread blocking on its
+    /// background one.
+    private nonisolated static let writeQueue = DispatchQueue(
+        label: "com.victorlam.ContactSyncMate.contacts-write",
+        qos: .userInitiated
+    )
+
+    /// Run a Contacts mutation off the main actor.
+    ///
+    /// The store operations are synchronous XPC; performing them on the main
+    /// actor is what produced both the Hang Risk warnings and — via contention
+    /// on the same XPC connection that faulting uses — the 134092 save failures.
+    nonisolated static func performWriteOffMain<T>(
+        _ work: @escaping @Sendable () throws -> T
+    ) async throws -> T where T: Sendable {
+        try await withCheckedThrowingContinuation { continuation in
+            writeQueue.async {
+                do { continuation.resume(returning: try work()) }
+                catch { continuation.resume(throwing: error) }
+            }
+        }
+    }
+
+    /// Off-main equivalent of `fetchAllContacts(in:)`.
+    ///
+    /// Every CNContactStore call is synchronous XPC to contactsd, which runs at
+    /// background QoS. Driving them from the main actor (user-interactive QoS)
+    /// makes the high-priority thread block on a low-priority one — the
+    /// priority inversion Xcode reports as a Hang Risk at
+    /// `NSXPCStoreConnectionManager _checkoutConnection`.
+    ///
+    /// This is not merely a responsiveness issue. Faulting a CNContact property
+    /// travels over that same XPC connection, so contention there surfaces as
+    /// "Unhandled error … occurred during faulting" — Cocoa 134092 — on save.
+    /// SyncEngine drove the whole sync from the main actor, so the inversion was
+    /// present for the entire run.
+    ///
+    /// Returns identifiers-and-values only: `CNContact` is not `Sendable`, so the
+    /// objects themselves must not cross the isolation boundary casually. They
+    /// are safe here because the detached task hands back a freshly built array
+    /// that nothing else retains.
+    nonisolated func fetchAllContactsOffMainActor(
+        in container: CNContainer? = nil
+    ) async throws -> [CNContact] {
+        try await Task.detached(priority: .userInitiated) {
+            try Self.fetchAllContactsOffMain(in: container)
+        }.value
+    }
+
     func fetchAllContacts(in container: CNContainer? = nil) throws -> [CNContact] {
         guard isAuthorized else {
             throw MacContactsError.notAuthorized
@@ -145,12 +202,11 @@ class MacContactsConnector: ObservableObject {
             fetchRequest.predicate = CNContact.predicateForContactsInContainer(withIdentifier: recommended.identifier)
         }
         
-        let containerName: String = {
-            if let specific = container { return specific.name }
-            let recommended: CNContainer? = try? getRecommendedContainer()
-            if let c = recommended { return c.name }
-            return "(none)"
-        }()
+        // Reuse the lookup from above rather than repeating it. Each
+        // getRecommendedContainer() is a synchronous XPC round trip to contactsd,
+        // and this one existed only to produce a name for the log line — which
+        // doubled the container queries on every fetch.
+        let containerName = container?.name ?? recommendedContainerOpt?.name ?? "(none)"
         history.log(source: "MacContacts", action: "fetchAllContacts.begin", details: "container=\(containerName)")
 
         try store.enumerateContacts(with: fetchRequest) { contact, stop in
@@ -189,6 +245,45 @@ class MacContactsConnector: ObservableObject {
     
     // MARK: - Saving Contacts
     
+    /// `saveContact` callable from the write queue.
+    ///
+    /// Same body, minus the actor isolation, so `performWriteOffMain` can invoke
+    /// it without hopping back to main — which would defeat the entire point.
+    nonisolated func saveContactSync(_ contact: CNMutableContact,
+                                     to container: CNContainer? = nil) throws {
+        let history = SyncHistory.shared
+        let containerID = container?.identifier ?? Self.shared.defaultContainerIdentifier()
+
+        let request = CNSaveRequest()
+        request.add(contact, toContainerWithIdentifier: containerID)
+
+        history.log(source: "MacContacts", action: "saveContact",
+                    details: container?.name ?? "default: \(containerID)")
+
+        do {
+            try Self.shared.execute(request)
+        } catch {
+            history.log(source: "MacContacts", action: "saveContact.failed",
+                        details: "\(containerID): \(Self.diagnose(error))")
+            throw error
+        }
+    }
+
+    /// `updateContact` callable from the write queue. See `saveContactSync`.
+    nonisolated func updateContactSync(_ contact: CNMutableContact) throws {
+        let history = SyncHistory.shared
+        let request = CNSaveRequest()
+        request.update(contact)
+
+        do {
+            try Self.shared.execute(request)
+        } catch {
+            history.log(source: "MacContacts", action: "updateContact.failed",
+                        details: Self.diagnose(error))
+            throw error
+        }
+    }
+
     func saveContact(_ contact: CNMutableContact, to container: CNContainer? = nil) throws {
         guard isAuthorized else {
             throw MacContactsError.notAuthorized
@@ -359,7 +454,7 @@ class MacContactsConnector: ObservableObject {
     /// reason, which made a 100%-reproducible write failure impossible to pin
     /// down from logs alone. Contacts does report the offending key paths, but
     /// only in `userInfo` under `CNErrorUserInfoKeyPaths`.
-    static func diagnose(_ error: Error) -> String {
+    nonisolated static func diagnose(_ error: Error) -> String {
         let nsError = error as NSError
         var parts = ["\(nsError.domain) \(nsError.code)"]
 

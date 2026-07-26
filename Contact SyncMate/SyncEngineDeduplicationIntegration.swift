@@ -23,7 +23,7 @@ extension SyncEngine {
         
         // 1. Fetch contacts from both sides
         let googleContacts = try await googleConnector.fetchAllContacts()
-        let macContacts = try macConnector.fetchAllContacts()
+        let macContacts = try await macConnector.fetchAllContactsOffMainActor()
         
         // 2. Convert to unified format
         let unifiedGoogleContacts = googleContacts.map { ContactMapper.toUnified(from: $0) }
@@ -87,7 +87,7 @@ extension SyncEngine {
         
         // 1. Fetch contacts
         let googleContacts = try await googleConnector.fetchAllContacts()
-        let macContacts = try macConnector.fetchAllContacts()
+        let macContacts = try await macConnector.fetchAllContactsOffMainActor()
         
         let unifiedGoogleContacts = googleContacts.map { ContactMapper.toUnified(from: $0) }
         let unifiedMacContacts = macContacts.map { ContactMapper.toUnified(from: $0) }

@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import Contacts
+@preconcurrency import Contacts
 import Combine
 import SwiftUI
 
@@ -76,7 +76,10 @@ class SyncEngine: ObservableObject {
         do {
             // Fetch contacts from both sides
             let googleContacts = try await googleConnector.fetchAllContacts()
-            let macContacts = try macConnector.fetchAllContacts()
+            // Off the main actor: see fetchAllContactsOffMainActor. Driving
+            // contactsd XPC from a user-interactive thread inverts priority and
+            // corrupts subsequent faulting.
+            let macContacts = try await macConnector.fetchAllContactsOffMainActor()
 
             // Convert to unified format
             let unifiedGoogleContacts = googleContacts.map { ContactMapper.toUnified(from: $0) }
@@ -239,7 +242,10 @@ class SyncEngine: ObservableObject {
         if AppSettings.shared.autoBackupEnabled, let syncSessionId = session.syncSessionId {
             do {
                 let googleContacts = try await googleConnector.fetchAllContacts()
-                let macContacts = try macConnector.fetchAllContacts()
+                // Off the main actor: see fetchAllContactsOffMainActor. Driving
+            // contactsd XPC from a user-interactive thread inverts priority and
+            // corrupts subsequent faulting.
+            let macContacts = try await macConnector.fetchAllContactsOffMainActor()
 
                 _ = try await ContactBackupManager.shared.createPostSyncBackup(
                     googleContacts: googleContacts.map { ContactMapper.toUnified(from: $0) },
@@ -656,7 +662,13 @@ class SyncEngine: ObservableObject {
         case .googleToMac:
             // Add Google contact to Mac
             let cnContact = ContactMapper.toMac(from: source)
-            try macConnector.saveContact(cnContact, to: nil)
+            // Off-main: contactsd XPC from a user-interactive thread inverts
+            // priority, and that contention is what fails the faulting during
+            // save (Cocoa 134092).
+            let connector = macConnector
+            try await MacContactsConnector.performWriteOffMain {
+                try connector.saveContactSync(cnContact, to: nil)
+            }
             // Store mapping using the new Mac identifier
             if let gID = source.googleResourceName {
                 let mID = cnContact.identifier
@@ -705,7 +717,7 @@ class SyncEngine: ObservableObject {
             guard let existing = try macConnector.fetchContact(withIdentifier: mID) else { return }
             let mutableContact = existing.mutableCopy() as! CNMutableContact
             ContactMapper.applyToMac(from: source, to: mutableContact)
-            try macConnector.updateContact(mutableContact)
+            let c = macConnector; try await MacContactsConnector.performWriteOffMain { try c.updateContactSync(mutableContact) }
             mappingStore.saveMapping(ContactMapping(
                 googleResourceName: source.googleResourceName ?? "",
                 macContactIdentifier: mID,
@@ -810,7 +822,7 @@ class SyncEngine: ObservableObject {
             if let existing = try macConnector.fetchContact(withIdentifier: mID) {
                 let mutable = existing.mutableCopy() as! CNMutableContact
                 ContactMapper.applyToMac(from: finalMerged, to: mutable)
-                try macConnector.updateContact(mutable)
+                let c = macConnector; try await MacContactsConnector.performWriteOffMain { try c.updateContactSync(mutable) }
             }
         }
 

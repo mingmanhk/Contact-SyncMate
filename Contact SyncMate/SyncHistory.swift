@@ -1,14 +1,16 @@
 import Foundation
 import Combine
 
-public struct SyncEvent: Codable, Identifiable {
+/// `Sendable` because it is immutable value data — and it has to cross threads:
+/// events are now logged from the Contacts write queue, not just the main actor.
+public struct SyncEvent: Codable, Identifiable, Sendable {
     public let id: UUID
     public let timestamp: Date
     public let source: String
     public let action: String
     public let details: String?
 
-    public init(id: UUID = UUID(), timestamp: Date = Date(), source: String, action: String, details: String? = nil) {
+    public nonisolated init(id: UUID = UUID(), timestamp: Date = Date(), source: String, action: String, details: String? = nil) {
         self.id = id
         self.timestamp = timestamp
         self.source = source
@@ -17,8 +19,13 @@ public struct SyncEvent: Codable, Identifiable {
     }
 }
 
-public final class SyncHistory {
-    public static let shared = SyncHistory()
+/// `@unchecked Sendable` because the invariant is enforced by `queue`, not by the
+/// type system: every read goes through `queue.sync` and every mutation through a
+/// barrier. The compiler cannot verify that discipline, but it is the reason this
+/// type is safe to log to from any thread — which matters now that Contacts work
+/// runs off the main actor and still needs to record what it did.
+public final class SyncHistory: @unchecked Sendable {
+    public nonisolated static let shared = SyncHistory()
 
     private let queue = DispatchQueue(label: "SyncHistory.queue", attributes: .concurrent)
     private var _events: [SyncEvent] = []
@@ -64,7 +71,7 @@ public final class SyncHistory {
     // MARK: - Public API
 
     @discardableResult
-    public func log(source: String, action: String, details: String? = nil) -> SyncEvent {
+    public nonisolated func log(source: String, action: String, details: String? = nil) -> SyncEvent {
         let event = SyncEvent(source: source, action: action, details: details)
         queue.async(flags: .barrier) { [weak self] in
             guard let self = self else { return }
@@ -77,7 +84,7 @@ public final class SyncHistory {
         return event
     }
 
-    public func events() -> [SyncEvent] {
+    public nonisolated func events() -> [SyncEvent] {
         var snapshot: [SyncEvent] = []
         queue.sync {
             snapshot = self._events
@@ -90,7 +97,7 @@ public final class SyncHistory {
     /// Barriered on the same queue as `log`, so a clear cannot interleave with a
     /// concurrent append. Writes through to disk immediately — otherwise a crash
     /// before the next log call would resurrect what the user just cleared.
-    public func clear() {
+    public nonisolated func clear() {
         queue.async(flags: .barrier) { [weak self] in
             guard let self = self else { return }
             self._events.removeAll()
