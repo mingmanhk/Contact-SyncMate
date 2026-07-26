@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers  // UTType.json for the export panel
 import Combine
 
 // MARK: - History Filter
@@ -11,10 +12,38 @@ import Combine
 /// Three buckets, not four. "Success" and "Warnings" split the log along a line
 /// nobody actually searches on — the real questions are "what did it do to my
 /// contacts?" and "what went wrong?".
+private extension String {
+    /// "cnContactStoreDidChange" → "Cn Contact Store Did Change".
+    ///
+    /// Only used for action identifiers with no explicit label — a readable
+    /// fallback, not a substitute for translating the ones users actually see.
+    func splitCamelCaseWords() -> String {
+        var out = ""
+        for (index, character) in enumerated() {
+            if index > 0, character.isUppercase, !out.hasSuffix(" ") {
+                out.append(" ")
+            }
+            out.append(character)
+        }
+        return out.prefix(1).uppercased() + out.dropFirst()
+    }
+}
+
 private enum HistoryFilter: String, CaseIterable {
     case all     = "All"
     case changes = "Changes"
     case errors  = "Errors"
+
+    /// `Text(someString)` is not localized — `LocalizedStringKey` is only
+    /// inferred for string *literals*, so feeding it `rawValue` shipped the
+    /// English segment labels regardless of the chosen language.
+    var localizedTitle: String {
+        switch self {
+        case .all:     return String(localized: "All")
+        case .changes: return String(localized: "Changes")
+        case .errors:  return String(localized: "Errors")
+        }
+    }
 }
 
 // MARK: - Sync History View
@@ -24,6 +53,7 @@ struct SyncHistoryView: View {
     @State private var activeFilter: HistoryFilter = .all
     @State private var searchText = ""
     @State private var expandedIDs: Set<UUID> = []
+    @State private var exportError: String?
 
     private var filteredEvents: [SyncEvent] {
         var events = allEvents
@@ -95,6 +125,12 @@ struct SyncHistoryView: View {
 
                 Button("Export Log") { exportLog() }
                     .buttonStyle(.bordered)
+                    .alert("Couldn't export the log",
+                           isPresented: .constant(exportError != nil)) {
+                        Button("OK") { exportError = nil }
+                    } message: {
+                        Text(exportError ?? "")
+                    }
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
@@ -116,7 +152,7 @@ struct SyncHistoryView: View {
                 // is for, and it picks up keyboard focus and VoiceOver for free.
                 Picker("Filter history", selection: $activeFilter) {
                     ForEach(HistoryFilter.allCases, id: \.self) { filter in
-                        Text(filter.rawValue).tag(filter)
+                        Text(filter.localizedTitle).tag(filter)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -219,23 +255,33 @@ struct SyncHistoryView: View {
 
     private func friendlyLabel(for action: String) -> String {
         switch action {
-        case "sync.complete":                       return "Sync completed"
-        case "sync.start", "scanForDuplicates.start": return "Sync started"
-        case "add":                                 return "Contact added"
-        case "update":                              return "Contact updated"
-        case "delete":                              return "Contact deleted"
-        case "merge.deferred":                      return "Conflict flagged for review"
-        case "autoMerge":                           return "Duplicates auto-merged"
-        case "userMerge":                           return "Duplicates merged"
-        case "keepSeparate":                        return "Contacts kept separate"
-        case "skippedDuplicatesNotification":       return "Duplicates skipped (auto-sync)"
-        case "createMappingFromMerge":              return "Contact mapping created"
-        case "clearPatterns":                       return "Saved patterns cleared"
+        case "sync.complete":                       return String(localized: "Sync completed")
+        case "sync.start", "scanForDuplicates.start": return String(localized: "Sync started")
+        case "add", "change.add":                   return String(localized: "Contact added")
+        case "update", "change.update":             return String(localized: "Contact updated")
+        case "delete", "change.delete":             return String(localized: "Contact deleted")
+        case "change.merge":                        return String(localized: "Contacts merged")
+        case "change.failed":                       return String(localized: "Change failed")
+        case "merge.deferred":                      return String(localized: "Conflict flagged for review")
+        case "autoMerge":                           return String(localized: "Duplicates auto-merged")
+        case "userMerge":                           return String(localized: "Duplicates merged")
+        case "keepSeparate":                        return String(localized: "Contacts kept separate")
+        case "skippedDuplicatesNotification":       return String(localized: "Duplicates skipped (auto-sync)")
+        case "createMappingFromMerge":              return String(localized: "Contact mapping created")
+        case "clearPatterns":                       return String(localized: "Saved patterns cleared")
+        case "preSyncBackup.failed",
+             "postSyncBackup.failed":               return String(localized: "Backup failed")
+        case "request.retrying":                    return String(localized: "Retrying after rate limit")
+        case "cnContactStoreDidChange":             return String(localized: "Mac contacts changed")
         default:
+            // The old fallback ran `.capitalized` over a dotted identifier, which
+            // turned "cnContactStoreDidChange" into "Cncontactstoredidchange" —
+            // unreadable in any language. Split on case boundaries instead and
+            // leave it in the development language rather than mangling it.
             return action
                 .replacingOccurrences(of: ".", with: " ")
                 .replacingOccurrences(of: "_", with: " ")
-                .capitalized
+                .splitCamelCaseWords()
         }
     }
 
@@ -272,15 +318,47 @@ struct SyncHistoryView: View {
         }
     }
 
+    /// Export the history as JSON to a location the user picks.
+    ///
+    /// The previous implementation wrote to
+    /// `FileManager.urls(for: .downloadsDirectory)` and swallowed every failure
+    /// with `guard … else { return }` and `try?`. Under App Sandbox that path
+    /// resolves to the *container's* Downloads folder, and writing to the real
+    /// one needs `files.downloads.read-write`, which this app deliberately does
+    /// not request. So the button silently did nothing.
+    ///
+    /// `NSSavePanel` is the sandbox-correct route: the user's choice carries an
+    /// implicit grant via `files.user-selected.read-write`, which we do hold.
     private func exportLog() {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = .prettyPrinted
-        guard let data = try? encoder.encode(SyncHistory.shared.events()),
-              let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else { return }
-        let url = downloads.appendingPathComponent("contact_syncmate_history.json")
-        try? data.write(to: url)
-        NSWorkspace.shared.activateFileViewerSelecting([url])
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+
+        let data: Data
+        do {
+            data = try encoder.encode(SyncHistory.shared.events())
+        } catch {
+            exportError = error.localizedDescription
+            return
+        }
+
+        let panel = NSSavePanel()
+        panel.title = String(localized: "Export Log")
+        panel.nameFieldStringValue = "contact-syncmate-history.json"
+        panel.allowedContentTypes = [.json]
+        panel.canCreateDirectories = true
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            try data.write(to: url, options: .atomic)
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } catch {
+            exportError = error.localizedDescription
+            SyncHistory.shared.log(source: "SyncHistoryView",
+                                   action: "exportLog.failed",
+                                   details: error.localizedDescription)
+        }
     }
 }
 

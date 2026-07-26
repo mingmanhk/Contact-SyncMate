@@ -585,6 +585,28 @@ T = {
     "Mac contacts are the master, changes sync to Google only":
         "以 Mac 聯絡人為準,變更只同步到 Google",
     "Preview and approve each change before syncing": "同步前逐項預覽並核准變更",
+
+    "All": "全部",
+    "Changes": "變更",
+    "Errors": "錯誤",
+    "Sync started": "同步已開始",
+    "Contact added": "已新增聯絡人",
+    "Contact updated": "已更新聯絡人",
+    "Contact deleted": "已刪除聯絡人",
+    "Contacts merged": "已合併聯絡人",
+    "Change failed": "變更失敗",
+    "Backup failed": "備份失敗",
+    "Retrying after rate limit": "已達速率上限,正在重試",
+    "Mac contacts changed": "Mac 聯絡人已變更",
+    "Conflict flagged for review": "衝突已標記待檢視",
+    "Duplicates auto-merged": "重複項已自動合併",
+    "Duplicates merged": "重複項已合併",
+    "Contacts kept separate": "聯絡人保持分開",
+    "Duplicates skipped (auto-sync)": "已略過重複項(自動同步)",
+    "Contact mapping created": "已建立聯絡人對應",
+    "Saved patterns cleared": "已清除儲存的模式",
+    "Couldn't export the log": "無法匯出記錄",
+    "OK": "好",
 }
 
 

@@ -42,61 +42,98 @@ class GoogleContactsConnector: ObservableObject {
     
     // MARK: - API Request Helper
     
+    /// How many times a request is retried before the error is surfaced.
+    ///
+    /// Google's People API applies a **per-minute** quota, so a sync touching a
+    /// few hundred contacts will hit 429 during normal operation. That is not an
+    /// error condition — it is the API asking us to slow down. Retrying with
+    /// exponential backoff is the documented client contract; without it a large
+    /// address book can never finish syncing, which is exactly the "sync never
+    /// works" symptom this replaced.
+    private static let maxRetryAttempts = 5
+
+    /// Base delay, doubled per attempt: 1s, 2s, 4s, 8s, 16s.
+    /// Total worst-case wait is ~31s, comfortably inside a per-minute window.
+    private static let baseRetryDelay: Duration = .seconds(1)
+
     private func makeRequest(url: URL) async throws -> (Data, URLResponse) {
-        let token = try await oauthManager.getValidAccessToken()
-        
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw GoogleContactsError.networkError(NSError(domain: "InvalidResponse", code: -1))
-        }
-        
-        // Handle specific status codes
-        switch httpResponse.statusCode {
-        case 200...299:
-            return (data, response)
-        case 401:
-            throw GoogleContactsError.invalidToken
-        case 429:
-            throw GoogleContactsError.rateLimitExceeded
-        default:
-            let message = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw GoogleContactsError.apiError(statusCode: httpResponse.statusCode, message: message)
-        }
+        try await makeRequest(url: url, method: "GET", body: nil)
     }
-    
+
     private func makeRequest(url: URL, method: String, body: Data?) async throws -> (Data, URLResponse) {
-        let token = try await oauthManager.getValidAccessToken()
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = body
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw GoogleContactsError.networkError(NSError(domain: "InvalidResponse", code: -1))
-        }
-        
-        switch httpResponse.statusCode {
-        case 200...299:
-            return (data, response)
-        case 401:
-            throw GoogleContactsError.invalidToken
-        case 429:
-            throw GoogleContactsError.rateLimitExceeded
-        default:
-            let message = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw GoogleContactsError.apiError(statusCode: httpResponse.statusCode, message: message)
+        var attempt = 0
+
+        while true {
+            // Fetched inside the loop: a long backoff can outlive the access
+            // token, and retrying with a stale one would fail as 401.
+            let token = try await oauthManager.getValidAccessToken()
+
+            var request = URLRequest(url: url)
+            request.httpMethod = method
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = body
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw GoogleContactsError.networkError(NSError(domain: "InvalidResponse", code: -1))
+            }
+
+            switch httpResponse.statusCode {
+            case 200...299:
+                return (data, response)
+
+            case 401:
+                throw GoogleContactsError.invalidToken
+
+            // 429 = quota; 500/502/503/504 = transient server-side faults.
+            // Both are retryable, and Google explicitly recommends backoff.
+            case 429, 500, 502, 503, 504:
+                attempt += 1
+                guard attempt <= Self.maxRetryAttempts else {
+                    if httpResponse.statusCode == 429 {
+                        throw GoogleContactsError.rateLimitExceeded
+                    }
+                    let message = String(data: data, encoding: .utf8) ?? "Unknown error"
+                    throw GoogleContactsError.apiError(statusCode: httpResponse.statusCode,
+                                                       message: message)
+                }
+
+                let delay = Self.retryDelay(for: attempt, response: httpResponse)
+                SyncHistory.shared.log(
+                    source: "GoogleAPI",
+                    action: "request.retrying",
+                    details: "HTTP \(httpResponse.statusCode) — attempt \(attempt)/\(Self.maxRetryAttempts), waiting \(delay)"
+                )
+                try await Task.sleep(for: delay)
+                continue
+
+            default:
+                let message = String(data: data, encoding: .utf8) ?? "Unknown error"
+                throw GoogleContactsError.apiError(statusCode: httpResponse.statusCode, message: message)
+            }
         }
     }
-    
+
+    /// Backoff interval for `attempt` (1-based).
+    ///
+    /// A server-supplied `Retry-After` always wins — guessing shorter than what
+    /// the server asked for just burns quota and earns another 429.
+    private static func retryDelay(for attempt: Int, response: HTTPURLResponse) -> Duration {
+        if let header = response.value(forHTTPHeaderField: "Retry-After"),
+           let seconds = Double(header), seconds > 0 {
+            return .seconds(min(seconds, 60))
+        }
+
+        // Exponential, with jitter so parallel requests don't retry in lockstep
+        // and immediately re-trip the same quota.
+        let exponential = pow(2.0, Double(attempt - 1))
+        let jitter = Double.random(in: 0...0.3)
+        return .seconds(min(exponential + jitter, 30))
+    }
+
+
     // MARK: - Fetching Contacts
     
     func fetchAllContacts() async throws -> [GoogleContact] {

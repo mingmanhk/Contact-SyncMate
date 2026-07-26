@@ -186,8 +186,51 @@ class MacContactsConnector: ObservableObject {
             return "default: \(store.defaultContainerIdentifier())"
         }()
         history.log(source: "MacContacts", action: "saveContact", details: targetContainerName)
-        
-        try store.execute(saveRequest)
+
+        do {
+            try store.execute(saveRequest)
+        } catch {
+            // The default container is not guaranteed to be writable. On this
+            // machine it can be a Google/Exchange CardDAV account, which rejects
+            // adds with Cocoa error 134092 ("could not complete the operation") —
+            // an opaque message that gave no hint the *destination* was the
+            // problem. Retry once against a container we know accepts writes.
+            guard container == nil,
+                  let fallback = try? firstWritableContainer(),
+                  fallback.identifier != store.defaultContainerIdentifier()
+            else {
+                history.log(source: "MacContacts", action: "saveContact.failed",
+                            details: "\(targetContainerName): \(error.localizedDescription)")
+                throw error
+            }
+
+            history.log(
+                source: "MacContacts",
+                action: "saveContact.retryingInFallbackContainer",
+                details: "\(targetContainerName) rejected the write (\(error.localizedDescription)); retrying in \(fallback.name)"
+            )
+
+            let retry = CNSaveRequest()
+            retry.add(contact, toContainerWithIdentifier: fallback.identifier)
+            try store.execute(retry)
+        }
+    }
+
+    /// A container that accepts new contacts.
+    ///
+    /// Prefers local, then iCloud. Google/Gmail CardDAV containers are excluded
+    /// on purpose: writing Google contacts through Apple's CardDAV mirror would
+    /// race this app's own Google People API writes and produce duplicates.
+    private func firstWritableContainer() throws -> CNContainer? {
+        let containers = try store.containers(matching: nil)
+            .filter { !isLikelyGoogleContainer($0) }
+
+        if let local = containers.first(where: { $0.type == .local }) {
+            return local
+        }
+        return containers.first(where: {
+            $0.type == .cardDAV && $0.name.lowercased().contains("icloud")
+        }) ?? containers.first
     }
     
     func updateContact(_ contact: CNMutableContact) throws {

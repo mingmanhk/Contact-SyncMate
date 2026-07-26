@@ -87,3 +87,4 @@ tmp/
 .idea/
 .l10n_keys.txt
 .l10n_untranslated.txt
+build/verify-logs/
