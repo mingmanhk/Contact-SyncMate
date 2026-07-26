@@ -59,10 +59,18 @@ class GoogleOAuthManager: NSObject, ObservableObject {
     // Keychain key for the client secret
     private static let clientSecretKeychainKey = "GoogleOAuthClientSecret"
     
-    // Scopes needed for Google People API
+    // Scopes needed for Google People API.
+    //
+    // Deliberately minimal — every scope here must be justified during OAuth
+    // verification, and each sensitive scope lengthens review.
+    //   • contacts        — required: two-way sync needs read AND write.
+    //   • userinfo.email  — required: shows which account is connected in the UI.
+    //
+    // Removed: contacts.other.readonly ("Other contacts" auto-collected by
+    // Gmail). It was requested but never read by any code path, and it is a
+    // sensitive scope, so asking for it was pure liability.
     private let scopes = [
         "https://www.googleapis.com/auth/contacts",
-        "https://www.googleapis.com/auth/contacts.other.readonly",
         "https://www.googleapis.com/auth/userinfo.email"
     ]
     
