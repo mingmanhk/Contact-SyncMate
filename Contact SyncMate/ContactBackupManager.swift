@@ -534,19 +534,30 @@ class ContactBackupManager: ObservableObject {
         }
     }
 
+    /// Resolve the folder backups are written to.
+    ///
+    /// Sandbox-aware resolution order:
+    ///   1. A user-chosen folder, reached through a *security-scoped bookmark*
+    ///      (the only way a sandboxed app keeps folder access across launches —
+    ///      a bare path string is revoked when the process exits).
+    ///   2. The app's own Documents directory. Under the sandbox this is
+    ///      `~/Library/Containers/<bundle-id>/Data/Documents`, which is always
+    ///      writable without any entitlement.
+    ///   3. Temp directory as a last resort.
     private func backupDirectoryURL() -> URL {
         let fm = FileManager.default
 
-        // 1. Use custom path if set
-        if let custom = customBackupPath, !custom.isEmpty {
-            let url = URL(fileURLWithPath: custom)
+        // 1. User-chosen folder via bookmark
+        if let url = SecurityScopedBookmark.resolve(.backupFolder) {
+            let didStart = url.startAccessingSecurityScopedResource()
+            defer { if didStart { url.stopAccessingSecurityScopedResource() } }
             if !fm.fileExists(atPath: url.path) {
                 try? fm.createDirectory(at: url, withIntermediateDirectories: true)
             }
             return url
         }
 
-        // 2. Default: ~/Documents/Contact SyncMate Backups
+        // 2. Container Documents (sandbox-safe default)
         if let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first {
             let backupDir = docs.appendingPathComponent("Contact SyncMate Backups", isDirectory: true)
             if !fm.fileExists(atPath: backupDir.path) {
@@ -558,20 +569,54 @@ class ContactBackupManager: ObservableObject {
         return fm.temporaryDirectory
     }
 
-    /// Let the user pick a new backup folder
+    /// Whether the user has chosen a custom backup folder (vs. the default
+    /// container location). Drives the "Reset to Default" button in Settings.
+    var hasCustomBackupFolder: Bool {
+        SecurityScopedBookmark.exists(.backupFolder)
+    }
+
+    /// Let the user pick a new backup folder.
+    ///
+    /// The chosen URL is persisted as a security-scoped bookmark so access
+    /// survives relaunch under the App Sandbox.
     @MainActor
     func chooseBackupDirectory() {
         let panel = NSOpenPanel()
         panel.title = "Choose Backup Folder"
+        panel.message = "Contact SyncMate will store backup snapshots in this folder."
+        panel.prompt = "Choose"
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK, let url = panel.url {
-            customBackupPath = url.path
-            // Reload after changing directory
-            loadBackupIndex()
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        // Persist the grant BEFORE doing anything else with the URL.
+        guard SecurityScopedBookmark.save(url, forKey: .backupFolder) else {
+            SyncHistory.shared.log(
+                source: "BackupManager",
+                action: "chooseBackupDirectory.failed",
+                details: "Could not persist access to \(url.lastPathComponent)"
+            )
+            return
         }
+
+        customBackupPath = url.path   // display only
+        SyncHistory.shared.log(
+            source: "BackupManager",
+            action: "backupFolder.changed",
+            details: url.lastPathComponent
+        )
+        loadBackupIndex()
+    }
+
+    /// Return to the default (container) backup folder and drop the bookmark.
+    @MainActor
+    func resetBackupDirectoryToDefault() {
+        SecurityScopedBookmark.clear(.backupFolder)
+        customBackupPath = nil
+        loadBackupIndex()
     }
 
     private var backupIndexURL: URL {

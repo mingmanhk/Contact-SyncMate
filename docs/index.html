@@ -3,135 +3,427 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Contact SyncMate — Two-way contact sync for macOS</title>
-<meta name="description" content="Contact SyncMate is a macOS menu bar app that two-way syncs your Google Contacts with your Apple Contacts. All processing is local — no servers, no telemetry.">
+<title>Contact SyncMate</title>
+<meta name="description" content="Contact SyncMate is a native macOS menu bar app that two-way syncs your Google Contacts with your Apple Contacts. All processing is local on your Mac — no server, no telemetry, no data sale.">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<meta property="og:title" content="Contact SyncMate">
+<meta property="og:description" content="Two-way contact synchronisation between Google Contacts and Apple Contacts, entirely on your Mac.">
+<meta property="og:type" content="website">
 <style>
-  :root { --fg:#1d1d1f; --muted:#6e6e73; --line:#d2d2d7; --accent:#0b5cd5; --bg:#fff; --card:#f5f5f7; }
-  @media (prefers-color-scheme: dark) {
-    :root { --fg:#f5f5f7; --muted:#a1a1a6; --line:#3a3a3c; --accent:#6ea8ff; --bg:#161617; --card:#1f1f21; }
+  :root{
+    --fg:#1d1d1f; --muted:#6e6e73; --faint:#86868b; --line:#d2d2d7;
+    --accent:#4b3fd8; --bg:#fff; --card:#f5f5f7; --tint:#eef1fb;
+    --ok:#1a7f3c; --warn:#a35c00; --shadow:0 1px 3px rgba(0,0,0,.06);
   }
-  * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--fg);
-         font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
-  .wrap { max-width:780px; margin:0 auto; padding:56px 24px 80px; }
-  header { border-bottom:1px solid var(--line); padding-bottom:28px; margin-bottom:36px; }
-  h1 { font-size:2.4rem; margin:0 0 8px; letter-spacing:-.02em; }
-  .tagline { font-size:1.2rem; color:var(--muted); margin:0; }
-  h2 { font-size:1.35rem; margin:40px 0 12px; letter-spacing:-.01em; }
-  h3 { font-size:1.05rem; margin:24px 0 8px; }
-  p, li { color:var(--fg); }
-  .muted { color:var(--muted); }
-  ul { padding-left:22px; }
-  li { margin:6px 0; }
-  a { color:var(--accent); }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:12px;
-          padding:18px 20px; margin:20px 0; }
-  .flow { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.9rem;
-          white-space:pre; overflow-x:auto; color:var(--muted); }
-  table { width:100%; border-collapse:collapse; margin:16px 0; font-size:.95rem; }
-  th,td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
-  th { font-weight:600; }
-  code { background:var(--card); padding:2px 6px; border-radius:5px; font-size:.9em; }
-  footer { margin-top:56px; padding-top:24px; border-top:1px solid var(--line);
-           color:var(--muted); font-size:.9rem; }
-  .nav { display:flex; gap:18px; flex-wrap:wrap; margin-top:14px; font-size:.95rem; }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --fg:#f5f5f7; --muted:#a1a1a6; --faint:#8e8e93; --line:#3a3a3c;
+      --accent:#8b83ff; --bg:#161617; --card:#1f1f21; --tint:#23233a;
+      --ok:#4ade80; --warn:#fbbf24; --shadow:none;
+    }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font:16px/1.68 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       -webkit-font-smoothing:antialiased}
+  .wrap{max-width:860px;margin:0 auto;padding:52px 24px 96px}
+  a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:2px}
+
+  /* Header */
+  .hero{display:flex;gap:22px;align-items:center;margin-bottom:10px}
+  .hero img{width:84px;height:84px;flex:0 0 84px;border-radius:19px;box-shadow:var(--shadow)}
+  h1{font-size:2.5rem;margin:0 0 4px;letter-spacing:-.025em;line-height:1.1}
+  .tagline{font-size:1.16rem;color:var(--muted);margin:0}
+  .nav{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0 34px}
+  .nav a{display:inline-block;padding:7px 14px;border:1px solid var(--line);border-radius:999px;
+         font-size:.9rem;text-decoration:none;background:var(--card)}
+  .nav a:hover{border-color:var(--accent)}
+  header{border-bottom:1px solid var(--line);padding-bottom:8px}
+
+  h2{font-size:1.5rem;margin:52px 0 14px;letter-spacing:-.015em;
+     padding-bottom:8px;border-bottom:1px solid var(--line)}
+  h3{font-size:1.06rem;margin:26px 0 8px}
+  p{margin:12px 0}
+  ul{padding-left:22px} li{margin:7px 0}
+  .lead{font-size:1.06rem}
+
+  /* Cards & callouts */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin:22px 0}
+  .callout{border-left:3px solid var(--accent);background:var(--tint);
+           border-radius:0 12px 12px 0;padding:14px 18px;margin:20px 0;font-size:.96rem}
+  .callout.good{border-left-color:var(--ok)}
+  .callout strong{color:var(--fg)}
+
+  /* Figures */
+  figure{margin:26px 0;padding:0}
+  figure img{width:100%;height:auto;display:block;border:1px solid var(--line);
+             border-radius:14px;background:var(--card)}
+  figcaption{font-size:.86rem;color:var(--faint);margin-top:10px;text-align:center}
+
+  /* Tables */
+  .tw{overflow-x:auto;margin:18px 0;border:1px solid var(--line);border-radius:12px}
+  table{width:100%;border-collapse:collapse;font-size:.94rem;min-width:520px}
+  thead th{background:var(--card);font-weight:650;text-align:left;padding:12px 14px;
+           border-bottom:1px solid var(--line);position:sticky;top:0}
+  td{padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:var(--card)}
+  code{background:var(--card);border:1px solid var(--line);padding:1px 6px;
+       border-radius:5px;font:.88em ui-monospace,SFMono-Regular,Menlo,monospace}
+  .yes{color:var(--ok);font-weight:600}
+  .no{color:var(--muted)}
+
+  /* Accordion — CSS only, no JavaScript */
+  details{border:1px solid var(--line);border-radius:12px;margin:10px 0;background:var(--card)}
+  details[open]{background:var(--bg)}
+  summary{cursor:pointer;padding:14px 18px;font-weight:600;font-size:.98rem;
+          list-style:none;display:flex;align-items:center;gap:10px}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"▸";color:var(--accent);font-size:.9em;transition:transform .15s}
+  details[open] summary::before{transform:rotate(90deg)}
+  details .body{padding:0 18px 16px;border-top:1px solid var(--line);margin-top:2px;padding-top:14px}
+
+  /* Spec grid */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:18px 0}
+  .grid div{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:14px 16px}
+  .grid dt{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:0 0 4px}
+  .grid dd{margin:0;font-weight:600;font-size:.98rem}
+
+  footer{margin-top:64px;padding-top:26px;border-top:1px solid var(--line);
+         color:var(--muted);font-size:.9rem}
+  @media (max-width:560px){
+    .hero{flex-direction:column;align-items:flex-start;gap:14px}
+    h1{font-size:2rem}
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
 
 <header>
-  <h1>Contact SyncMate</h1>
-  <p class="tagline">Two-way contact synchronisation between Google Contacts and Apple Contacts, for macOS.</p>
+  <div class="hero">
+    <img src="assets/logo.svg" alt="Contact SyncMate app icon">
+    <div>
+      <h1>Contact SyncMate</h1>
+      <p class="tagline">Two-way contact synchronisation between Google Contacts and Apple Contacts, for macOS.</p>
+    </div>
+  </div>
   <nav class="nav">
+    <a href="#what">What it does</a>
+    <a href="#how">How it works</a>
+    <a href="#scopes">Permissions</a>
+    <a href="#features">Features</a>
+    <a href="#privacy-summary">Privacy</a>
     <a href="privacy.html">Privacy Policy</a>
-    <a href="terms.html">Terms of Service</a>
-    <a href="https://github.com/mingmanhk/Contact-SyncMate">Source code</a>
+    <a href="terms.html">Terms</a>
+    <a href="https://github.com/mingmanhk/Contact-SyncMate">GitHub</a>
   </nav>
 </header>
 
-<h2>What this app does</h2>
-<p>
-  <strong>Contact SyncMate</strong> is a native macOS menu bar application that keeps
-  your <strong>Google Contacts</strong> and your <strong>Apple Contacts</strong>
-  (iCloud or “On My Mac”) in sync with each other.
-</p>
-<p>
-  Many people keep contacts in two places — a Google account used for mail and
-  Android, and Apple Contacts used across Mac, iPhone and iPad. Over time the two
-  lists drift apart: a phone number updated on one side never reaches the other,
-  and the same person ends up duplicated. Contact SyncMate reconciles both lists
-  and keeps them matching.
+<!-- ══════════════ WHAT ══════════════ -->
+<h2 id="what">What Contact SyncMate does</h2>
+
+<p class="lead">
+  <strong>Contact SyncMate</strong> is a native macOS menu bar application that keeps your
+  <strong>Google Contacts</strong> and your <strong>Apple Contacts</strong>
+  (iCloud or “On My Mac”) matching each other — in both directions, on a schedule
+  you control, with every change reviewable before it is written.
 </p>
 
-<div class="card">
-  <h3 style="margin-top:0">How data flows</h3>
-  <div class="flow">Google Contacts  ⇄  [ Your Mac — Contact SyncMate ]  ⇄  Apple Contacts
+<h3>Who it is for</h3>
+<p>
+  People who maintain contacts in two ecosystems at once: a Google account used
+  for Gmail, Android, or work, and Apple Contacts used across Mac, iPhone, and
+  iPad. Also anyone migrating between the two who wants the move to be
+  reversible rather than a one-shot import.
+</p>
 
-No server operated by the developer sits anywhere in this path.</div>
+<h3>The problem it solves</h3>
+<p>
+  When the same address book lives in two places, the two copies drift. A phone
+  number corrected on your iPhone never reaches Gmail. A colleague added in
+  Google Contacts never appears on your Mac. Re-importing to catch up creates
+  duplicates — “Bob Smith” beside “Robert Smith”, the same person twice with
+  half the details on each card.
+</p>
+<p>
+  Contact SyncMate reconciles the two lists instead of overwriting one with the
+  other: it tracks which Google contact corresponds to which Mac contact, detects
+  what actually changed on each side since the last run, merges field-level
+  differences, and recognises records that are the same person under different
+  spellings.
+</p>
+
+<div class="callout good">
+  <strong>Local by design.</strong> There is no Contact SyncMate server. Your
+  contacts move only between your Mac and the two providers you already use.
+  Nothing is uploaded to the developer, because there is nowhere to upload it to.
 </div>
 
-<h2>What it does with your Google data</h2>
-<p>The app requests exactly two OAuth scopes, and nothing else:</p>
-<table>
-  <tr><th>Scope</th><th>Why it is needed</th></tr>
-  <tr>
-    <td><code>auth/contacts</code></td>
-    <td>
-      <strong>Read</strong> — to list your Google contacts and detect what changed
-      since the last sync.<br>
-      <strong>Write</strong> — to create, update, and (only when you explicitly
-      enable it and confirm) delete Google contacts, so that edits you made on your
-      Mac reach Google. Two-way sync is impossible without write access;
-      <code>contacts.readonly</code> would allow Google → Mac only.
-    </td>
-  </tr>
-  <tr>
-    <td><code>auth/userinfo.email</code></td>
-    <td>To display which Google account is currently connected in the app’s
-        Settings window, so you can tell accounts apart.</td>
-  </tr>
-</table>
+<!-- ══════════════ HOW ══════════════ -->
+<h2 id="how">How it works</h2>
 
-<h2>Features</h2>
-<ul>
-  <li><strong>Two-way sync</strong> — or one-way (Google → Mac, Mac → Google) if you prefer a single source of truth.</li>
-  <li><strong>Preview before applying</strong> — every add, update, delete and merge is listed for review; you can override any individual change.</li>
-  <li><strong>Automatic backups</strong> — a snapshot is taken before and after each sync so any sync can be reviewed and rolled back.</li>
-  <li><strong>Duplicate detection</strong> — on-device matching for nicknames, transposed names, phonetic surnames and phone-format differences. Optional cloud AI assistance is off by default and requires your own API key.</li>
-  <li><strong>Field-level control</strong> — choose which fields participate (photos, birthdays, addresses, websites, job titles).</li>
-  <li><strong>Scheduled sync</strong> — runs in the background at an interval you choose, with optional conditions (AC power, Wi-Fi only, idle only).</li>
-  <li><strong>Change history</strong> — a per-contact log of exactly what the app changed and when.</li>
-</ul>
+<figure>
+  <img src="assets/architecture.svg" alt="Architecture diagram: Google Contacts and Apple Contacts each connect directly to Contact SyncMate running on the user's Mac. Inside the app, SyncCoordinator drives SyncEngine, which uses connectors, a deduplicator, and backup and history stores. Secrets live in the macOS Keychain; snapshots and history live on local disk. No developer-operated server appears anywhere.">
+  <figcaption>Figure 1 — System architecture. Every component runs on the user’s Mac.</figcaption>
+</figure>
 
-<h2>Privacy</h2>
 <p>
-  All synchronisation runs locally on your Mac. Your contacts are never
-  transmitted to, stored on, or processed by any server operated by the developer
-  or by any third party. There is no analytics, no telemetry, no advertising, and
-  no sale of data. OAuth tokens are stored in the macOS Keychain, never in plain
-  text. You can revoke access at any time from your
-  <a href="https://myaccount.google.com/permissions">Google Account permissions
-  page</a> or with the app’s Sign Out button.
+  A sync is a deterministic pipeline. Whether you press <em>Sync Now</em> or the
+  background timer fires, execution goes through a single coordinator, so
+  progress, history, and the menu bar indicator can never disagree with each other.
 </p>
-<p>Full details: <a href="privacy.html">Privacy Policy</a>.</p>
 
-<h2>Requirements</h2>
-<ul>
-  <li>macOS 13 Ventura or later</li>
-  <li>A Google account (for Google Contacts access)</li>
-  <li>Permission to access Apple Contacts, granted on first launch</li>
-</ul>
+<figure>
+  <img src="assets/sync-flow.svg" alt="Sync pipeline flow chart: trigger from Sync Now or the auto-sync timer, both entering SyncCoordinator.runSync. Then preflight checks, fetch both sides, pre-sync snapshot, compute diff, duplicate detection, review and confirm, apply changes, post-sync snapshot, and history plus notification. A dashed return path shows rollback from a snapshot.">
+  <figcaption>Figure 2 — The sync pipeline, from trigger to audit trail. Snapshots (green) make every step reversible.</figcaption>
+</figure>
 
-<h2>Support</h2>
+<div class="tw">
+<table>
+  <caption class="sr-only"></caption>
+  <thead>
+    <tr><th>Stage</th><th>What happens</th><th>Your control</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>1. Trigger</strong></td>
+        <td>Manual (menu bar, dashboard, or a Shortcuts action) or the auto-sync timer.</td>
+        <td>Optional confirmation prompt before any sync starts.</td></tr>
+    <tr><td><strong>2. Preflight</strong></td>
+        <td>Verifies Google is signed in and Contacts access is granted; aborts with a plain-language reason if not.</td>
+        <td>Failures are surfaced, never silent.</td></tr>
+    <tr><td><strong>3. Fetch</strong></td>
+        <td>Reads both address books and normalises them into one internal contact model.</td>
+        <td>Restrict to selected groups or labels.</td></tr>
+    <tr><td><strong>4. Pre-sync snapshot</strong></td>
+        <td>Writes a complete before-state to disk, atomically, tagged with a session ID.</td>
+        <td>On by default; can be disabled.</td></tr>
+    <tr><td><strong>5. Diff</strong></td>
+        <td>Uses stored ID mappings plus fuzzy matching to classify each contact as add, update, delete, or merge.</td>
+        <td>Choose direction: two-way, Google → Mac, or Mac → Google.</td></tr>
+    <tr><td><strong>6. Duplicate detection</strong></td>
+        <td>On-device matching for nicknames, initials, transposed names, phonetic surnames, phone formats, and email aliases.</td>
+        <td>Optional cloud AI tier for borderline pairs — off by default.</td></tr>
+    <tr><td><strong>7. Review</strong></td>
+        <td>Every pending change is listed with the exact fields affected.</td>
+        <td>Override any single change; or dry-run and write nothing.</td></tr>
+    <tr><td><strong>8. Apply</strong></td>
+        <td>Changes are written one at a time; each is logged with contact, direction, fields, and session ID.</td>
+        <td>Deletions require confirmation unless you turn that off.</td></tr>
+    <tr><td><strong>9. Post-sync snapshot + audit</strong></td>
+        <td>Final state is snapshotted, the result written to history, and a macOS notification posted.</td>
+        <td>Roll back the whole session, or one contact to any earlier version.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ══════════════ SCOPES ══════════════ -->
+<h2 id="scopes">Google permissions we request — and why</h2>
+
 <p>
-  Questions, bug reports and feature requests:
+  Contact SyncMate requests <strong>exactly two</strong> OAuth scopes. It requests
+  no others, and it does not read your mail, calendar, files, or profile beyond
+  the address shown below.
+</p>
+
+<div class="tw">
+<table>
+  <thead>
+    <tr><th style="width:30%">Scope</th><th>Why it is required</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>https://www.googleapis.com/auth/contacts</code><br>
+          <span class="no" style="font-size:.85rem">sensitive · read + write</span></td>
+      <td>
+        <strong>Read</strong> — list your Google contacts so the app can determine
+        what changed since the previous sync.<br>
+        <strong>Write</strong> — create and update Google contacts so edits you made
+        on your Mac reach Google, and delete them <em>only</em> when you have
+        enabled deletion propagation and confirmed the specific deletion.<br>
+        <strong>Why nothing narrower works:</strong> <code>contacts.readonly</code>
+        permits Google → Mac only. Two-way sync is the app’s core function and
+        requires write access; the People API exposes no narrower write scope.
+      </td>
+    </tr>
+    <tr>
+      <td><code>https://www.googleapis.com/auth/userinfo.email</code><br>
+          <span class="no" style="font-size:.85rem">non-sensitive</span></td>
+      <td>
+        Display <em>which</em> Google account is currently connected, in Settings →
+        Accounts, so you can tell multiple accounts apart and confirm you signed in
+        with the right one. The address is not transmitted anywhere.
+      </td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<details>
+  <summary>Which contact fields are actually read or written?</summary>
+  <div class="body">
+    <p>Only fields you enable in <em>Settings → Sync Fields</em> participate.
+       Deselected fields are left untouched on both sides.</p>
+    <div class="tw">
+    <table>
+      <thead><tr><th>Field</th><th>Default</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td>Names (given / middle / family / prefix / suffix)</td><td class="yes">Always</td><td>Core identity; used for matching.</td></tr>
+        <tr><td>Phone numbers</td><td class="yes">Always</td><td>Also used as a matching signal.</td></tr>
+        <tr><td>Email addresses</td><td class="yes">Always</td><td>Also used as a matching signal.</td></tr>
+        <tr><td>Photos</td><td class="yes">On</td><td>Toggleable.</td></tr>
+        <tr><td>Birthday</td><td class="yes">On</td><td>Toggleable.</td></tr>
+        <tr><td>Postal addresses</td><td class="yes">On</td><td>Optional country-code normalisation.</td></tr>
+        <tr><td>Websites / URLs</td><td class="yes">On</td><td>Toggleable.</td></tr>
+        <tr><td>Job title &amp; organisation</td><td class="yes">On</td><td>Toggleable.</td></tr>
+        <tr><td>Notes</td><td class="no">Unavailable</td><td>Apple restricts the Contacts note field to apps holding a special entitlement, which this build does not have. The control is disabled rather than silently failing.</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</details>
+
+<!-- ══════════════ FEATURES ══════════════ -->
+<h2 id="features">Features in detail</h2>
+
+<details open>
+  <summary>Sync directions &amp; scheduling</summary>
+  <div class="body">
+    <ul>
+      <li><strong>Two-way sync</strong> — changes flow in both directions; field-level merge when both sides changed.</li>
+      <li><strong>Google → Mac</strong> — Google is the source of truth; Mac is updated to match.</li>
+      <li><strong>Mac → Google</strong> — the reverse.</li>
+      <li><strong>Manual sync</strong> — always preview and approve before anything is written.</li>
+      <li><strong>Auto-sync</strong> — 5 min, 15 min, 30 min, hourly, 4-hourly, or daily. Optional conditions: only on AC power, only on Wi-Fi, only when the Mac is idle.</li>
+      <li><strong>Live status</strong> — the menu bar icon shows a percentage while syncing; the popover shows an item counter and a countdown to the next scheduled run.</li>
+    </ul>
+  </div>
+</details>
+
+<details>
+  <summary>Duplicate detection &amp; matching</summary>
+  <div class="body">
+    <p>Matching runs on-device first. Signals include:</p>
+    <ul>
+      <li>Nickname equivalence — Bob ↔ Robert, Liz ↔ Elizabeth</li>
+      <li>Initial abbreviation — J. Smith ↔ John Smith</li>
+      <li>Transposed name order — Wei Li ↔ Li Wei</li>
+      <li>Phonetic surnames — Schmidt ↔ Schmitt</li>
+      <li>Phone suffix matching across local and international formats</li>
+      <li>Email plus-alias detection — <code>john+work@</code> ≈ <code>john@</code></li>
+      <li>Compound-name handling — Liwei Zhang ↔ Li Wei Zhang</li>
+    </ul>
+    <p>
+      Scores below the confidence threshold are never merged silently. High-confidence
+      merges require a small group size and no conflicting critical fields. An
+      optional cloud AI tier (Claude Haiku, Sonnet, or Opus) can be enabled with
+      <em>your own</em> API key to adjudicate borderline pairs; it is off by default,
+      and when active only the two records being compared are sent — never your list.
+    </p>
+    <p>Your decisions are remembered, so a pair you marked “keep separate” is not raised again.</p>
+  </div>
+</details>
+
+<details>
+  <summary>Backups, history &amp; rollback</summary>
+  <div class="body">
+    <ul>
+      <li>Automatic snapshot before and after every sync, written atomically and linked by session ID.</li>
+      <li>Manual snapshot on demand.</li>
+      <li>Per-contact version history with a side-by-side comparison view.</li>
+      <li>Roll back an entire sync session, or restore one contact to an earlier version.</li>
+      <li>Configurable retention: how many snapshots to keep, and how long to keep history events.</li>
+      <li>Spreadsheet export (CSV / XLSX) of either address book for archiving.</li>
+      <li>Change log records, for each applied change, the contact, direction, fields affected, and session ID.</li>
+    </ul>
+  </div>
+</details>
+
+<details>
+  <summary>Conflict resolution &amp; safety</summary>
+  <div class="body">
+    <ul>
+      <li>Default policy: always ask, prefer Google, or prefer Mac.</li>
+      <li>Per-contact override in the preview sheet, whatever the default.</li>
+      <li>Deletion propagation is off by default; when on, each deletion is confirmed.</li>
+      <li>Dry-run mode computes the full diff and writes nothing.</li>
+      <li>Force-update mode rewrites every contact — useful after changing normalisation rules.</li>
+      <li>Optional name normalisation (Title Case, UPPER, lower) with particle-aware handling of “van der Berg”, “McDonald”, “O’Brien”. Off by default, and CJK names are never altered.</li>
+    </ul>
+  </div>
+</details>
+
+<details>
+  <summary>macOS integration</summary>
+  <div class="body">
+    <ul>
+      <li>Menu bar app with optional Dock icon.</li>
+      <li>Native notifications on completion, failure, and when duplicates need review.</li>
+      <li><strong>Shortcuts / Siri</strong> — “Sync Contacts Now” and “Get Last Sync Status” actions for automation.</li>
+      <li><strong>Spotlight</strong> — sync summaries are indexed so you can search past runs. Contact data is never indexed.</li>
+      <li>Launch at login, appearance override (system / light / dark), selectable accent colour, and a menu bar popover you can trim to just the sections you use.</li>
+      <li>Full keyboard navigation, VoiceOver labels, Reduce Motion and Differentiate Without Color support.</li>
+    </ul>
+  </div>
+</details>
+
+<!-- ══════════════ PRIVACY ══════════════ -->
+<h2 id="privacy-summary">Privacy &amp; data handling</h2>
+
+<div class="tw">
+<table>
+  <thead><tr><th style="width:38%">Question</th><th>Answer</th></tr></thead>
+  <tbody>
+    <tr><td>Where is contact data processed?</td><td>Entirely on your Mac.</td></tr>
+    <tr><td>Does the developer receive your contacts?</td><td><strong>No.</strong> There is no server to receive them.</td></tr>
+    <tr><td>Analytics or telemetry?</td><td><strong>None.</strong></td></tr>
+    <tr><td>Advertising or data sale?</td><td><strong>Never.</strong></td></tr>
+    <tr><td>Where are OAuth tokens stored?</td><td>macOS Keychain — never in plain text.</td></tr>
+    <tr><td>Where are backups stored?</td><td>On your disk, in a folder you choose.</td></tr>
+    <tr><td>Can access be revoked?</td><td>Yes — in-app Sign Out, or your
+        <a href="https://myaccount.google.com/permissions">Google Account permissions page</a>.</td></tr>
+    <tr><td>Is the code auditable?</td><td>Yes —
+        <a href="https://github.com/mingmanhk/Contact-SyncMate">source is public</a>.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>
+  Contact SyncMate’s use and transfer of information received from Google APIs
+  adheres to the
+  <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>,
+  including the Limited Use requirements. Full detail in the
+  <a href="privacy.html">Privacy Policy</a>.
+</p>
+
+<!-- ══════════════ REQUIREMENTS ══════════════ -->
+<h2 id="requirements">Requirements</h2>
+<div class="grid">
+  <div><dt>Operating system</dt><dd>macOS 13 Ventura or later</dd></div>
+  <div><dt>Google account</dt><dd>Required, for Google Contacts</dd></div>
+  <div><dt>Contacts permission</dt><dd>Granted on first launch</dd></div>
+  <div><dt>Network</dt><dd>Outgoing HTTPS only</dd></div>
+  <div><dt>Backend account</dt><dd>None — no sign-up</dd></div>
+  <div><dt>Cost</dt><dd>Free and open source</dd></div>
+</div>
+
+<h2 id="support">Support</h2>
+<p>
+  Questions, bug reports, and feature requests:
   <a href="https://github.com/mingmanhk/Contact-SyncMate/issues">GitHub Issues</a>.
+  The full source code is available at
+  <a href="https://github.com/mingmanhk/Contact-SyncMate">github.com/mingmanhk/Contact-SyncMate</a>.
 </p>
 
 <footer>
   <p><strong>Contact SyncMate</strong> — developed by Victor Lam.</p>
-  <p><a href="privacy.html">Privacy Policy</a> · <a href="terms.html">Terms of Service</a> · <a href="https://github.com/mingmanhk/Contact-SyncMate">GitHub</a></p>
+  <p>
+    <a href="privacy.html">Privacy Policy</a> ·
+    <a href="terms.html">Terms of Service</a> ·
+    <a href="https://github.com/mingmanhk/Contact-SyncMate">GitHub</a> ·
+    <a href="https://github.com/mingmanhk/Contact-SyncMate/issues">Support</a>
+  </p>
 </footer>
 
 </div>

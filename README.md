@@ -1,172 +1,464 @@
+<div align="center">
+
+<img src="docs/assets/logo.svg" width="120" height="120" alt="Contact SyncMate">
+
 # Contact SyncMate
 
-> A macOS menu bar app that keeps **Google Contacts** and **Apple Contacts** (iCloud / On My Mac / Exchange / CardDAV) in sync — privately, locally, with full preview, automatic backups, and AI-assisted duplicate detection.
+**Two-way contact synchronisation between Google Contacts and Apple Contacts — entirely on your Mac.**
 
-[![Platform](https://img.shields.io/badge/platform-macOS%2013%2B-blue.svg)]()
-[![Language](https://img.shields.io/badge/language-Swift%205.9-orange.svg)]()
-[![License](https://img.shields.io/badge/license-Proprietary-lightgrey.svg)]()
+[![Platform](https://img.shields.io/badge/platform-macOS%2013%2B-000000?logo=apple&logoColor=white)](https://www.apple.com/macos/)
+[![Swift](https://img.shields.io/badge/Swift-5.9-F05138?logo=swift&logoColor=white)](https://swift.org)
+[![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0071e3)](https://developer.apple.com/xcode/swiftui/)
+[![Tests](https://img.shields.io/badge/tests-109%20passing-2ea44f)](#testing)
+[![Privacy](https://img.shields.io/badge/telemetry-none-2ea44f)](#privacy-architecture)
+[![Backend](https://img.shields.io/badge/backend-none-2ea44f)](#privacy-architecture)
 
----
+[Website](https://mingmanhk.github.io/Contact-SyncMate/) ·
+[Privacy Policy](https://mingmanhk.github.io/Contact-SyncMate/privacy.html) ·
+[Terms](https://mingmanhk.github.io/Contact-SyncMate/terms.html) ·
+[Issues](https://github.com/mingmanhk/Contact-SyncMate/issues)
 
-## Table of Contents
-
-1. [Features](#features)
-2. [Architecture overview](#architecture-overview)
-3. [Sync engine overview](#sync-engine-overview)
-4. [Setup](#setup)
-5. [Build](#build)
-6. [Permissions required](#permissions-required)
-7. [Configuration](#configuration)
-8. [Screenshots (described)](#screenshots-described)
-9. [Known limitations](#known-limitations)
-10. [Future improvements](#future-improvements)
-11. [Troubleshooting](#troubleshooting)
-12. [Project structure](#project-structure)
+</div>
 
 ---
 
-## Features
+## Table of contents
 
-- **Two-way sync** — Google ↔ Apple Contacts in either direction or both.
-- **Manual sync with preview** — see every add / update / delete / merge before it runs; override per contact.
-- **Auto sync** — background sync at configurable intervals (5 min … daily) with optional run-conditions (on power, on Wi-Fi, when idle).
-- **Field-level control** — opt in/out of photos, notes, birthday, addresses, websites, job title.
-- **Conflict resolution** — Always Ask, Prefer Google, or Prefer Mac, with a per-contact override sheet.
-- **Duplicate detection** — local NLP (nicknames, initials, transposed names, phonetic surname matching, plus-aliases) plus optional Anthropic AI escalation for borderline scores.
-- **Automatic snapshots** — pre-sync and post-sync backups stored locally; restore any prior state from Settings → Backups.
-- **Accessibility-first UI** — semantic colour tokens, hierarchical SF Symbols, VoiceOver labels, `accessibilityReduceMotion` and `accessibilityDifferentiateWithoutColor` honoured.
-- **Privacy-first** — no backend; OAuth tokens, API keys, and contact data never leave your Mac (except the People API calls to Google).
-
----
-
-## Architecture overview
-
-Contact SyncMate is a single-process macOS app composed of four layers:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Views (SwiftUI)                                            │
-│   MenuBarView · DashboardView · SettingsView (sidebar)      │
-│   OnboardingView · SyncPreviewView · BackupComparisonView   │
-└─────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Coordinators / View models                                 │
-│   SyncCoordinator (@MainActor singleton)                    │
-│   AppState (ObservableObject)                               │
-│   AppSettings (UserDefaults + Keychain facade)              │
-└─────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Domain services                                            │
-│   SyncEngine · DeduplicationCoordinator · AIContactMatcher  │
-│   ContactBackupManager · SyncHistory · AutoSyncScheduler    │
-└─────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Connectors / storage                                       │
-│   GoogleContactsConnector (People API + OAuth + Keychain)   │
-│   MacContactsConnector (CNContactStore)                     │
-│   ContactMappingStore (JSON on disk)                        │
-│   KeychainStore                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Single sync execution path
-
-Every sync — whether triggered by the **Sync Now** button, **Auto Sync timer**, or any other code path — flows through `SyncCoordinator.runSync()`. This guarantees that:
-
-- `AppState.isSyncing`, the menu bar icon, the dashboard banner, and the popover progress bar all stay in sync.
-- Two syncs cannot run concurrently (the coordinator's `isRunning` guard).
-- Errors are translated to user-friendly messages in one place (`SyncCoordinator.friendlyMessage`).
-
-### Design system
-
-A small `DesignSystem/` module defines the project-wide vocabulary used by every view:
-
-- `Color+App.swift` — semantic colour tokens (`.appSuccess`, `.appWarning`, `.appError`, `.appInfo`, `.appAccent`, `.appBrand`, `.appSourceGoogle`, `.appSourceApple`, `.appSurface`, `.appSurfaceTinted`, `.appBorder`, `.appText{Primary,Secondary,Tertiary,Inverse}`). Every token is backed by an asset-catalog colour set with light + dark variants.
-- `AdaptiveIcon.swift` — `AdaptiveIcon` view + `AppIcon` typed registry of every SF Symbol the app uses. All icons use `.symbolRenderingMode(.hierarchical)` for guaranteed visibility in both modes.
-- `AppButtonStyle.swift` — `.appRow` (hover/pressed/focus feedback) and `.appDestructive` button styles.
-- `KeychainStore.swift` — wrapper for storing user secrets in the macOS Keychain.
-
-**Rule:** views never use `Color.red`, `Color.green`, `Color.blue`, etc. directly — always reach for a semantic token.
+- [The concept](#the-concept)
+- [Why two-way sync is hard](#why-two-way-sync-is-hard)
+- [System architecture](#system-architecture)
+- [The sync pipeline](#the-sync-pipeline)
+- [Contact matching model](#contact-matching-model)
+- [Privacy architecture](#privacy-architecture)
+- [Feature matrix](#feature-matrix)
+- [Permissions & entitlements](#permissions--entitlements)
+- [Setup](#setup)
+- [Build](#build)
+- [Testing](#testing)
+- [Project structure](#project-structure)
+- [Design system](#design-system)
+- [Troubleshooting](#troubleshooting)
+- [Known limitations](#known-limitations)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## Sync engine overview
+## The concept
 
-```
-┌──────────────────┐    ┌─────────────────┐
-│  Google People   │    │ Apple Contacts  │
-│       API        │    │ (CNContactStore)│
-└────────┬─────────┘    └────────┬────────┘
-         │ fetch                  │ fetch
-         ▼                        ▼
-   GoogleContact           CNContact
-         │                        │
-         └────────┬───────────────┘
-                  ▼
-           UnifiedContact          ← canonical in-memory model
-                  │
-                  ▼
-        ContactMappingStore        ← persistent ID linkage
-                  │
-                  ▼
-              SyncEngine
-        ┌─────┬──┴──┬─────┬─────┐
-        ▼     ▼     ▼     ▼     ▼
-       diff  dedup  conflict  backup  history
-                  │
-                  ▼
-            SyncSession  ← list of ContactChange (add/update/delete/merge/skip)
-                  │
-                  ▼
-   user preview / per-contact override (manual sync only)
-                  │
-                  ▼
-           apply via connectors
-                  │
-                  ▼
-         post-sync snapshot + history log
+Most people's address book lives in **two** places at once:
+
+| Ecosystem | Typically used for | Reached via |
+|---|---|---|
+| **Google Contacts** | Gmail, Android, Google Workspace | Google People API (OAuth 2.0) |
+| **Apple Contacts** | Mac, iPhone, iPad, Apple Mail | `Contacts.framework` / `CNContactStore` |
+
+Neither vendor offers true bidirectional reconciliation with the other. macOS can
+*subscribe* to a Google account read-only, and Google can *import* a vCard once —
+but neither keeps the two lists genuinely in step.
+
+**Contact SyncMate is a reconciliation engine, not an importer.** It maintains a
+persistent identity mapping between the two address books, computes what actually
+changed on each side since the last run, merges field-level differences, and
+recognises the same human under different spellings.
+
+```mermaid
+flowchart LR
+    G["☁️ Google Contacts<br/><small>People API</small>"]
+    M["🖥️ Contact SyncMate<br/><small>your Mac — all logic here</small>"]
+    A["📇 Apple Contacts<br/><small>iCloud / On My Mac</small>"]
+
+    G <--> M
+    M <--> A
+
+    style M fill:#eef1fb,stroke:#5B51E8,stroke-width:3px
+    style G fill:#f5f5f7,stroke:#d2d2d7
+    style A fill:#f5f5f7,stroke:#d2d2d7
 ```
 
-### Field-level sync
+> **No server exists in this diagram.** There is no Contact SyncMate backend, no
+> account to create, and no path by which the developer could receive your data.
 
-Every contact field can be opted out individually (Settings → Sync Fields). The engine consults `AppSettings` in two places:
+---
 
-- `compareFields(...)` — fields the user has opted out of are not considered when computing the diff.
-- `applyFieldFilters(...)` — opt-out fields are zeroed on the unified contact before being written, so a contact that already had data on the target side is left untouched.
+## Why two-way sync is hard
 
-### Conflict resolution
+Naïve syncing breaks in five predictable ways. Each drove a design decision:
 
-When the same contact differs on both sides, the engine consults `AppSettings.defaultConflictResolution`:
+<table>
+<thead>
+<tr><th width="22%">Problem</th><th width="39%">What goes wrong naïvely</th><th width="39%">How Contact SyncMate handles it</th></tr>
+</thead>
+<tbody>
+<tr>
+  <td><strong>Identity</strong></td>
+  <td>Re-importing creates a second copy of everyone, because Google resource names and <code>CNContact</code> identifiers are unrelated.</td>
+  <td>A persistent <code>ContactMappingStore</code> records each Google ↔ Mac pairing, so the second run updates instead of duplicating.</td>
+</tr>
+<tr>
+  <td><strong>Change detection</strong></td>
+  <td>Blind overwrite silently discards whichever side you didn't pick as master.</td>
+  <td>Timestamps are compared against the last-sync marker per mapping; only genuinely changed records move.</td>
+</tr>
+<tr>
+  <td><strong>Simultaneous edits</strong></td>
+  <td>Both sides changed → last writer wins → data loss.</td>
+  <td>Classified as a <em>conflict</em>. Resolved by field-level merge, by a configured preference, or by asking you.</td>
+</tr>
+<tr>
+  <td><strong>Fuzzy identity</strong></td>
+  <td>"Bob Smith" and "Robert Smith" stay forever separate.</td>
+  <td>Multi-signal on-device matcher (nicknames, initials, transposition, phonetics, phone suffix, email aliases) with a confidence score.</td>
+</tr>
+<tr>
+  <td><strong>Irreversibility</strong></td>
+  <td>A bad sync destroys an address book with no undo.</td>
+  <td>Atomic snapshots before <em>and</em> after every sync, plus a per-change audit log, make any run reversible.</td>
+</tr>
+</tbody>
+</table>
 
-- **Always Ask** — the contact ends up in the preview screen with `.userOverride` left for the user to set.
-- **Prefer Google** — Google value wins automatically.
-- **Prefer Mac** — Mac value wins automatically.
+---
 
-Per-contact overrides set in the preview screen always trump the default.
+## System architecture
 
-### Deduplication
+<div align="center">
+<img src="docs/assets/architecture.svg" alt="Architecture: Google Contacts and Apple Contacts both connect directly to Contact SyncMate on the user's Mac. Inside, SyncCoordinator drives SyncEngine over connectors, deduplicator, and backup/history stores. Secrets in Keychain, data on local disk. No developer server." width="100%">
+</div>
 
-A two-tier system handles duplicates:
+Strict layering — each layer may only call downward:
 
-1. **Local NLP (always on)** — exact email/phone match, normalised name match, nickname expansion, phonetic surname (Soundex), transposed-name matching, plus-alias email handling.
-2. **AI escalation (optional)** — if an Anthropic API key is configured, contact pairs whose rule score lands inside `[aiAPIScoreRangeLow, aiAPIScoreRangeHigh]` (default 30–79) are escalated to Claude Haiku for a final judgement. High-confidence and offline cases skip the API entirely.
+```mermaid
+flowchart TD
+    subgraph V["🎨 Views — stateless SwiftUI"]
+        V1[MenuBarView]
+        V2[DashboardView]
+        V3[SettingsView]
+        V4[SyncPreviewView]
+    end
+    subgraph C["🎯 Coordination — the only sync entry point"]
+        C1[SyncCoordinator<br/>@MainActor · publishes phase & progress]
+    end
+    subgraph E["⚙️ Domain"]
+        E1[SyncEngine<br/>fetch → diff → apply]
+        E2[ContactDeduplicator]
+        E3[NameFormattingEngine]
+        E4[ContactNormalizer]
+    end
+    subgraph S["🔌 Services"]
+        S1[GoogleContactsConnector]
+        S2[MacContactsConnector]
+        S3[ContactMappingStore]
+        S4[ContactBackupManager]
+        S5[SyncHistory]
+        S6[KeychainStore]
+        S7[GoogleOAuthManager]
+    end
+    subgraph P["💾 Persistence"]
+        P1[(macOS Keychain<br/>tokens · API keys)]
+        P2[(Local disk<br/>snapshots · history)]
+        P3[(UserDefaults<br/>preferences)]
+    end
 
-Auto-merge is gated on three checks: score ≥ 80, group size ≤ 3, no critical-field conflicts.
+    V --> C
+    C --> E
+    E --> S
+    S --> P
 
-### Backups
+    style C fill:#eef1fb,stroke:#5B51E8,stroke-width:2px
+    style P fill:#eaf7ee,stroke:#34a853
+```
 
-Two snapshots are taken around every sync (when `autoBackupEnabled` is on, which it is by default):
+**Key invariant — one sync path.** `SyncCoordinator.runSync()` is the *only*
+function that instantiates `SyncEngine`. The menu bar button, the dashboard
+button, the auto-sync timer, and the Shortcuts action all funnel through it.
+Progress state, history, notifications, and the menu bar icon therefore can never
+disagree, and two syncs can never overlap.
 
-- **Pre-sync** — full Google + Mac state immediately before any changes.
-- **Post-sync** — full Google + Mac state after the sync completes.
+---
 
-Both are linked to the sync session via `syncSessionId`. Restore is available from Settings → Backups; it performs an **additive** restore (upserts every contact in the snapshot) without deleting contacts that were created after the snapshot — by design, to avoid destructive surprises.
+## The sync pipeline
+
+<div align="center">
+<img src="docs/assets/sync-flow.svg" alt="Sync pipeline: trigger, preflight, fetch both sides, pre-sync snapshot, diff, duplicate detection, review and confirm, apply changes, post-sync snapshot, history and notification, with a dashed rollback return path." width="100%">
+</div>
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as User / Timer
+    participant Co as SyncCoordinator
+    participant En as SyncEngine
+    participant Bk as BackupManager
+    participant Gg as Google People API
+    participant Mc as CNContactStore
+    participant Hi as SyncHistory
+
+    U->>Co: runSync()
+    Co->>Co: preflight — OAuth + Contacts authorised?
+    Co->>En: prepare(direction)
+    En->>Gg: fetch all contacts
+    En->>Mc: fetch all contacts
+    En->>Bk: pre-sync snapshot (sessionId)
+    En->>En: computeChanges() → [ContactChange]
+    En->>En: deduplicate (on-device, optional AI)
+    Co-->>U: preview — review & override
+    U->>Co: confirm
+    loop each approved change
+        En->>Gg: create / update / delete
+        En->>Mc: create / update / delete
+        En->>Hi: log change.* (contact, fields, sessionId)
+    end
+    En->>Bk: post-sync snapshot (same sessionId)
+    Co->>Hi: log sync.complete
+    Co-->>U: notification + result banner
+```
+
+<details>
+<summary><strong>Change classification rules</strong> — how each contact is categorised</summary>
+
+<br>
+
+| Situation | Two-way | Google → Mac | Mac → Google |
+|---|---|---|---|
+| Exists in Google only, unmapped | **Add** to Mac | **Add** to Mac | Skip |
+| Exists in Mac only, unmapped | **Add** to Google | Skip | **Add** to Google |
+| Mapped; Google newer | **Update** Mac | **Update** Mac | Skip |
+| Mapped; Mac newer | **Update** Google | Skip | **Update** Google |
+| Mapped; **both** changed since last sync | **Merge** (conflict) | Update Mac | Update Google |
+| Mapped; neither changed | Skip | Skip | Skip |
+| Mapped; deleted on one side | **Delete** other side¹ | Delete Mac¹ | Delete Google¹ |
+| Unmapped but fuzzy-matched | **Merge** + create mapping | Merge | Merge |
+
+¹ Only when *Sync deleted contacts* is enabled. Each deletion is confirmed
+individually unless you disable that safeguard.
+
+**Conflict resolution options:** `Always Ask` (default) · `Prefer Google` ·
+`Prefer Mac` — with per-contact override always available in the preview sheet.
+
+</details>
+
+---
+
+## Contact matching model
+
+Two records are scored, then routed by confidence. Scoring is deterministic and
+runs on-device.
+
+```mermaid
+flowchart TD
+    S[Candidate pair] --> B{Contact count<br/>> 500?}
+    B -- No --> EX[Exhaustive O n² scan<br/>zero recall loss]
+    B -- Yes --> BL[Blocked comparison<br/>bucket by email · phone suffix ·<br/>name initials → near-linear]
+    EX --> SC[Rule-based score]
+    BL --> SC
+    SC --> R{Score}
+    R -- "≥ 80" --> AM[Auto-merge candidate<br/>+ 3 safety gates]
+    R -- "50–79" --> AI{AI tier<br/>enabled?}
+    R -- "< 50" --> SEP[Keep separate]
+    AI -- Yes --> CL[Cloud adjudication<br/>only these 2 records sent]
+    AI -- No --> RV[Send to review queue]
+    CL --> RV
+    AM --> G{Group ≤ 3?<br/>No critical field conflict?<br/>Silent-merge opted in?}
+    G -- All yes --> MRG[Merge]
+    G -- Any no --> RV
+
+    style MRG fill:#eaf7ee,stroke:#34a853
+    style SEP fill:#f5f5f7,stroke:#d2d2d7
+    style RV fill:#fff6e5,stroke:#f59e0b
+```
+
+### Scoring signals
+
+| Signal | Weight | Example |
+|---|:--:|---|
+| Exact email match | **+60** | `a@x.com` on both records |
+| Exact phone match | **+60** | `+1 555 0100` ≡ `5550100` |
+| Exact full-name match | **+30** | `John Smith` ≡ `John Smith` |
+| Similar name (nickname / initial / phonetic / transposed) | **+20** | `Bob Smith` ≈ `Robert Smith` |
+| Organisation match | **+10** | both `Acme Inc` |
+| Address match | **+10** | same street + city |
+| Email **domain mismatch** | **−10** | two different `John Smith`s at different firms |
+| Contradictory contact info | **−20** | no overlapping email *or* phone |
+
+### On-device matching signals
+
+| Signal | Recognises |
+|---|---|
+| Nickname dictionary | Bob ↔ Robert · Liz ↔ Elizabeth · Bill ↔ William |
+| Initial abbreviation | `J. Smith` ↔ `John Smith` |
+| Transposed name order | `Wei Li` ↔ `Li Wei` |
+| Soundex phonetics | `Schmidt` ↔ `Schmitt` |
+| Phone suffix | `+1 415 555 0100` ↔ `555-0100` |
+| Email plus-alias | `john+work@x.com` ↔ `john@x.com` |
+| Compound names | `Liwei Zhang` ↔ `Li Wei Zhang` |
+| Stored nickname field | the contact's own Nickname |
+
+> **Decision memory.** A pair you mark *keep separate* is remembered as a pattern
+> and never raised again.
+
+<details>
+<summary><strong>Optional cloud AI tier</strong> — how it is bounded</summary>
+
+<br>
+
+Disabled by default. When you supply **your own** Anthropic API key:
+
+| Property | Value |
+|---|---|
+| When invoked | Only for pairs scoring inside your configured band (default 30–79) |
+| Model | Your choice: Claude Haiku (default) · Sonnet · Opus |
+| Data sent | Only the **two records being compared** — never your address book |
+| Key storage | macOS Keychain |
+| Developer involvement | None — the call goes from your Mac to Anthropic under your account |
+| Caching | Content-fingerprinted, so editing a contact invalidates stale verdicts; cleared after each scan |
+| Offline | Silently skipped; on-device matching still runs |
+
+</details>
+
+---
+
+## Privacy architecture
+
+```mermaid
+flowchart LR
+    subgraph YOURMAC["🖥️ Your Mac — trust boundary"]
+        APP[Contact SyncMate]
+        KC[(Keychain)]
+        DK[(Snapshots + history)]
+        APP --- KC
+        APP --- DK
+    end
+    APP -->|"HTTPS · OAuth 2.0 + PKCE"| GOOG[☁️ Google People API]
+    APP -->|"local framework call"| APPLE[📇 Apple Contacts]
+    APP -.->|"opt-in only · 2 records · your key"| ANTH[☁️ Anthropic API]
+    APP -.-x DEV["❌ Developer server<br/>does not exist"]
+
+    style YOURMAC fill:#eaf7ee,stroke:#34a853,stroke-width:2px
+    style DEV fill:#ffeaea,stroke:#d33,stroke-dasharray:5 5
+```
+
+| Guarantee | Implementation |
+|---|---|
+| No backend | No server component exists in the product |
+| No telemetry | No analytics SDK, no crash reporting, no usage beacons |
+| No data sale | Never — there is no data to sell |
+| Secrets encrypted | `KeychainStore` wraps `kSecClassGenericPassword` with `kSecAttrAccessibleAfterFirstUnlock` |
+| Minimal scopes | Exactly two; `contacts.other.readonly` was **removed** after audit showed no code read it |
+| Sandboxed | App Sandbox enabled; user folders reached via security-scoped bookmarks |
+| Revocable | In-app Sign Out clears Keychain; Google-side revocation also honoured |
+| Auditable | Source is public |
+| Google policy | Adheres to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), Limited Use included |
+
+---
+
+## Feature matrix
+
+<details open>
+<summary><strong>Sync</strong></summary>
+
+| Feature | Detail | Default |
+|---|---|:--:|
+| Two-way sync | Field-level merge when both sides changed | ✅ |
+| One-way Google → Mac | Google is source of truth | — |
+| One-way Mac → Google | Mac is source of truth | — |
+| Preview before apply | Every add/update/delete/merge listed | ✅ On |
+| Per-contact override | Change or skip any single item | ✅ |
+| Dry-run | Full diff computed, nothing written | ❌ Off |
+| Force-update all | Rewrite every contact | ❌ Off |
+| Group / label filter | Restrict to selected Mac groups or Google labels | ❌ Off |
+| Deletion propagation | Delete on one side deletes the other | ❌ Off |
+| Auto-sync | 5 m / 15 m / 30 m / 1 h / 4 h / daily | ❌ Off |
+| Run conditions | AC power only · Wi-Fi only · idle only | ❌ Off |
+
+</details>
+
+<details>
+<summary><strong>Fields</strong></summary>
+
+| Field | Syncs | Note |
+|---|:--:|---|
+| Names, phones, emails | ✅ Always | Also used as matching signals |
+| Photos | ✅ On | Toggleable |
+| Birthday | ✅ On | Toggleable |
+| Postal addresses | ✅ On | Optional country-code normalisation |
+| Websites | ✅ On | Toggleable |
+| Job title & organisation | ✅ On | Toggleable |
+| **Notes** | ❌ **Unavailable** | Requires `com.apple.developer.contacts.notes`, an Apple-managed entitlement this build does not hold. The toggle is disabled rather than silently failing. |
+
+</details>
+
+<details>
+<summary><strong>Backup & recovery</strong></summary>
+
+| Feature | Detail | Default |
+|---|---|:--:|
+| Pre-sync snapshot | Atomic, session-tagged | ✅ On |
+| Post-sync snapshot | Final state, same session ID | ✅ On |
+| Manual snapshot | On demand | — |
+| Session rollback | Restore an entire sync (additive) | — |
+| Per-contact rollback | Restore one contact to any version | — |
+| Version comparison | Side-by-side timeline | — |
+| Retention | Snapshot count + history age | 30 / 30 d |
+| CSV / XLSX export | Either address book | — |
+| Custom folder | Security-scoped bookmark, survives relaunch | Container default |
+
+</details>
+
+<details>
+<summary><strong>macOS integration & accessibility</strong></summary>
+
+| Feature | Detail |
+|---|---|
+| Menu bar app | Live `%` progress in the status item; optional Dock icon |
+| Notifications | Complete · failed · duplicates need review |
+| Shortcuts / Siri | `Sync Contacts Now`, `Get Last Sync Status` |
+| Spotlight | Sync summaries indexed — **never** contact data |
+| Launch at login | `SMAppService` |
+| Appearance | System / Light / Dark override |
+| Accent colour | 7 choices, or follow system |
+| Popover customisation | Hide any section you don't use |
+| Confirmations | Per-action opt in/out |
+| VoiceOver | Labels, values, grouped rows |
+| Reduce Motion | Honoured — animations disabled |
+| Differentiate Without Color | Status conveyed by shape too |
+| Keyboard | Full navigation; ⌘R sync, ⌘, settings, ⌘Q quit |
+
+</details>
+
+---
+
+## Permissions & entitlements
+
+### macOS entitlements
+
+| Entitlement | Why |
+|---|---|
+| `com.apple.security.app-sandbox` | Required for Mac App Store distribution |
+| `com.apple.security.personal-information.addressbook` | Read/write Apple Contacts — the core function |
+| `com.apple.security.network.client` | Outgoing HTTPS to Google (and Anthropic if opted in) |
+| `com.apple.security.files.user-selected.read-write` | Backup folder and export destinations you pick |
+| `keychain-access-groups` | Token and API-key storage |
+
+**Deliberately not requested:** `com.apple.developer.contacts.notes` (denied by
+Apple — Notes sync degrades gracefully), `network.server` (no inbound
+connections; OAuth uses `ASWebAuthenticationSession`), and any Downloads or
+media-library access.
+
+### Google OAuth scopes
+
+| Scope | Class | Why |
+|---|---|---|
+| `auth/contacts` | Sensitive | Read to detect changes; write to push Mac-side edits. `contacts.readonly` would allow one-way only. |
+| `auth/userinfo.email` | Non-sensitive | Show which account is connected in Settings |
+
+### macOS privacy prompt
+
+`NSContactsUsageDescription` in `Info.plist` explains the request at the system
+consent prompt. All four authorisation states are handled — `notDetermined`,
+`authorized`, `denied`, `restricted` — with a deep link to
+System Settings → Privacy & Security → Contacts when access was refused.
 
 ---
 
@@ -174,187 +466,100 @@ Both are linked to the sync session via `syncSessionId`. Restore is available fr
 
 ### Prerequisites
 
-- macOS 13 (Ventura) or later
+- macOS 13 Ventura or later
 - Xcode 15 or later
-- A Google Cloud project with:
-  - **Google People API** enabled
-  - An OAuth 2.0 **Client ID for macOS** (or a desktop app type)
-- *(Optional)* An Anthropic API key for the AI duplicate-matching tier — get one at [console.anthropic.com](https://console.anthropic.com)
+- A Google Cloud project with the **People API** enabled
 
-### 1. Clone the repository
+### 1. Clone
 
 ```bash
-git clone https://github.com/your-org/contact-syncmate.git
-cd contact-syncmate
+git clone https://github.com/mingmanhk/Contact-SyncMate.git
+cd Contact-SyncMate
 ```
 
-### 2. Provide your Google OAuth credentials
+### 2. Create an OAuth client
 
-```bash
-cp "Contact SyncMate/GoogleOAuthConfig.example.json" \
-   "Contact SyncMate/GoogleOAuthConfig.json"
-```
+In [Google Cloud Console](https://console.cloud.google.com) →
+**APIs & Services → Credentials**:
 
-Edit `GoogleOAuthConfig.json`:
+1. Enable the **People API** (APIs & Services → Library).
+2. **Create Credentials → OAuth client ID → Desktop app**.
+3. Note the Client ID and create a Client Secret.
+
+### 3. Configure credentials
+
+Create `Contact SyncMate/GoogleOAuthConfig.json` — **gitignored, never commit it**:
 
 ```json
 {
   "clientId": "YOUR_CLIENT_ID.apps.googleusercontent.com",
-  "redirectURI": "com.googleusercontent.apps.YOUR_CLIENT_ID:/oauth2redirect",
-  "clientSecret": "SET_AT_RUNTIME_OR_CI"
+  "clientSecret": "GOCSPX-your-secret",
+  "redirectURI": "com.googleusercontent.apps.YOUR_CLIENT_ID:/oauth2redirect"
 }
 ```
 
-`GoogleOAuthConfig.json` is **gitignored**. The client ID is public and safe to embed; the client secret is migrated into the macOS Keychain on first launch.
+> On first launch the secret is migrated into the **macOS Keychain**, after which
+> you may delete the `clientSecret` line. PKCE (RFC 7636) is used for all flows.
 
-### 3. Update `Info.plist`'s URL scheme
+### 4. Match the URL scheme
 
-Replace the placeholder URL scheme in `Info.plist > CFBundleURLTypes > CFBundleURLSchemes` with:
+`Info.plist` → `CFBundleURLSchemes` must equal the reversed client ID:
 
 ```
 com.googleusercontent.apps.YOUR_CLIENT_ID
 ```
 
-This is the reverse-DNS of your client ID and must match the `redirectURI` in step 2.
+### 5. Optional — AI matching
+
+Settings → AI Matching → paste your own Anthropic API key. Stored in the
+Keychain. Leave empty to use on-device matching only.
 
 ---
 
 ## Build
 
 ```bash
-open "Contact SyncMate.xcodeproj"
+# Debug build
+xcodebuild -project "Contact SyncMate.xcodeproj" \
+           -scheme "Contact SyncMate" -configuration Debug build
+
+# Run the full test suite
+xcodebuild -project "Contact SyncMate.xcodeproj" \
+           -scheme "Contact SyncMate" test
+
+# Release archive
+xcodebuild -project "Contact SyncMate.xcodeproj" \
+           -scheme "Contact SyncMate" -configuration Release \
+           -archivePath build/ContactSyncMate.xcarchive archive
 ```
 
-Build and run with **⌘R**. The first launch will show the onboarding sheet — connect Google, grant Contacts access, choose a sync direction, and run a dry-run preview.
-
-### Pre-commit secret check
-
-The repo ships with `Scripts/check-secrets.sh`. Wire it into your pre-commit hook to guarantee no API keys land in git:
-
-```bash
-ln -s ../../Scripts/check-secrets.sh .git/hooks/pre-commit
-```
+Full signing, notarisation, and submission steps are in
+[`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md).
 
 ---
 
-## Permissions required
+## Testing
 
-Contact SyncMate requests the minimum necessary permissions:
+**109 tests, 0 failures.**
 
-| Permission | Why | Where requested |
-|---|---|---|
-| **Contacts** (`NSContactsUsageDescription`) | Read & write Apple Contacts. | First launch — and re-grantable from Settings → Accounts → Permissions. If denied, the app deep-links to System Settings → Privacy → Contacts. |
-| **Network — Outbound** (`com.apple.security.network.client`) | OAuth + Google People API. | Granted by entitlement; no runtime prompt. |
-| **Personal Information / Address Book** (entitlement) | Required for `CNContactStore` write access on macOS. | Granted by entitlement. |
-| **Keychain** (`keychain-access-groups`) | Store OAuth tokens, OAuth client secret, and Anthropic API key. | Granted by entitlement; no runtime prompt. |
-| ~~Notes field~~ (`com.apple.developer.contacts.notes`) | Would enable Contacts `note` field sync. **Not currently requested** — Apple denied the entitlement. Notes sync is disabled at runtime; all other fields sync normally. Re-enable by getting the entitlement approved and setting `MacContactsConnector.notesFieldAvailable = true`. | — |
-
-Contact SyncMate runs **outside the App Sandbox** in the current configuration. To submit to the Mac App Store, add `com.apple.security.app-sandbox` to the entitlements file and audit network/file access.
-
----
-
-## Configuration
-
-All preferences are exposed in **Settings** (⌘,) and persisted to `UserDefaults`, except secrets which live in the Keychain.
-
-| Tab | Highlights |
+| Suite | Covers |
 |---|---|
-| **General** | Sync mode, launch at login, monochrome menu bar icon, dock visibility, notifications, language, history retention, reset-to-defaults |
-| **Sync Fields** | Per-field opt-out (photos, notes, birthday, websites, addresses, job title), default conflict resolution, merge behaviour, country-code normalisation, batched updates, group/label filtering |
-| **Manual Sync** | Detect-duplicates toggle, confirm-pending-deletions, force-update-all, dry-run mode |
-| **Auto Sync** | Enable, direction, interval (5 min / 15 min / 30 min / 1 h / 4 h / daily), run-conditions (AC power / Wi-Fi only / idle only) |
-| **AI Matching** | Enable, Anthropic API key (Keychain-backed, with show/hide & test button), call-sensitivity range slider (default 30–79) |
-| **Accounts** | Google sign-in/out, contact count, test connection, CSV/Excel export, Mac account mode (auto / all / specific), per-account picker with contact counts |
-| **Backups** | Last backup, total backups, storage used, manual backup, location chooser, recent backup files (reveal in Finder), automatic backups toggle, max-backup-count stepper |
+| `SyncEngineDiffTests` | Change classification across all three directions, conflict → merge, fuzzy match dedup |
+| `SyncEngineModelTests` | Domain model invariants |
+| `NameFormattingEngineTests` | Title Case particles (`van der Berg`), prefixes (`McDonald`, `O'Brien`), hyphens, CJK safety, idempotence |
+| `DedupBlockingTests` | Blocking keys, candidate generation, exhaustive-vs-blocked switchover |
+| `SyncHistoryRetentionTests` | Age-based and count-based pruning |
+| `ContactNormalizerTests` | Phone/email/name normalisation |
+| `DeduplicationTests` | Scoring and grouping |
+| `ContactMappingStoreTests` | Mapping persistence |
+| `AppSettingsTests` | Defaults, persistence, reset |
+| `SyncHistoryTests` | Event log |
+| `UnifiedContactTests` | Model behaviour |
+| `PerformanceTests` | Diff throughput |
 
----
-
-## Screenshots (described)
-
-> Screenshots are not included in this repo. Each visual is described below so the surface can be verified against the description after a build.
-
-1. **Menu bar popover (light mode)** — 280-pt wide. Top: green pulse dot + "Up to date" / "Synced 2 hours ago". A divider, then a borderless **Sync Now** primary button. Account rows for Google (red `g.circle.fill`) and Mac (blue desktop) with right-aligned 6-pt connection dots. Auto-sync toggle row. Three menu links (Open Dashboard, Sync History, Preferences) with hover backgrounds. Bottom: red **Quit Contact SyncMate** with ⌘Q shortcut.
-2. **Menu bar popover (dark mode)** — same layout; backgrounds adapt; `BrandIndigo` and `Accent` colour sets shift to their dark variants; the green pulse dot uses the `StatusSuccess` dark variant (slightly desaturated).
-3. **Settings — Accounts tab** — sidebar on the left grouped into App / Sync / Advanced / Account; right pane shows the Google account banner at the top (with email + count), then a Google section with status row, Test Connection / Backup to CSV / Backup to Excel / Sign Out, then a Mac Contacts section with account-mode picker and the same actions, then a Permissions section with Grant Access CTA when needed.
-4. **Settings — AI Matching tab** — overview card with `sparkles` icon, enable toggle, a list of the eight on-device NLP signals, an Anthropic API key text field with show/hide eye button, a Test API Key button, and a two-thumb sensitivity slider for the API call range.
-5. **Sync preview** — list of contact changes grouped by action; each row shows direction (Google → Mac / Mac → Google), the field changes, and a per-row override picker (Add / Update / Skip / Force Google / Force Mac).
-6. **Backup comparison** — side-by-side diff of a contact between the current state and a chosen backup; field-level highlighting in `appWarning` for changed lines.
-7. **Onboarding** — four-step sheet: Welcome → Connect Google → Grant Contacts → Choose direction. Now resizable and only marks setup complete when the user reaches the final step.
-
----
-
-## Known limitations
-
-- **Notes field is not synced.** The Contacts `note` field is gated by `com.apple.developer.contacts.notes`, a special-access entitlement that Apple must approve. Contact SyncMate ships without it; the Notes toggle in Settings → Sync Fields is disabled and forced off. Every other field syncs normally. Once Apple approves the entitlement, re-add the key to `Contact SyncMate.entitlements` and set `MacContactsConnector.notesFieldAvailable = true`.
-- **Rollback is additive only.** Restoring a backup re-creates and updates contacts but does not delete contacts that were added after the snapshot. To do a destructive rollback, manually remove the new contacts before restoring.
-- **Group / label filtering UI** is gated behind `Settings → Sync Fields → Filter by Groups`; the picker UI ships in a future update.
-- **Sync between two Google accounts** is on the roadmap.
-- **Field-level rules** ("always trust Google for company") are global today (Sync Fields tab); per-field source preferences are roadmap.
-- **CLI** is not yet shipped.
-- **App Sandbox** is currently disabled. Direct distribution only; not yet submitted to the Mac App Store.
-- **Hardcoded Google API key** in `GoogleAPIConfig.swift` should be rotated and externalised before public distribution. (Public client IDs are safe; this is a separate API key for non-OAuth People API metadata calls.)
-- **History pruning** uses a hard cap (1000 events) rather than the `historyRetentionDays` setting; the latter is exposed in UI but not yet enforced.
-
----
-
-## Future improvements
-
-- Two-Google-account sync (Google A ↔ Google B via Mac mapping).
-- Per-field source rules ("always trust Google for company & title"; "always keep Mac photos").
-- Multiple sync profiles ("Personal" / "Work").
-- Notification Center integration ("Synced 120 contacts (3 updated, 1 deleted)").
-- Command-line interface for power users / CI.
-- Smart duplicate resolver UI (side-by-side merge editor with field-level confidence).
-- Time-window history retention (honour `historyRetentionDays`).
-- Mac App Store distribution (sandbox + entitlement audit).
-
----
-
-## Troubleshooting
-
-### Google sign-in immediately fails
-
-- Confirm `GoogleOAuthConfig.json` is in the bundle and `clientId` is correct.
-- Confirm the URL scheme in `Info.plist > CFBundleURLTypes > CFBundleURLSchemes` matches your reverse-domain client ID.
-- Check **Settings → Accounts → Google → Sign In** for an inline error message.
-- Look at the Console log for `OAuth callback` events.
-
-### Contact SyncMate cannot see my contacts
-
-- **System Settings → Privacy & Security → Contacts** — make sure Contact SyncMate is toggled on.
-- Quit and relaunch — `CNContactStore` authorization is checked at launch and on `applicationDidBecomeActive`.
-- If you have multiple accounts (iCloud + On My Mac + Exchange), set **Settings → Accounts → Mac Contacts → Account mode** to **Specific** and pick the right container.
-
-### Auto-sync isn't running
-
-- **Settings → Auto Sync → Enable automatic sync** must be on.
-- Check the run-conditions — if "Only on AC power" is on and you're on battery, sync is skipped (you'll see a `skipped` event in **Sync History**).
-- Confirm both accounts are connected (the menu bar popover shows green dots).
-
-### "Sync already in progress" error
-
-- A sync is genuinely running (manual or auto). Wait for it to finish.
-- If the icon shows the spinner indefinitely, something has hung — quit and relaunch. The next launch will reset `SyncCoordinator.phase` to `.idle`.
-
-### AI matching does nothing
-
-- Enter a valid Anthropic API key in **Settings → AI Matching → Cloud AI Tier**. Click **Test API Key** to verify.
-- Adjust the sensitivity slider — by default the API is only called for borderline matches (rule score 30–79). Wider range = more API calls = higher accuracy and cost.
-- If you have no key configured, only the on-device NLP signals run (still effective for most cases).
-
-### Restore from backup didn't delete a contact I expected
-
-- Restore is **additive** by design (see [Known limitations](#known-limitations)). To remove the contact, delete it manually then restore.
-
-### Where are my backups stored?
-
-- Default: `~/Documents/Contact SyncMate Backups/`
-- Custom: whatever you chose in **Settings → Backups → Backup Location → Change Location…**
-- Click **Open in Finder** in that section to reveal the folder.
-
-### Anthropic API key disappeared after upgrade
-
-The key migrated automatically from `UserDefaults` to the macOS Keychain on first launch after upgrade. If migration failed (Keychain locked, etc.), re-paste the key in **Settings → AI Matching → Cloud AI Tier**.
+Tests pin the settings they depend on in `setUp`/`tearDown` — the app and the
+test bundle share a `UserDefaults` domain, so without that a user's real
+preferences leak into assertions.
 
 ---
 
@@ -362,86 +567,223 @@ The key migrated automatically from `UserDefaults` to the macOS Keychain on firs
 
 ```
 Contact SyncMate/
-├── Contact SyncMate.xcodeproj/
-├── Contact SyncMate/
-│   ├── Contact_SyncMateApp.swift          # @main, AppDelegate, status item, scheduler wiring
-│   ├── ContentView.swift                  # Root: onboarding gate → DashboardView
-│   ├── AppState.swift                     # @Published global state (auth, sync, last result)
-│   ├── AppSettings.swift                  # UserDefaults + Keychain facade
-│   │
-│   ├── DesignSystem/                      # Project-wide vocabulary
-│   │   ├── Color+App.swift                #   • semantic colour tokens
-│   │   ├── AdaptiveIcon.swift             #   • SF Symbol component + AppIcon registry
-│   │   ├── AppButtonStyle.swift           #   • .appRow / .appDestructive
-│   │   └── KeychainStore.swift            #   • secrets storage
-│   │
-│   ├── Components/                        # Small reusable views
-│   │   ├── StatusDot.swift                #   • accessible pulse indicator
-│   │   ├── SyncSummaryBadges.swift        #   • +N / ~N / -N / !N counters
-│   │   ├── SyncProgressView.swift
-│   │   └── ContactChangeRow.swift
-│   │
-│   ├── Coordinators / view layer
-│   │   ├── SyncCoordinator.swift          # the single sync execution path
-│   │   ├── DashboardView.swift
-│   │   ├── MenuBarView.swift              # 280pt menu bar popover
-│   │   ├── SettingsView.swift             # NavigationSplitView with 7 tabs
-│   │   ├── OnboardingView.swift
-│   │   ├── SyncPreviewView.swift / ContactDiffView.swift
-│   │   ├── SyncHistoryView.swift / SyncHistoryAndBackupView.swift
-│   │   ├── BackupComparisonView.swift / RestoreBackupDialog.swift
-│   │   └── DeduplicationSettingsView.swift / DeduplicationConfirmationView.swift
-│   │
-│   ├── Domain / engine
-│   │   ├── SyncEngine.swift                       # diff + apply + ContactMappingStore
-│   │   ├── SyncTypes.swift / UnifiedContact.swift
-│   │   ├── ContactNormalizer.swift                # email/phone/name normalisation
-│   │   ├── SyncEngineDeduplicationIntegration.swift
-│   │   ├── SyncBackupIntegration.swift            # rollback path
-│   │   ├── ContactBackupManager.swift             # snapshot store
-│   │   ├── SyncHistory.swift / SyncHistoryViewModel.swift
-│   │   ├── AutoSyncScheduler.swift                # DispatchSource timer
-│   │   ├── ContactDeduplicator.swift / AIContactMatcher.swift
-│   │   ├── DeduplicationCoordinator.swift / DeduplicationModels.swift
-│   │   └── DeduplicationDecisionStore.swift / DeduplicationScoringReference.swift
-│   │
-│   ├── Connectors
-│   │   ├── GoogleContactsConnector.swift          # People API client
-│   │   ├── GoogleOAuthManager.swift               # ASWebAuthenticationSession + Keychain
-│   │   ├── GoogleOAuthConfig.swift                # JSON loader
-│   │   ├── GoogleAPIConfig.swift                  # API key (rotate before public release)
-│   │   ├── GoogleContactsExporter.swift           # CSV / Excel export
-│   │   ├── MacContactsConnector.swift             # CNContactStore
-│   │   └── MacContactsExporter.swift
-│   │
-│   ├── Assets.xcassets/                   # Asset catalog (colour sets + app icons)
-│   ├── Info.plist / *.entitlements
-│   ├── PRIVACY_POLICY.md / TERMS_OF_SERVICE.md / CHANGELOG.md
-│   └── GoogleOAuthConfig.example.json     # template — copy to GoogleOAuthConfig.json
+├── Contact_SyncMateApp.swift      # @main · AppDelegate · status item · windows
+├── AppState.swift                 # observable app-wide state
+├── AppSettings.swift              # typed preferences + migration + enums
 │
-├── ContactSyncMateTests/
-│   ├── ContactSyncMateTests.swift
-│   └── SyncEngineDiffTests.swift
+├── DesignSystem/
+│   ├── Color+App.swift            # semantic colour tokens (asset-backed)
+│   ├── AdaptiveIcon.swift         # SF Symbol wrapper + AppIcon registry
+│   ├── AppButtonStyle.swift       # hover / pressed / focus styles
+│   ├── KeychainStore.swift        # secret storage
+│   └── SecurityScopedBookmark.swift # sandbox folder persistence
 │
-├── Scripts/
-│   └── check-secrets.sh                   # pre-commit guard for API keys
+├── SyncCoordinator.swift          # ⭐ the only sync entry point
+├── SyncEngine.swift               # fetch → diff → apply · ContactMapper
+├── AutoSyncScheduler.swift        # repeating timer + conditions
+├── SyncBackupIntegration.swift    # rollback
 │
-└── README.md
+├── GoogleOAuthManager.swift       # ASWebAuthenticationSession + PKCE
+├── GoogleContactsConnector.swift  # People API client
+├── MacContactsConnector.swift     # CNContactStore client
+│
+├── ContactDeduplicator.swift      # scoring + blocking
+├── AIContactMatcher.swift         # on-device NLP + optional cloud tier
+├── DeduplicationCoordinator.swift # scan orchestration
+├── ContactNormalizer.swift        # phone/email/name normalisation
+├── NameFormattingEngine.swift     # opt-in casing, CJK-safe
+│
+├── ContactBackupManager.swift     # snapshots + versions
+├── SyncHistory.swift              # audit log + retention
+│
+├── AppIntents.swift               # Shortcuts / Siri
+├── SpotlightIndexer.swift         # Core Spotlight
+├── SyncNotifier.swift             # user notifications
+│
+├── DashboardView.swift  MenuBarView.swift  SettingsView.swift
+├── OnboardingView.swift  SyncPreviewView.swift  ContactDiffView.swift
+├── GroupFilterPickerView.swift  BackupComparisonView.swift
+└── Components/                    # StatusDot · badges · rows
+
+docs/
+├── index.html  privacy.html  terms.html   # GitHub Pages site
+├── assets/                               # logo + SVG diagrams
+└── RELEASE_CHECKLIST.md
 ```
 
 ---
 
-## Privacy
+## Design system
 
-Contact SyncMate runs **entirely on your Mac**. There is no Contact SyncMate server, no telemetry, and no third-party analytics. The only network calls are:
+All colour flows through semantic tokens backed by asset-catalog colour sets with
+paired light/dark values. **No view contains a hardcoded colour literal** —
+enforced by review and greppable.
 
-- **Google People API** — to read and write your Google Contacts (after you sign in).
-- **Anthropic API** — only if you provide an API key and only for borderline duplicate matches.
+| Token | Role |
+|---|---|
+| `.appSuccess` / `.appWarning` / `.appError` / `.appInfo` | Status |
+| `.appAccent` / `.appBrand` | Brand and selection |
+| `.appSourceGoogle` / `.appSourceApple` | Provider identity |
+| `.appSurface` / `.appSurfaceTinted` / `.appBackground` | Surfaces |
+| `.appBorder` / `.appBorderEmphasized` | Separators |
+| `.appTextPrimary/Secondary/Tertiary/Inverse` | Typography |
 
-OAuth tokens, the OAuth client secret, and the Anthropic API key are stored in the macOS Keychain. Backups are stored in plain `.json` files under `~/Documents/Contact SyncMate Backups/` (or your chosen folder). See `PRIVACY_POLICY.md` for the full text.
+Icons come from a typed `AppIcon` registry and render with
+`.symbolRenderingMode(.hierarchical)`, so a symbol rename is a one-line change
+rather than a project-wide search.
+
+---
+
+## Troubleshooting
+
+<details>
+<summary><strong>“Google hasn't verified this app”</strong></summary>
+
+<br>
+
+Expected for an app pending OAuth verification. Click **Advanced → Go to Contact
+SyncMate**. You are authorising software running on your own machine.
+
+⚠️ If the OAuth publishing status is **Testing**, refresh tokens expire after
+**7 days** and auto-sync will break weekly. Switch to **In production**
+(Google Auth Platform → Audience → Publish app) — no review needed, and tokens
+stop expiring.
+
+</details>
+
+<details>
+<summary><strong><code>invalid_client</code> on sign-in</strong></summary>
+
+<br>
+
+The `clientId` or `clientSecret` in `GoogleOAuthConfig.json` doesn't match the
+console. Common causes:
+
+- A secret pasted into the `clientId` field
+- A newline inside a JSON string value
+- Two JSON objects concatenated in the file
+- The active secret was rotated and the file still holds the old one
+
+Validate with `python3 -m json.tool "Contact SyncMate/GoogleOAuthConfig.json"`,
+then confirm the client ID matches the console exactly.
+
+</details>
+
+<details>
+<summary><strong>Contacts permission was denied</strong></summary>
+
+<br>
+
+macOS only prompts once. Re-enable at **System Settings → Privacy & Security →
+Contacts**. Settings → Accounts also offers a direct deep link.
+
+</details>
+
+<details>
+<summary><strong>Backups stop working after relaunch</strong></summary>
+
+<br>
+
+Under the App Sandbox a folder path alone is revoked when the process exits.
+Contact SyncMate stores a **security-scoped bookmark**
+(`DesignSystem/SecurityScopedBookmark.swift`). If the folder was moved or
+deleted, re-pick it: Settings → Backups → **Change Location…**
+
+</details>
+
+<details>
+<summary><strong>Notes aren't syncing</strong></summary>
+
+<br>
+
+By design. The Contacts `note` field requires
+`com.apple.developer.contacts.notes`, an Apple-managed entitlement this build
+does not hold. The toggle is disabled and forced off so the app never claims to
+sync a field it cannot read or write. Every other field is unaffected.
+
+</details>
+
+<details>
+<summary><strong>Duplicates aren't detected on a large address book</strong></summary>
+
+<br>
+
+Above 500 contacts, comparison switches from exhaustive to blocked (bucketing by
+email, phone suffix, and name initials) to stay fast. A pair that shares *only* a
+transposed name — no email, no phone — may not become a candidate at that scale.
+Sync a filtered group to force the exhaustive path.
+
+</details>
+
+<details>
+<summary><strong>Sync appears to hang</strong></summary>
+
+<br>
+
+Check the menu bar percentage and the popover item counter. Large first syncs are
+API-bound. Sync History records each change as it is applied, so you can see
+exactly where it is. If a hang is genuine, Sync History will show the last
+successful change plus any `change.failed` entry.
+
+</details>
+
+---
+
+## Known limitations
+
+| Limitation | Reason | Workaround |
+|---|---|---|
+| Notes field not synced | Apple entitlement not granted | All other fields sync |
+| Rollback is additive | Restore re-creates and updates, but does not delete contacts added *after* the snapshot | Remove new contacts manually before restoring |
+| Blocked dedup at scale | >500 contacts uses bucketing; transposed-name-only pairs need a shared email/phone | Sync a smaller filtered group |
+| Single Google account | One account per profile | — |
+| Google-side sync tokens | Full fetch each run rather than incremental delta | Acceptable for typical address-book sizes |
+
+---
+
+## Roadmap
+
+- Google ↔ Google account sync
+- Per-field source rules (e.g. *always trust Google for job title*)
+- Multiple sync profiles (Personal / Work)
+- WidgetKit desktop widget
+- Incremental sync via People API sync tokens
+- Command-line interface for scripted syncs
+
+---
+
+## Contributing
+
+Issues and pull requests are welcome.
+
+1. Fork and branch from `main`
+2. Keep the architecture invariants:
+   - **Never** instantiate `SyncEngine` outside `SyncCoordinator`
+   - **Never** use a raw colour literal in a view — use a semantic token
+   - **Never** call `CNContactStore` from the main actor — it is synchronous XPC to `contactsd` and causes priority-inversion hangs
+   - Add SF Symbols to the `AppIcon` registry rather than inlining strings
+3. Add tests for new logic; pure functions preferred
+4. `xcodebuild … test` must pass before opening a PR
+5. Never commit `GoogleOAuthConfig.json` or any credential
 
 ---
 
 ## License
 
-Proprietary. © Victor Lam. All rights reserved.
+See [`LICENSE`](LICENSE). Third-party services used — Google People API, Apple
+Contacts, and optionally the Anthropic API — remain governed by their own terms.
+
+---
+
+<div align="center">
+<sub>
+
+**Contact SyncMate** · built with Swift and SwiftUI · no servers, no telemetry, no tracking
+
+[Website](https://mingmanhk.github.io/Contact-SyncMate/) ·
+[Privacy](https://mingmanhk.github.io/Contact-SyncMate/privacy.html) ·
+[Terms](https://mingmanhk.github.io/Contact-SyncMate/terms.html) ·
+[Report an issue](https://github.com/mingmanhk/Contact-SyncMate/issues)
+
+</sub>
+</div>

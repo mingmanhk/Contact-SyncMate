@@ -1800,14 +1800,14 @@ struct BackupAndRecoverySettingsView: View {
                     }
                     .help("Choose a different folder for backups")
 
-                    if backupManager.customBackupPath != nil {
+                    if backupManager.hasCustomBackupFolder {
                         Button {
-                            backupManager.customBackupPath = nil
+                            backupManager.resetBackupDirectoryToDefault()
                             refreshBackupFiles()
                         } label: {
-                            Label("Reset to Default", systemImage: "arrow.uturn.backward")
+                            Label("Reset to Default", systemImage: AppIcon.restore)
                         }
-                        .help("Reset to ~/Documents/Contact SyncMate Backups")
+                        .help("Return to the app's default backup folder")
                     }
                 }
             } header: {

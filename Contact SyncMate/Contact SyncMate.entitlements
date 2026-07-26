@@ -3,28 +3,64 @@
 <plist version="1.0">
 <dict>
 	<!--
-	  com.apple.developer.contacts.notes is a *managed capability* that must be
-	  granted by Apple in the developer portal. If your request has been denied
-	  (or you don't want to depend on it), leave the key out — the app still
-	  builds, ships, and syncs every other contact field. Notes sync is
-	  gracefully disabled at runtime; see AppSettings.syncNotes and the
-	  `notesFieldAvailable` runtime probe in MacContactsConnector.
-
-	  To re-enable Notes sync in the future:
-	    1. Get the entitlement approved by Apple (developer.apple.com → Account
-	       → Membership → Additional Capabilities → "Contact Notes Field Access").
-	    2. Re-add:  <key>com.apple.developer.contacts.notes</key><true/>
-	    3. Rebuild — the runtime probe will detect the entitlement and
-	       automatically re-enable the "Notes" toggle in Settings.
+	  ══════════════════════════════════════════════════════════════════
+	  App Sandbox — REQUIRED for Mac App Store distribution.
+	  ══════════════════════════════════════════════════════════════════
 	-->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
 
+	<!--
+	  Outgoing network connections: Google People API (people.googleapis.com,
+	  oauth2.googleapis.com) and, only when the user opts in with their own
+	  key, the Anthropic API. No incoming server socket is needed.
+	-->
 	<key>com.apple.security.network.client</key>
 	<true/>
+
+	<!--
+	  Read/write access to the user's Contacts database (CNContactStore).
+	  This is the core function of the app. NSContactsUsageDescription in
+	  Info.plist explains the purpose to the user at the consent prompt.
+	-->
 	<key>com.apple.security.personal-information.addressbook</key>
 	<true/>
+
+	<!--
+	  User-selected folders (backup destination, CSV/XLSX export target)
+	  chosen through NSOpenPanel / NSSavePanel. Access persists across
+	  launches via security-scoped bookmarks — see
+	  DesignSystem/SecurityScopedBookmark.swift.
+	-->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+
+	<!--
+	  Keychain access group for OAuth tokens and the optional Anthropic API
+	  key. Secrets are never written to disk in plain text.
+	-->
 	<key>keychain-access-groups</key>
 	<array>
 		<string>$(AppIdentifierPrefix)com.victorlam.ContactSyncMate</string>
 	</array>
+
+	<!--
+	  ══════════════════════════════════════════════════════════════════
+	  Deliberately NOT requested
+	  ══════════════════════════════════════════════════════════════════
+	  com.apple.developer.contacts.notes
+	      Managed capability; Apple denied the request. Notes sync is
+	      disabled at runtime via MacContactsConnector.notesFieldAvailable.
+	      To re-enable: get approval, add the key back, flip the flag.
+
+	  com.apple.security.files.downloads.read-write
+	  com.apple.security.assets.*
+	      Not needed — all file writes go to the app container or to a
+	      folder the user explicitly picked.
+
+	  com.apple.security.network.server
+	      No inbound connections. OAuth uses ASWebAuthenticationSession,
+	      which needs no local listener.
+	-->
 </dict>
 </plist>

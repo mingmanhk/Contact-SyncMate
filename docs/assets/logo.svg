@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Contact SyncMate logo">
+  <title>Contact SyncMate</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"  stop-color="#5B51E8"/>
+      <stop offset="100%" stop-color="#3423C4"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity=".22"/>
+      <stop offset="55%"  stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- App-icon rounded square -->
+  <rect x="26" y="26" width="460" height="460" rx="104" fill="url(#bg)"/>
+  <rect x="26" y="26" width="460" height="460" rx="104" fill="url(#sheen)"/>
+
+  <!-- Circular sync arrows -->
+  <g fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="round">
+    <path d="M150 256a106 106 0 0 1 106-106c40 0 75 22 93 55" opacity=".95"/>
+    <path d="M362 256a106 106 0 0 1-106 106c-40 0-75-22-93-55" opacity=".95"/>
+  </g>
+  <!-- Arrow heads -->
+  <path d="M349 205l4-46 -44 16z" fill="#ffffff"/>
+  <path d="M163 307l-4 46 44-16z" fill="#ffffff"/>
+
+  <!-- Two contact glyphs, left (Google side) and right (Apple side) -->
+  <g fill="#ffffff">
+    <!-- left person -->
+    <circle cx="200" cy="228" r="26"/>
+    <path d="M158 300c0-23 19-42 42-42s42 19 42 42v6h-84z"/>
+    <!-- right person -->
+    <circle cx="312" cy="284" r="26"/>
+    <path d="M270 356c0-23 19-42 42-42s42 19 42 42v6h-84z"/>
+  </g>
+</svg>
