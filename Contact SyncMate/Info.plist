@@ -23,9 +23,21 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.utilities</string>
 
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2026 Victor Lam. All rights reserved.</string>
+
+	<!--
+	  Export compliance. The app uses only HTTPS/TLS provided by the operating
+	  system and implements no proprietary cryptography, so it qualifies for
+	  the standard exemption. Declaring this here stops App Store Connect
+	  asking the encryption question on every single submission.
+	-->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+
 	<!-- Contacts privacy description (required for CNContactStore access) -->
 	<key>NSContactsUsageDescription</key>
-	<string>Contact SyncMate needs access to your contacts to synchronize them with Google Contacts.</string>
+	<string>Contact SyncMate needs access to your contacts so it can synchronise them with your Google Contacts. All processing happens on this Mac — your contacts are never sent to the developer.</string>
 
 	<!-- OAuth redirect URL scheme (Google sign-in callback) -->
 	<key>CFBundleURLTypes</key>

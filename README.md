@@ -6,7 +6,7 @@
 
 **Two-way contact synchronisation between Google Contacts and Apple Contacts — entirely on your Mac.**
 
-[![Platform](https://img.shields.io/badge/platform-macOS%2013%2B-000000?logo=apple&logoColor=white)](https://www.apple.com/macos/)
+[![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-000000?logo=apple&logoColor=white)](https://www.apple.com/macos/)
 [![Swift](https://img.shields.io/badge/Swift-5.9-F05138?logo=swift&logoColor=white)](https://swift.org)
 [![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0071e3)](https://developer.apple.com/xcode/swiftui/)
 [![Tests](https://img.shields.io/badge/tests-109%20passing-2ea44f)](#testing)
@@ -466,7 +466,8 @@ System Settings → Privacy & Security → Contacts when access was refused.
 
 ### Prerequisites
 
-- macOS 13 Ventura or later
+- macOS 14 Sonoma or later (deployment target; the app builds universal
+  `arm64` + `x86_64`)
 - Xcode 15 or later
 - A Google Cloud project with the **People API** enabled
 
