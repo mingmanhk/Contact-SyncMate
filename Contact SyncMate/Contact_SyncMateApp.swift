@@ -24,10 +24,33 @@ struct Contact_SyncMateApp: App {
         .windowResizability(.contentMinSize)
         .commands {
             CommandGroup(replacing: .appSettings) {
-                Button("Settings...") {
+                Button("Settings…") {
                     NotificationCenter.default.post(name: .openSettingsWindow, object: nil)
                 }
                 .keyboardShortcut(",", modifiers: .command)
+            }
+
+            // ── Sync menu ──────────────────────────────────────────────
+            // App-level menu so every window gets the same commands and
+            // keyboard shortcuts (HIG: primary actions belong in the menu
+            // bar, not only in window chrome).
+            CommandMenu("Sync") {
+                Button("Sync Now") {
+                    Task { await SyncCoordinator.shared.runSync() }
+                }
+                .keyboardShortcut("r", modifiers: .command)
+
+                Divider()
+
+                Button("Open Dashboard") {
+                    NotificationCenter.default.post(name: .openDashboardWindow, object: nil)
+                }
+                .keyboardShortcut("1", modifiers: .command)
+
+                Button("Sync History") {
+                    NotificationCenter.default.post(name: .openHistoryWindow, object: nil)
+                }
+                .keyboardShortcut("2", modifiers: .command)
             }
         }
     }
@@ -56,11 +79,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // AppleEvent URL handler. The legacy handler that previously lived
         // here only `print()`d the callback URL and was dead code.
 
-        // Settings notification
+        // Window-open notifications (posted by the app menu commands)
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleOpenSettingsWindow),
             name: .openSettingsWindow,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleOpenDashboardWindow),
+            name: .openDashboardWindow,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleOpenHistoryWindow),
+            name: .openHistoryWindow,
             object: nil
         )
 
@@ -129,6 +164,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updateStatusItemIcon()
         statusItem?.button?.action = #selector(menuBarIconClicked)
         statusItem?.button?.target = self
+        // HIG dual behaviour for menu bar extras: left-click opens the rich
+        // popover; right-click (or Control-click) shows a lightweight
+        // context menu of quick actions.
+        statusItem?.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
 
         // React to SyncCoordinator phase changes (syncing, error, completed, idle)
         SyncCoordinator.shared.$phase
@@ -212,11 +251,72 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func menuBarIconClicked() {
         guard let button = statusItem?.button else { return }
+
+        // Right-click / Control-click → quick-action context menu
+        if let event = NSApp.currentEvent,
+           event.type == .rightMouseUp ||
+           (event.type == .leftMouseUp && event.modifierFlags.contains(.control)) {
+            showStatusItemContextMenu()
+            return
+        }
+
+        // Left-click → popover
         if let popover, popover.isShown {
             popover.performClose(nil)
         } else {
             popover?.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         }
+    }
+
+    /// Lightweight right-click menu. Mirrors the app's Sync menu so the two
+    /// surfaces never disagree; state-dependent items are disabled rather
+    /// than hidden (HIG).
+    private func showStatusItemContextMenu() {
+        let menu = NSMenu()
+
+        let syncItem = NSMenuItem(title: "Sync Now",
+                                  action: #selector(contextSyncNow),
+                                  keyEquivalent: "")
+        syncItem.target = self
+        syncItem.isEnabled = !SyncCoordinator.shared.isRunning
+        menu.addItem(syncItem)
+
+        menu.addItem(.separator())
+
+        let dashItem = NSMenuItem(title: "Open Dashboard",
+                                  action: #selector(handleOpenDashboardWindow),
+                                  keyEquivalent: "")
+        dashItem.target = self
+        menu.addItem(dashItem)
+
+        let histItem = NSMenuItem(title: "Sync History",
+                                  action: #selector(handleOpenHistoryWindow),
+                                  keyEquivalent: "")
+        histItem.target = self
+        menu.addItem(histItem)
+
+        let prefItem = NSMenuItem(title: "Settings…",
+                                  action: #selector(handleOpenSettingsWindow),
+                                  keyEquivalent: "")
+        prefItem.target = self
+        menu.addItem(prefItem)
+
+        menu.addItem(.separator())
+
+        let quitItem = NSMenuItem(title: "Quit Contact SyncMate",
+                                  action: #selector(NSApplication.terminate(_:)),
+                                  keyEquivalent: "q")
+        menu.addItem(quitItem)
+
+        // Show the menu, then detach so the next left-click opens the popover
+        // instead of re-triggering menu tracking.
+        statusItem?.menu = menu
+        statusItem?.button?.performClick(nil)
+        statusItem?.menu = nil
+    }
+
+    @objc private func contextSyncNow() {
+        Task { @MainActor in await SyncCoordinator.shared.runSync() }
     }
 
     // MARK: - Window Management
@@ -267,6 +367,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func handleOpenSettingsWindow() {
         openSettings()
+    }
+
+    @objc private func handleOpenDashboardWindow() {
+        openDashboard()
+    }
+
+    @objc private func handleOpenHistoryWindow() {
+        openHistory()
     }
 
     func openSettings() {
@@ -380,4 +488,6 @@ extension Notification.Name {
     static let showAccountsSettings  = Notification.Name("showAccountsSettings")
     static let activationPolicyChanged = Notification.Name("activationPolicyChanged")
     static let openSettingsWindow    = Notification.Name("openSettingsWindow")
+    static let openDashboardWindow   = Notification.Name("openDashboardWindow")
+    static let openHistoryWindow     = Notification.Name("openHistoryWindow")
 }
