@@ -225,10 +225,89 @@ struct SettingsView: View {
 
 struct GeneralSettingsView: View {
     @StateObject private var settings = AppSettings.shared
+    @StateObject private var sync = SyncCoordinator.shared
+    @EnvironmentObject private var appState: AppState
     @State private var showingResetConfirmation = false
+
+    /// Sync Mode used to be selectable here with no way to act on the choice —
+    /// picking "Manual Sync…" set a preference and then left the user with
+    /// nothing to press. This puts the state and the action next to the setting
+    /// that governs them.
+    private var canSync: Bool {
+        appState.isGoogleConnected
+            && appState.isMacContactsAuthorized
+            && !sync.isRunning
+    }
+
+    private var statusIcon: String {
+        guard appState.lastSyncDate != nil else { return "clock" }
+        guard let result = appState.lastSyncResult else { return AppIcon.statusSuccess }
+        return result.successful ? AppIcon.statusSuccess : "exclamationmark.triangle.fill"
+    }
+
+    private var statusTint: Color {
+        guard let result = appState.lastSyncResult else { return .secondary }
+        return result.successful ? Color.appSuccess : Color.appWarning
+    }
+
+    private var lastSyncSummary: String {
+        guard let date = appState.lastSyncDate else { return "Never synced" }
+        let relative = RelativeDateTimeFormatter()
+        relative.unitsStyle = .full
+        let when = relative.localizedString(for: date, relativeTo: Date())
+        guard let result = appState.lastSyncResult else { return "Last synced \(when)" }
+        return result.successful
+            ? "Last synced \(when)"
+            : "Last sync finished with errors \(when)"
+    }
 
     var body: some View {
         Form {
+            // ── Sync Status ────────────────────────────────────────────
+            Section {
+                if sync.isRunning {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ProgressView(value: sync.progress)
+                            .progressViewStyle(.linear)
+                        HStack {
+                            Text(sync.stepLabel.isEmpty ? sync.phase.label : sync.stepLabel)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("\(Int(sync.progress * 100))%")
+                                .font(.caption)
+                                .monospacedDigit()
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                } else {
+                    HStack {
+                        Label {
+                            Text(lastSyncSummary)
+                        } icon: {
+                            Image(systemName: statusIcon)
+                                .symbolRenderingMode(.hierarchical)
+                                .foregroundStyle(statusTint)
+                        }
+
+                        Spacer()
+
+                        Button(settings.selectedSyncType == .manual ? "Review…" : "Sync Now") {
+                            // Same single execution path as the menu bar and
+                            // Dashboard — never a second copy of sync logic.
+                            Task { await SyncCoordinator.shared.runSync() }
+                        }
+                        .disabled(!canSync)
+                        .help(canSync
+                              ? "Run a sync now using the mode selected below"
+                              : "Connect a Google account and grant Contacts access first")
+                    }
+                }
+            } header: {
+                Label("Sync Status", systemImage: "clock.arrow.circlepath")
+            }
+
             // ── Sync Mode ──────────────────────────────────────────────
             Section {
                 ForEach(SyncType.allCases, id: \.self) { type in

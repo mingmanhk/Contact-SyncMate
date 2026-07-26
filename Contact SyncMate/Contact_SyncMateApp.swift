@@ -197,31 +197,57 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateStatusItemIcon() }
             .store(in: &cancellables)
+
+        // Appearance preferences change the icon directly, so they must redraw
+        // it immediately — otherwise the toggle looks broken until the next sync
+        // happens to repaint.
+        AppSettings.shared.$useBlackWhiteIcon
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateStatusItemIcon() }
+            .store(in: &cancellables)
+
+        AppSettings.shared.$showSyncBadge
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateStatusItemIcon() }
+            .store(in: &cancellables)
     }
 
     private var cancellables = Set<AnyCancellable>()
 
     private func updateStatusItemIcon() {
         let coordinator = SyncCoordinator.shared
+        let settings = AppSettings.shared
         let phase = coordinator.phase
+
+        // `showSyncBadge` governs everything that decorates the plain icon: the
+        // progress percentage and the state-carrying glyph swaps. With it off
+        // the menu bar icon stays completely static.
+        let showBadge = settings.showSyncBadge
+
         let symbolName: String
-        var title = ""   // text shown next to the icon (progress % during sync)
+        var title = ""          // text shown next to the icon (progress % during sync)
+        var tint: NSColor?      // nil → monochrome template rendering
 
         switch phase {
         case .preparing:
             symbolName = "arrow.triangle.2.circlepath"
-            title = " …"
+            if showBadge { title = " …" }
+            tint = .controlAccentColor
         case .syncing(let fraction):
             symbolName = "arrow.triangle.2.circlepath"
-            title = " \(Int(fraction * 100))%"
+            if showBadge { title = " \(Int(fraction * 100))%" }
+            tint = .controlAccentColor
         case .failed:
-            symbolName = "exclamationmark.circle.fill"
+            symbolName = showBadge ? "exclamationmark.circle.fill" : "person.2.circle"
+            tint = showBadge ? .systemRed : nil
         case .completed(let r) where !r.successful:
-            symbolName = "exclamationmark.triangle.fill"
+            symbolName = showBadge ? "exclamationmark.triangle.fill" : "person.2.circle"
+            tint = showBadge ? .systemOrange : nil
         default:
             // Idle / post-success — show persistent error badge if last result had errors
-            if let result = appState.lastSyncResult, !result.successful {
+            if showBadge, let result = appState.lastSyncResult, !result.successful {
                 symbolName = "exclamationmark.circle"
+                tint = .systemRed
             } else {
                 symbolName = "person.2.circle"
             }
@@ -229,10 +255,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let image = NSImage(systemSymbolName: symbolName,
                             accessibilityDescription: "Contact SyncMate — \(phase.label)")
-        image?.isTemplate = true  // Adapts to light/dark menu bar automatically
+
+        // Always keep template rendering on: a template image inverts itself for
+        // light/dark menu bars and for a tinted desktop showing through the
+        // translucent bar. Colour is applied on top via the button's tint, which
+        // preserves that adaptivity — baking colour into the NSImage does not.
+        image?.isTemplate = true
 
         guard let button = statusItem?.button else { return }
         button.image = image
+        // nil tint = plain monochrome. Colour is opt-out rather than opt-in
+        // because the red error state is worth noticing.
+        button.contentTintColor = settings.useBlackWhiteIcon ? nil : tint
         button.imagePosition = .imageLeft
         // Small monospaced-digit font so "42%" doesn't jiggle as it counts
         button.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
