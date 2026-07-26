@@ -90,7 +90,7 @@ class MacContactsExporter: ObservableObject {
     
     private func fetchContacts(from containerIdentifier: String?) async throws -> [CNContact] {
         return try await Task.detached(priority: .userInitiated) {
-            let store = CNContactStore()
+            let store = MacContactsConnector.shared
 
             // Resolve target container: prefer provided ID; else prefer iCloud; else local
             var targetContainer: CNContainer?
@@ -568,7 +568,7 @@ class MacContactsExporter: ObservableObject {
         // Add account name if specific container
         var accountName = "MacContacts"
         if let identifier = containerIdentifier {
-            let store = CNContactStore()
+            let store = MacContactsConnector.shared
             if let containers = try? store.containers(matching: nil),
                let container = containers.first(where: { $0.identifier == identifier }) {
                 accountName = container.name.isEmpty ? "MacContacts" : container.name.replacingOccurrences(of: " ", with: "_")
@@ -577,7 +577,7 @@ class MacContactsExporter: ObservableObject {
         
         if containerIdentifier == nil {
             // Prefer iCloud name in default filename if available
-            let store = CNContactStore()
+            let store = MacContactsConnector.shared
             if let containers = try? store.containers(matching: nil),
                let iCloud = containers.first(where: { $0.type == .cardDAV && $0.name.lowercased().contains("icloud") }) {
                 accountName = iCloud.name.isEmpty ? "iCloud" : iCloud.name.replacingOccurrences(of: " ", with: "_")

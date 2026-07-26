@@ -19,7 +19,28 @@ import os.log
 ///
 /// See `DEDUPLICATION_GUIDE.md` for full deduplication workflow details.
 class MacContactsConnector: ObservableObject {
-    private let store = CNContactStore()
+    /// One `CNContactStore` for the whole process.
+    ///
+    /// Every store owns its own Core Data context, and a `CNContact` fetched
+    /// through one store belongs to that context. Passing it to a *different*
+    /// store's `CNSaveRequest` makes Core Data fault properties against a context
+    /// that no longer owns the object, which surfaces as
+    ///   NSCocoaErrorDomain 134092 · "Unhandled error … occurred during faulting"
+    /// — an opaque failure with no mention of the real cause.
+    ///
+    /// The app was creating a connector (and therefore a store) per call site —
+    /// SyncEngine, DeduplicationCoordinator, Settings, the exporters — so merges
+    /// routinely fetched through one store and saved through another. Every Mac
+    /// write failed. Sharing the store removes the mismatch by construction, and
+    /// is what Apple documents: CNContactStore is expensive to create and meant
+    /// to be shared.
+    /// `nonisolated(unsafe)` rather than main-actor isolated: `CNContactStore` is
+    /// documented as safe to use from any thread, and its calls are synchronous
+    /// XPC that *must* run off the main actor to avoid a priority inversion. The
+    /// isolation the compiler would infer here is exactly the thing we need not
+    /// to have.
+    nonisolated(unsafe) static let shared = CNContactStore()
+    private var store: CNContactStore { Self.shared }
     private let history = SyncHistory.shared
     
     @Published var authorizationStatus: CNAuthorizationStatus = .notDetermined
@@ -214,6 +235,50 @@ class MacContactsConnector: ObservableObject {
             retry.add(contact, toContainerWithIdentifier: fallback.identifier)
             try store.execute(retry)
         }
+    }
+
+    /// Fetch contacts without touching the main actor.
+    ///
+    /// `CNContactStore` calls are synchronous XPC to contactsd at background QoS,
+    /// so they must run off the main actor or they risk a priority inversion. The
+    /// call sites therefore use `Task.detached` — but constructing a
+    /// `MacContactsConnector` there is main-actor work, which Swift 6 rejects
+    /// outright rather than warning about.
+    ///
+    /// This is `nonisolated` and goes straight to the shared store, so a detached
+    /// task needs no actor hop and no connector instance.
+    nonisolated static func fetchAllContactsOffMain(
+        in container: CNContainer? = nil
+    ) throws -> [CNContact] {
+        let request = CNContactFetchRequest(keysToFetch: nonisolatedKeysToFetch())
+        if let container {
+            request.predicate = CNContact.predicateForContactsInContainer(
+                withIdentifier: container.identifier
+            )
+        }
+
+        var contacts: [CNContact] = []
+        try shared.enumerateContacts(with: request) { contact, _ in
+            contacts.append(contact)
+        }
+        return contacts
+    }
+
+    /// Key set for `fetchAllContactsOffMain`.
+    ///
+    /// Deliberately excludes `CNContactNoteKey`: reading it needs the
+    /// com.apple.developer.contacts.notes entitlement, which this app does not
+    /// hold, and requesting it makes the fetch itself fail.
+    nonisolated private static func nonisolatedKeysToFetch() -> [CNKeyDescriptor] {
+        [
+            CNContactIdentifierKey, CNContactGivenNameKey, CNContactMiddleNameKey,
+            CNContactFamilyNameKey, CNContactNamePrefixKey, CNContactNameSuffixKey,
+            CNContactNicknameKey, CNContactOrganizationNameKey,
+            CNContactDepartmentNameKey, CNContactJobTitleKey,
+            CNContactPhoneNumbersKey, CNContactEmailAddressesKey,
+            CNContactPostalAddressesKey, CNContactUrlAddressesKey,
+            CNContactBirthdayKey, CNContactImageDataAvailableKey,
+        ].map { $0 as CNKeyDescriptor }
     }
 
     /// Expand a Contacts error into something diagnosable.

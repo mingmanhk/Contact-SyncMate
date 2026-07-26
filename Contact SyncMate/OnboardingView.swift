@@ -304,7 +304,7 @@ private struct OnboardingMacPermissionStep: View {
             default:
                 Button(isRequesting ? "Requesting…" : "Allow Access") {
                     isRequesting = true
-                    CNContactStore().requestAccess(for: .contacts) { granted, _ in
+                    MacContactsConnector.shared.requestAccess(for: .contacts) { granted, _ in
                         DispatchQueue.main.async {
                             authStatus = granted ? .authorized : .denied
                             isRequesting = false

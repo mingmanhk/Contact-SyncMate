@@ -1495,8 +1495,7 @@ struct AccountsSettingsView: View {
         // priority-inversion hang risk — always hop off main first.
         Task.detached(priority: .userInitiated) {
             do {
-                let connector = MacContactsConnector()
-                let contacts = try connector.fetchAllContacts()
+                let contacts = try MacContactsConnector.fetchAllContactsOffMain()
                 await MainActor.run { macContactCount = contacts.count; isLoadingMacContactCount = false }
             } catch {
                 await MainActor.run { macContactCount = nil; isLoadingMacContactCount = false }
@@ -1541,8 +1540,7 @@ struct AccountsSettingsView: View {
     private func testMacContactsConnection() {
         Task.detached(priority: .userInitiated) {
             do {
-                let connector = MacContactsConnector()
-                let contacts = try connector.fetchAllContacts()
+                let contacts = try MacContactsConnector.fetchAllContactsOffMain()
                 await MainActor.run {
                     let alert = NSAlert()
                     alert.messageText = "Connection Successful"
@@ -1597,7 +1595,7 @@ struct AccountsSettingsView: View {
         switch status {
         case .notDetermined:
             // First time: triggers the system permission dialog
-            let store = CNContactStore()
+            let store = MacContactsConnector.shared
             store.requestAccess(for: .contacts) { granted, _ in
                 DispatchQueue.main.async {
                     appState.isMacContactsAuthorized = granted
@@ -1635,7 +1633,7 @@ struct AccountsSettingsView: View {
             return
         }
         Task.detached(priority: .utility) {
-            let store = CNContactStore()
+            let store = MacContactsConnector.shared
             let name: String?
             do {
                 let containers = try store.containers(matching: nil)
@@ -1757,7 +1755,7 @@ struct MacAccountPickerView: View {
     }
 
     private func loadContainers() {
-        let store = CNContactStore()
+        let store = MacContactsConnector.shared
         switch CNContactStore.authorizationStatus(for: .contacts) {
         case .authorized:
             fetchContainers(store: store)
@@ -2174,17 +2172,22 @@ struct BackupAndRecoverySettingsView: View {
                 // Fetch actual contacts from Mac Contacts (if authorized)
                 var macContacts: [UnifiedContact] = []
                 if await appState.isMacContactsAuthorized {
-                    let connector = MacContactsConnector()
-                    let cnContacts = try connector.fetchAllContacts()
-                    macContacts = cnContacts.map { ContactMapper.toUnified(from: $0) }
+                    // The CNContactStore work stays off main; the mapping hops
+                    // back because ContactMapper is main-actor isolated.
+                    let cnContacts = try MacContactsConnector.fetchAllContactsOffMain()
+                    macContacts = await MainActor.run {
+                        cnContacts.map { ContactMapper.toUnified(from: $0) }
+                    }
                 }
 
                 // Fetch Google contacts (if authenticated)
                 var googleContacts: [UnifiedContact] = []
-                if GoogleOAuthManager.shared.isAuthenticated {
-                    let connector = GoogleContactsConnector()
+                if await GoogleOAuthManager.shared.isAuthenticated {
+                    let connector = await GoogleContactsConnector()
                     let gContacts = try await connector.fetchAllContacts()
-                    googleContacts = gContacts.map { ContactMapper.toUnified(from: $0) }
+                    googleContacts = await MainActor.run {
+                        gContacts.map { ContactMapper.toUnified(from: $0) }
+                    }
                 }
 
                 let totalCount = googleContacts.count + macContacts.count
@@ -2241,8 +2244,7 @@ struct BackupAndRecoverySettingsView: View {
                     ? try await macExporter.exportToExcel(from: containerID)
                     : try await macExporter.exportToCSV(from: containerID)
                 guard let fileURL else { return }
-                let connector = MacContactsConnector()
-                let contacts = try connector.fetchAllContacts()
+                let contacts = try MacContactsConnector.fetchAllContactsOffMain()
                 await MainActor.run {
                     macExporter.showExportSuccessAlert(fileURL: fileURL, contactCount: contacts.count)
                 }

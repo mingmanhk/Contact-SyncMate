@@ -185,7 +185,7 @@ struct GroupFilterPickerView: View {
         macError = nil
         DispatchQueue.global(qos: .userInitiated).async {
             do {
-                let store = CNContactStore()
+                let store = MacContactsConnector.shared
                 let groups = try store.groups(matching: nil)
                 let mapped = groups.map { (id: $0.identifier, name: $0.name) }
                     .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
