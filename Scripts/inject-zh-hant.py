@@ -610,6 +610,7 @@ T = {
     "OK": "好",
     "%lld failed": "%lld 項失敗",
     "No changes yet.": "尚無變更。",
+    "Google access has expired. Please sign in again.": "Google 授權已過期,請重新登入。",
     "Contacts restored": "聯絡人已還原",
     "Your contacts were rolled back to the selected backup.": "你的聯絡人已回復到所選備份的狀態。",
     "Restore incomplete": "還原未完成",

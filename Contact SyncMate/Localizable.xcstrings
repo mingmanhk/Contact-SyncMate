@@ -7730,6 +7730,23 @@
           }
         }
       }
+    },
+    "Google access has expired. Please sign in again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 授權已過期,請重新登入。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 授权已过期,请重新登录。"
+          }
+        }
+      }
     }
   },
   "version": "1.1"

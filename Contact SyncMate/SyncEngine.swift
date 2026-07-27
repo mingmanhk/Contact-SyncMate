@@ -130,6 +130,24 @@ class SyncEngine: ObservableObject {
         }
     }
     
+    /// Whether an error means every remaining change would fail the same way.
+    ///
+    /// Only authentication is treated this way. A per-contact failure (a rejected
+    /// field, a stale identifier) says nothing about the next contact, so those
+    /// must not abort the run.
+    private static func isUnrecoverableForRemainingChanges(_ error: Error) -> Bool {
+        switch error {
+        case GoogleOAuthError.noRefreshToken,
+             GoogleOAuthError.notAuthenticated,
+             GoogleOAuthError.tokenRefreshFailed,
+             GoogleContactsError.notAuthenticated,
+             GoogleContactsError.invalidToken:
+            return true
+        default:
+            return false
+        }
+    }
+
     /// Execute a prepared sync session
     func executeSync(session: SyncSession) async throws -> SyncResult {
         guard !isRunning else {
@@ -243,9 +261,25 @@ class SyncEngine: ObservableObject {
                     action: "change.failed",
                     details: "\(change.contactName) [\(action.rawValue)]: \(error.localizedDescription)"
                 )
+
+                // Stop on a failure that every remaining change will hit too.
+                //
+                // When Google access dies mid-sync, the old behaviour was to keep
+                // going and fail all ~100 remaining contacts identically — a wall
+                // of "Failed to refresh access token" that buried the one fact
+                // that mattered: you need to sign in again. Aborting turns that
+                // into a single actionable error.
+                if Self.isUnrecoverableForRemainingChanges(error) {
+                    SyncHistory.shared.log(
+                        source: "SyncEngine",
+                        action: "sync.aborted",
+                        details: "Authentication failed — stopped after \(index + 1) of \(session.contactChanges.count) changes"
+                    )
+                    break
+                }
             }
         }
-        
+
         let endTime = Date()
 
         // Create result

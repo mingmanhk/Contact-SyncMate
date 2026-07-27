@@ -471,49 +471,145 @@ class GoogleOAuthManager: NSObject, ObservableObject {
             .data(using: String.Encoding.utf8)
         
         let (data, response) = try await URLSession.shared.data(for: request)
-        
+
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
-            throw GoogleOAuthError.tokenRefreshFailed
+            // Surface Google's own diagnosis, exactly as exchangeCodeForTokens
+            // does. This path used to throw a bare `.tokenRefreshFailed`, which
+            // is the one place the distinction matters most: `invalid_grant`
+            // means the refresh token is dead and the user must sign in again,
+            // while a 5xx is worth retrying. Discarding the body turned both
+            // into the same unactionable "Failed to refresh access token."
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            let body = String(data: data, encoding: .utf8) ?? ""
+            let detail = Self.googleErrorSummary(from: body, status: status)
+
+            if detail.contains("invalid_grant") {
+                // The grant is gone — revoked in the Google account, password
+                // changed, or the app's access removed. Retrying cannot help, and
+                // without this every remaining contact would repeat the same
+                // failure. Fail the session once, loudly.
+                clearTokens()
+                await MainActor.run {
+                    isAuthenticated = false
+                    signInError = String(
+                        localized: "Google access has expired. Please sign in again."
+                    )
+                }
+                SyncHistory.shared.log(source: "GoogleOAuth", action: "refresh.revoked",
+                                       details: detail)
+                throw GoogleOAuthError.noRefreshToken
+            }
+
+            SyncHistory.shared.log(source: "GoogleOAuth", action: "refresh.failed",
+                                   details: detail)
+            throw GoogleOAuthError.authError(detail)
         }
-        
+
         let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
-        
+
         // Store new access token
         try saveAccessToken(tokenResponse.accessToken)
-        
+
+        // Google rotates the refresh token on some grants. Dropping the new one
+        // leaves us re-presenting a superseded token on the next refresh, which
+        // is itself an invalid_grant a while later.
+        if let rotated = tokenResponse.refreshToken, !rotated.isEmpty {
+            try saveRefreshToken(rotated)
+        }
+
         let expiry = Date().addingTimeInterval(TimeInterval(tokenResponse.expiresIn))
         try saveTokenExpiry(expiry)
-        
+
         await MainActor.run {
             isAuthenticated = true
+            signInError = nil
         }
     }
     
+    /// The refresh currently in flight, if any.
+    ///
+    /// `getValidAccessToken()` is called once per API request, so a sync applying
+    /// a hundred changes crosses the expiry buffer and then fires a hundred
+    /// refreshes. Google rotates the refresh token as it issues a new one, so the
+    /// stampede invalidates itself: the first request succeeds and the rest come
+    /// back `invalid_grant` — which is exactly the wall of "Failed to refresh
+    /// access token" one per contact.
+    ///
+    /// Holding the Task lets every caller await the same refresh instead.
+    @MainActor private var refreshInFlight: Task<Void, Error>?
+
     /// Get valid access token (refreshing if needed)
     func getValidAccessToken() async throws -> String {
         guard let accessToken = getAccessToken(),
               let expiry = getTokenExpiry() else {
             throw GoogleOAuthError.notAuthenticated
         }
-        
+
         // Check if token is still valid (with 5 minute buffer)
         if expiry > Date().addingTimeInterval(300) {
             return accessToken
         }
-        
-        // Token expired or about to expire, refresh it
-        guard let refreshToken = getRefreshToken() else {
-            throw GoogleOAuthError.noRefreshToken
-        }
-        
-        try await refreshAccessToken(refreshToken: refreshToken)
-        
+
+        try await refreshOnce()
+
         guard let newAccessToken = getAccessToken() else {
             throw GoogleOAuthError.tokenRefreshFailed
         }
-        
+
         return newAccessToken
+    }
+
+    /// Refresh, coalescing concurrent callers onto a single request.
+    @MainActor
+    private func refreshOnce() async throws {
+        if let existing = refreshInFlight {
+            // Someone else is already refreshing — wait for their result rather
+            // than racing them.
+            return try await existing.value
+        }
+
+        guard let refreshToken = getRefreshToken() else {
+            throw GoogleOAuthError.noRefreshToken
+        }
+
+        let task = Task { [weak self] in
+            guard let self else { return }
+            try await self.refreshAccessTokenWithRetry(refreshToken: refreshToken)
+        }
+        refreshInFlight = task
+
+        defer { refreshInFlight = nil }
+        try await task.value
+    }
+
+    /// Refresh with backoff for transient failures.
+    ///
+    /// A single dropped connection used to fail the refresh outright, and because
+    /// nothing recorded that, every subsequent contact retried and failed the same
+    /// way. Only network and 5xx errors are retried — `invalid_grant` is terminal
+    /// and `refreshAccessToken` already handles it.
+    private func refreshAccessTokenWithRetry(refreshToken: String) async throws {
+        let maxAttempts = 3
+
+        for attempt in 1...maxAttempts {
+            do {
+                try await refreshAccessToken(refreshToken: refreshToken)
+                return
+            } catch GoogleOAuthError.noRefreshToken {
+                throw GoogleOAuthError.noRefreshToken   // revoked — do not retry
+            } catch {
+                let isTransient = (error as? URLError) != nil
+                guard isTransient, attempt < maxAttempts else { throw error }
+
+                SyncHistory.shared.log(
+                    source: "GoogleOAuth",
+                    action: "refresh.retrying",
+                    details: "attempt \(attempt)/\(maxAttempts): \(error.localizedDescription)"
+                )
+                try await Task.sleep(for: .seconds(pow(2.0, Double(attempt - 1))))
+            }
+        }
     }
     
     // MARK: - User Info
