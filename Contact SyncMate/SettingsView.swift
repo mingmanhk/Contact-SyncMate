@@ -542,6 +542,14 @@ struct GeneralSettingsView: View {
                     // install. This is the option that actually starts over.
                     Button("Reset Everything for Testing", role: .destructive) {
                         settings.resetForTesting()
+                        // AppState holds the session's sync record in memory, not
+                        // in UserDefaults, so AppSettings cannot clear it. Without
+                        // this the status line keeps reporting the sync that the
+                        // reset just erased every trace of.
+                        appState.lastSyncDate = nil
+                        appState.lastSyncResult = nil
+                        appState.nextScheduledSync = nil
+                        appState.currentSyncSession = nil
                     }
                     Button("Cancel", role: .cancel) {}
                 } message: {
