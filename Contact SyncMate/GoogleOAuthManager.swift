@@ -479,10 +479,17 @@ class GoogleOAuthManager: NSObject, ObservableObject {
         var bodyParams = [
             "code": code,
             "client_id": clientId,
-            "client_secret": clientSecret,
             "redirect_uri": redirectURI,
             "grant_type": "authorization_code"
         ]
+
+        // Only sent when there is one. An OAuth client of type "iOS" — the type
+        // Google requires for macOS apps — is a public client and is issued no
+        // secret at all. Sending `client_secret=` empty is not the same as
+        // omitting it, and Google answers `invalid_client`.
+        if !clientSecret.isEmpty {
+            bodyParams["client_secret"] = clientSecret
+        }
 
         // Include PKCE code_verifier (RFC 7636)
         if let verifier = codeVerifier {
@@ -535,12 +542,16 @@ class GoogleOAuthManager: NSObject, ObservableObject {
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         
-        let bodyParams = [
+        var bodyParams = [
             "client_id": clientId,
-            "client_secret": clientSecret,
             "refresh_token": refreshToken,
             "grant_type": "refresh_token"
         ]
+        // Same rule as the initial exchange: omitted entirely for a public
+        // client, not sent empty. See exchangeCodeForTokens.
+        if !clientSecret.isEmpty {
+            bodyParams["client_secret"] = clientSecret
+        }
         
         request.httpBody = bodyParams
             .map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed) ?? "")" }

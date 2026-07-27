@@ -1,5 +1,6 @@
 {
+  "_comment": "Create the OAuth client in Google Cloud Console as application type 'iOS' — that is the type Google requires for macOS apps. Enter this app's bundle ID (com.victorlam.ContactSyncMate); leave App Store ID and Team ID blank. An iOS client is a public client and is issued NO secret, so leave clientSecret empty. PKCE is what protects the exchange. Then set CFBundleURLSchemes in Info.plist to the same reversed client ID used below.",
   "clientId": "YOUR_CLIENT_ID.apps.googleusercontent.com",
-  "clientSecret": "SET_AT_RUNTIME_OR_CI",
+  "clientSecret": "",
   "redirectURI": "com.googleusercontent.apps.YOUR_CLIENT_ID:/oauth2redirect"
 }
