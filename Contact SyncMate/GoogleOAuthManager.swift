@@ -334,20 +334,80 @@ class GoogleOAuthManager: NSObject, ObservableObject {
         }
     }
     
-    /// Sign out and clear tokens
+    /// Compare two strings without short-circuiting on the first difference.
+    private static func constantTimeEquals(_ a: String, _ b: String) -> Bool {
+        let lhs = Array(a.utf8), rhs = Array(b.utf8)
+        guard lhs.count == rhs.count else { return false }
+        var diff: UInt8 = 0
+        for i in 0..<lhs.count { diff |= lhs[i] ^ rhs[i] }
+        return diff == 0
+    }
+
+    /// Sign out, revoking the grant with Google before discarding it locally.
+    ///
+    /// Deleting the tokens alone left the authorisation **live on Google's
+    /// side**: the app kept appearing under the account's third-party access
+    /// list, and anyone holding a copy of the refresh token (a backup, a synced
+    /// Keychain, a stolen disk image) could keep using it indefinitely. Signing
+    /// out should mean the grant is gone.
+    ///
+    /// Revocation is best-effort — offline sign-out must still work — but the
+    /// local tokens are cleared either way.
     func signOut() {
+        let refreshToken = getRefreshToken()
+        let accessToken = getAccessToken()
+
         clearTokens()
         isAuthenticated = false
         userEmail = nil
+        signInError = nil
+
+        // Prefer the refresh token: revoking it invalidates every access token
+        // derived from it, whereas revoking an access token leaves the grant.
+        guard let token = refreshToken ?? accessToken else { return }
+
+        Task.detached {
+            var request = URLRequest(url: URL(string: "https://oauth2.googleapis.com/revoke")!)
+            request.httpMethod = "POST"
+            request.setValue("application/x-www-form-urlencoded",
+                             forHTTPHeaderField: "Content-Type")
+            request.httpBody = "token=\(token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? token)"
+                .data(using: .utf8)
+
+            do {
+                let (_, response) = try await URLSession.shared.data(for: request)
+                let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+                SyncHistory.shared.log(
+                    source: "GoogleOAuth",
+                    action: status == 200 ? "signOut.revoked" : "signOut.revokeFailed",
+                    details: "HTTP \(status)"
+                )
+            } catch {
+                SyncHistory.shared.log(source: "GoogleOAuth", action: "signOut.revokeFailed",
+                                       details: error.localizedDescription)
+            }
+        }
     }
     
     // MARK: - OAuth Flow Helpers
     
+    /// Random value binding the authorization response to this request (RFC 6749
+    /// §10.12). Regenerated per sign-in, checked in `handleCallback`.
+    private var authState: String?
+
     private func buildAuthorizationURL() -> URL {
         // Generate fresh PKCE pair for each sign-in attempt
         let verifier = generateCodeVerifier()
         codeVerifier = verifier
         let challenge = generateCodeChallenge(from: verifier)
+
+        // `state` was missing entirely. PKCE stops a stolen code from being
+        // *exchanged* by anyone else, but it does not tell us the response we
+        // received belongs to the request we sent — and this app uses a custom
+        // URL scheme, which any other app on the machine can also register. A
+        // state we generated and verified is the standard defence.
+        let state = generateCodeVerifier()   // same CSPRNG, 32 bytes base64url
+        authState = state
 
         var components = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
         components.queryItems = [
@@ -357,6 +417,7 @@ class GoogleOAuthManager: NSObject, ObservableObject {
             URLQueryItem(name: "scope", value: scopes.joined(separator: " ")),
             URLQueryItem(name: "access_type", value: "offline"),
             URLQueryItem(name: "prompt", value: "consent"),
+            URLQueryItem(name: "state", value: state),
             // PKCE parameters (RFC 7636)
             URLQueryItem(name: "code_challenge", value: challenge),
             URLQueryItem(name: "code_challenge_method", value: "S256")
@@ -380,9 +441,25 @@ class GoogleOAuthManager: NSObject, ObservableObject {
         }
         
         if let error = queryItems.first(where: { $0.name == "error" })?.value {
-            print("Google OAuth error from callback: \(error)")
+            SyncHistory.shared.log(source: "GoogleOAuth", action: "callback.error", details: error)
             throw GoogleOAuthError.authError(error)
         }
+
+        // Reject a response that is not the one we asked for.
+        //
+        // Compared with `constantTimeEquals` rather than `==`: string comparison
+        // short-circuits on the first differing byte, which leaks how much of a
+        // guess was right.
+        let returnedState = queryItems.first(where: { $0.name == "state" })?.value
+        guard let expected = authState,
+              let returnedState,
+              Self.constantTimeEquals(expected, returnedState) else {
+            authState = nil
+            SyncHistory.shared.log(source: "GoogleOAuth", action: "callback.stateMismatch",
+                                   details: "authorization response did not match the request")
+            throw GoogleOAuthError.invalidCallback
+        }
+        authState = nil
         
         // Extract authorization code
         guard let code = queryItems.first(where: { $0.name == "code" })?.value else {

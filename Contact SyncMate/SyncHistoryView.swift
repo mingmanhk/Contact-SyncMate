@@ -54,6 +54,33 @@ struct SyncHistoryView: View {
     @State private var expandedIDs: Set<UUID> = []
     @State private var exportError: String?
     @State private var showingClearConfirmation = false
+    /// Default on: the common reason to export a log is to send it to someone.
+    @State private var redactNamesOnExport = true
+
+    /// Strip contact names from an event, keeping everything diagnostic.
+    ///
+    /// Only the leading name is removed — the action, direction, session id,
+    /// field list and error text all survive, which is what makes a log useful
+    /// for troubleshooting in the first place.
+    private nonisolated static func redacted(_ event: SyncEvent) -> SyncEvent {
+        guard let details = event.details else { return event }
+
+        // SyncEngine writes "<name> [<direction>] session=… fields=…", so the
+        // name is everything before the first bracketed direction.
+        guard let bracket = details.firstIndex(of: "[") else {
+            return SyncEvent(id: event.id, timestamp: event.timestamp,
+                             source: event.source, action: event.action,
+                             details: details)
+        }
+
+        let name = details[details.startIndex..<bracket].trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return event }
+
+        let rest = details[bracket...]
+        return SyncEvent(id: event.id, timestamp: event.timestamp,
+                         source: event.source, action: event.action,
+                         details: "<contact \(name.count) chars> \(rest)")
+    }
 
     private var filteredEvents: [SyncEvent] {
         var events = allEvents
@@ -356,9 +383,17 @@ struct SyncHistoryView: View {
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
 
+        // The log records a contact's name on every change, so an exported log is
+        // effectively a list of everyone in the user's address book. Logs get
+        // attached to bug reports and forum posts — redacting by default means
+        // sharing one does not mean sharing your contacts.
+        let events = redactNamesOnExport
+            ? SyncHistory.shared.events().map(Self.redacted)
+            : SyncHistory.shared.events()
+
         let data: Data
         do {
-            data = try encoder.encode(SyncHistory.shared.events())
+            data = try encoder.encode(events)
         } catch {
             exportError = error.localizedDescription
             return
@@ -366,14 +401,40 @@ struct SyncHistoryView: View {
 
         let panel = NSSavePanel()
         panel.title = String(localized: "Export Log")
-        panel.nameFieldStringValue = "contact-syncmate-history.json"
+        panel.nameFieldStringValue = redactNamesOnExport
+            ? "contact-syncmate-history-redacted.json"
+            : "contact-syncmate-history.json"
         panel.allowedContentTypes = [.json]
         panel.canCreateDirectories = true
 
+        // Offered in the panel itself: the decision belongs at the moment of
+        // sharing, not buried in Settings.
+        let toggle = NSButton(checkboxWithTitle: String(localized: "Hide contact names"),
+                              target: nil, action: nil)
+        toggle.state = redactNamesOnExport ? .on : .off
+        toggle.toolTip = String(localized: "Replaces names with placeholders so the log can be shared safely")
+        panel.accessoryView = toggle
+
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
+        // Re-encode if the user flipped the checkbox inside the panel.
+        let finalData: Data
+        if (toggle.state == .on) != redactNamesOnExport {
+            redactNamesOnExport = toggle.state == .on
+            let reselected = redactNamesOnExport
+                ? SyncHistory.shared.events().map(Self.redacted)
+                : SyncHistory.shared.events()
+            guard let encoded = try? encoder.encode(reselected) else {
+                exportError = String(localized: "Couldn't encode the log.")
+                return
+            }
+            finalData = encoded
+        } else {
+            finalData = data
+        }
+
         do {
-            try data.write(to: url, options: .atomic)
+            try finalData.write(to: url, options: .atomic)
             NSWorkspace.shared.activateFileViewerSelecting([url])
         } catch {
             exportError = error.localizedDescription

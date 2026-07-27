@@ -615,6 +615,10 @@ T = {
     "waiting for an unmetered network": "等待非計量網路",
     "waiting until the Mac is idle": "等待 Mac 閒置",
     "Unnamed contact": "未命名聯絡人",
+    "Hide contact names": "隱藏聯絡人姓名",
+    "Replaces names with placeholders so the log can be shared safely":
+        "以佔位符取代姓名,讓記錄可以安全分享",
+    "Couldn't encode the log.": "無法編碼記錄。",
     "Contacts": "聯絡人",
     "Search contacts": "搜尋聯絡人",
     "No version history yet. It builds up as syncs create backups.":

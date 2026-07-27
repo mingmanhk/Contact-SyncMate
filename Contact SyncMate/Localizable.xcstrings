@@ -8107,6 +8107,57 @@
           }
         }
       }
+    },
+    "Hide contact names": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隱藏聯絡人姓名"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏联系人姓名"
+          }
+        }
+      }
+    },
+    "Replaces names with placeholders so the log can be shared safely": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以佔位符取代姓名,讓記錄可以安全分享"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以占位符取代姓名,让记录可以安全分享"
+          }
+        }
+      }
+    },
+    "Couldn't encode the log.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法編碼記錄。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法编码记录。"
+          }
+        }
+      }
     }
   },
   "version": "1.1"

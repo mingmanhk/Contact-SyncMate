@@ -114,17 +114,70 @@ struct SettingsView: View {
     // MARK: Sidebar
 
     private var sidebarList: some View {
-        List(selection: $selectedSection) {
-            ForEach(groups, id: \.0.rawValue) { group, sections in
-                Section(group.rawValue) {
-                    ForEach(sections) { section in
-                        sidebarRow(section)
-                            .tag(section)
+        VStack(spacing: 0) {
+            List(selection: $selectedSection) {
+                ForEach(groups, id: \.0.rawValue) { group, sections in
+                    Section(group.rawValue) {
+                        ForEach(sections) { section in
+                            sidebarRow(section)
+                                .tag(section)
+                        }
                     }
                 }
             }
+            .listStyle(.sidebar)
+
+            Divider()
+            windowShortcuts
         }
-        .listStyle(.sidebar)
+    }
+
+    /// Ways out of Settings, below the pane list rather than inside it.
+    ///
+    /// Dashboard and Sync History are windows, not settings panes. Putting them
+    /// in the `List` would make selecting one highlight a sidebar row that has no
+    /// corresponding detail view — the selection model would be lying. Keeping
+    /// them in a separate footer preserves that distinction while making them
+    /// reachable: previously the only routes were the menu bar icon and ⌘1/⌘2,
+    /// neither of which is discoverable from in here.
+    private var windowShortcuts: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            windowButton(title: "Open Dashboard",
+                         icon: AppIcon.dashboard,
+                         shortcut: "⌘1",
+                         notification: .openDashboardWindow)
+
+            windowButton(title: "Sync History",
+                         icon: AppIcon.history,
+                         shortcut: "⌘2",
+                         notification: .openHistoryWindow)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+    }
+
+    private func windowButton(title: LocalizedStringKey,
+                              icon: String,
+                              shortcut: String,
+                              notification: Notification.Name) -> some View {
+        Button {
+            NotificationCenter.default.post(name: notification, object: nil)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .symbolRenderingMode(.hierarchical)
+                    .frame(width: 16)
+                Text(title)
+                    .font(.subheadline)
+                Spacer(minLength: 4)
+                // Showing the shortcut here is how the user learns it exists.
+                Text(shortcut)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.appRow)
     }
 
     private func sidebarRow(_ section: SettingsSection) -> some View {
