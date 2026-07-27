@@ -559,6 +559,18 @@ class SyncEngine: ObservableObject {
 
         // --- Step 3: New on Mac, not yet mapped ---
         for (_, mContact) in macByIdentifier where !processedMac.contains(mContact.macContactIdentifier ?? "") {
+            // Empty rows are not worth propagating: pushing one to Google creates
+            // a permanent blank contact there, and it will come back as a
+            // "new contact" on every future sync from the other side.
+            guard mContact.hasSyncableContent else {
+                SyncHistory.shared.log(
+                    source: "SyncEngine",
+                    action: "change.skippedEmpty",
+                    details: "Mac contact \(mContact.macContactIdentifier ?? "?") has no name, phone, email or organisation"
+                )
+                continue
+            }
+
             changes.append(ContactChange(
                 contactName: mContact.displayName, action: .add,
                 direction: .macToGoogle, changes: ["New contact from Mac"],

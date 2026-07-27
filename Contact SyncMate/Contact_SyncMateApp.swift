@@ -148,6 +148,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                            details: "accounts not connected")
                     return
                 }
+                // Run Conditions apply to scheduled syncs only — a sync the user
+                // asked for runs regardless of power or network.
+                if let blocker = AutoSyncConditions.blocker() {
+                    SyncHistory.shared.log(source: "AutoSyncScheduler", action: "skipped",
+                                           details: blocker.reason)
+                    return
+                }
                 SyncHistory.shared.log(
                     source: "AutoSyncScheduler",
                     action: "timerFired",

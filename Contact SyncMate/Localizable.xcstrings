@@ -7747,6 +7747,74 @@
           }
         }
       }
+    },
+    "waiting for AC power": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待接上電源"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待接上电源"
+          }
+        }
+      }
+    },
+    "waiting for an unmetered network": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待非計量網路"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待非计量网络"
+          }
+        }
+      }
+    },
+    "waiting until the Mac is idle": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待 Mac 閒置"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待 Mac 闲置"
+          }
+        }
+      }
+    },
+    "Unnamed contact": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未命名聯絡人"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未命名联系人"
+          }
+        }
+      }
     }
   },
   "version": "1.1"

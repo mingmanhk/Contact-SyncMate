@@ -55,7 +55,33 @@ final class UnifiedContactTests: XCTestCase {
 
     func test_displayName_unknownWhenEmpty() {
         let c = UnifiedContact.make()
-        XCTAssertEqual(c.displayName, "Unknown Contact")
+        XCTAssertEqual(c.displayName, "Unnamed contact")
+    }
+
+    /// Empty strings are not nil, so `if let givenName` used to succeed for them
+    /// and produce a name of pure whitespace — which is not `.isEmpty`, so the
+    /// fallback never ran and contacts showed up blank in logs and previews.
+    func test_displayName_treatsBlankNamePartsAsMissing() {
+        var c = UnifiedContact.make(emails: ["blank@example.com"])
+        c.givenName = ""
+        c.familyName = "   "
+        XCTAssertEqual(c.displayName, "blank@example.com")
+    }
+
+    func test_displayName_fallsBackToPhoneWhenNoName() {
+        let c = UnifiedContact.make(phones: ["+1 555 0101"])
+        XCTAssertEqual(c.displayName, "+1 555 0101")
+    }
+
+    /// A row with nothing in it must not be pushed to the other side — doing so
+    /// creates a permanent blank contact there.
+    func test_hasSyncableContent_rejectsEmptyRow() {
+        var c = UnifiedContact.make()
+        c.givenName = "  "
+        XCTAssertFalse(c.hasSyncableContent)
+
+        XCTAssertTrue(UnifiedContact.make(phones: ["+1 555 0101"]).hasSyncableContent)
+        XCTAssertTrue(UnifiedContact.make(emails: ["a@b.com"]).hasSyncableContent)
     }
 
     func test_phoneNumber_stored() {

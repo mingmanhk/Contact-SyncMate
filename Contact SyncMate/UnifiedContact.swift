@@ -7,6 +7,18 @@
 
 import Foundation
 
+extension String {
+    /// The trimmed string, or nil when it holds nothing but whitespace.
+    ///
+    /// Providers disagree about how to say "missing" — Google omits the key,
+    /// Contacts hands back "". Treating both as absent stops empty strings from
+    /// masquerading as real values.
+    var nonBlank: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
 /// Unified contact model that can represent both Google and Mac contacts
 /// Used internally by the sync engine for mapping and comparison
 struct UnifiedContact: Identifiable, Equatable {
@@ -49,15 +61,44 @@ struct UnifiedContact: Identifiable, Equatable {
     // MARK: - Computed Properties
     
     var displayName: String {
-        var components: [String] = []
-        if let prefix = namePrefix { components.append(prefix) }
-        if let given = givenName { components.append(given) }
-        if let middle = middleName { components.append(middle) }
-        if let family = familyName { components.append(family) }
-        if let suffix = nameSuffix { components.append(suffix) }
-        
-        let fullName = components.joined(separator: " ")
-        return fullName.isEmpty ? (emailAddresses.first?.value ?? "Unknown Contact") : fullName
+        // Trimmed, and empty parts dropped before joining.
+        //
+        // `if let given = givenName` succeeds for an *empty string* — it is
+        // non-nil — so a contact whose name fields are all "" produced
+        // components ["", ""], joined to " ". A single space is not `.isEmpty`,
+        // so the fallback below never fired and the contact appeared in logs and
+        // sync previews as blank whitespace.
+        let components = [namePrefix, givenName, middleName, familyName, nameSuffix]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        if !components.isEmpty {
+            return components.joined(separator: " ")
+        }
+
+        // Fall back through anything that identifies the person, widest first.
+        // Phone and organisation were missing: a contact holding only a number is
+        // perfectly ordinary, and showing it beats "Unknown Contact".
+        if let email = emailAddresses.first?.value.nonBlank { return email }
+        if let phone = phoneNumbers.first?.value.nonBlank { return phone }
+        if let org = organizationName?.nonBlank { return org }
+        if let nickname = nickname?.nonBlank { return nickname }
+        return "Unnamed contact"
+    }
+
+    /// Whether this contact carries anything worth syncing.
+    ///
+    /// A record with no name, no phone, no email and no organisation is an empty
+    /// row — usually a stray created by another app. Pushing it to Google makes a
+    /// permanent blank contact there, so the diff skips it instead.
+    var hasSyncableContent: Bool {
+        let hasName = [namePrefix, givenName, middleName, familyName, nameSuffix, nickname]
+            .contains { $0?.nonBlank != nil }
+        return hasName
+            || !phoneNumbers.isEmpty
+            || !emailAddresses.isEmpty
+            || !postalAddresses.isEmpty
+            || organizationName?.nonBlank != nil
     }
     
     var primaryEmail: String? {
