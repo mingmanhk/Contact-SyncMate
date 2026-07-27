@@ -50,6 +50,26 @@ OUR_WARNINGS=$(grep -E ' warning: ' "$LOG_DIR/build.log" \
 [ "$OUR_WARNINGS" != "0" ] && info "$OUR_WARNINGS warning(s) in app sources — see build.log"
 echo
 
+# ── 1b. Debug build ─────────────────────────────────────────────────────
+#
+# Not redundant with the Release build above. Actor-isolation diagnostics
+# differ between the two configurations, and Debug is what Xcode runs — so a
+# Release-only check reported "all clear" on code that failed to compile the
+# moment the project was opened. That happened with `String.nonBlank` being
+# main-actor isolated under default MainActor isolation.
+bold "1b. Build (Debug)"
+if xcodebuild -project "$PROJECT" -scheme "$SCHEME" \
+     -configuration Debug build > "$LOG_DIR/build-debug.log" 2>&1; then
+    pass "BUILD SUCCEEDED"
+else
+    fail "debug build failed"
+    grep -E ' error: ' "$LOG_DIR/build-debug.log" | sed 's|.*/Contact SyncMate/||' \
+        | sort -u | head -15 | sed 's/^/    /'
+    info "full log: $LOG_DIR/build-debug.log"
+    exit 1
+fi
+echo
+
 # ── 2. Tests ────────────────────────────────────────────────────────────
 bold "2. Tests"
 if xcodebuild -project "$PROJECT" -scheme "$SCHEME" \

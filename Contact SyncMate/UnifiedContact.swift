@@ -13,7 +13,13 @@ extension String {
     /// Providers disagree about how to say "missing" — Google omits the key,
     /// Contacts hands back "". Treating both as absent stops empty strings from
     /// masquerading as real values.
-    var nonBlank: String? {
+    ///
+    /// `nonisolated`: the project builds with default MainActor isolation, which
+    /// would otherwise pin this to the main actor and make it unusable from the
+    /// off-main paths — the Contacts write queue, the batch pre-pass, the
+    /// country normaliser. It is a pure function of `self` on a value type, so
+    /// there is nothing for the isolation to protect.
+    nonisolated var nonBlank: String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
