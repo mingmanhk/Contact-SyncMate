@@ -209,12 +209,21 @@ final class SyncCoordinator: ObservableObject {
 
             // System notification so the user knows the sync finished even
             // when the popover is closed (Settings → General → Notifications).
-            SyncNotifier.notifySyncCompleted(
-                added: result.added,
-                updated: result.updated,
-                deleted: result.deleted,
-                errorCount: result.errors.count
-            )
+            //
+            // Suppressed when the sync changed nothing and hit no errors: with a
+            // scheduled sync every few hours and an address book that rarely
+            // moves, that is most runs, and "0 added, 0 updated" six times a day
+            // trains the user to dismiss the one notification that matters.
+            let changedSomething = result.added + result.updated
+                + result.deleted + result.merged > 0
+            if changedSomething || !result.errors.isEmpty {
+                SyncNotifier.notifySyncCompleted(
+                    added: result.added,
+                    updated: result.updated,
+                    deleted: result.deleted,
+                    errorCount: result.errors.count
+                )
+            }
 
             // Spotlight: make this sync findable via ⌘Space ("contact sync").
             // Summaries only — no contact data is indexed.

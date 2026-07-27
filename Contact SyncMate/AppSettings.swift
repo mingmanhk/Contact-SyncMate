@@ -111,7 +111,16 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(autoSyncDirection.rawValue, forKey: "autoSyncDirection") }
     }
     
-    @Published var autoSyncInterval: TimeInterval = UserDefaults.standard.object(forKey: "autoSyncInterval") as? TimeInterval ?? 900 {
+    /// Default 4 hours.
+    ///
+    /// Address books change rarely, so a short interval mostly buys full fetches
+    /// that find nothing. Going all the way to daily is the wrong trade though:
+    /// a long window between syncs is exactly what lets both sides be edited
+    /// before they reconcile, and every one of those becomes a conflict the user
+    /// has to resolve. Four hours keeps the two copies close without polling.
+    ///
+    /// The user can pick anything from 5 minutes to daily in Settings → Auto Sync.
+    @Published var autoSyncInterval: TimeInterval = UserDefaults.standard.object(forKey: "autoSyncInterval") as? TimeInterval ?? 14400 {
         didSet { UserDefaults.standard.set(autoSyncInterval, forKey: "autoSyncInterval") }
     }
     
@@ -434,7 +443,7 @@ class AppSettings: ObservableObject {
 
         autoSyncEnabled = false
         autoSyncDirection = .twoWay
-        autoSyncInterval = 900
+        autoSyncInterval = 14400
         autoSyncOnlyOnPower = false
         autoSyncOnlyOnWiFi = false
         autoSyncOnlyWhenIdle = false

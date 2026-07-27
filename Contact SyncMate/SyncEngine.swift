@@ -91,10 +91,28 @@ class SyncEngine: ObservableObject {
             // Create sync session ID for backup linkage
             let syncSessionId = UUID().uuidString
 
-            // Create pre-sync backup before any changes — gated on the
-            // user's "Automatic Backups" preference. When disabled the sync
-            // proceeds without a snapshot. Default is enabled (recommended).
-            if AppSettings.shared.autoBackupEnabled {
+            // Diff first, back up second.
+            //
+            // The order used to be reversed, so every scheduled sync wrote a full
+            // snapshot of both address books before discovering there was nothing
+            // to do. Contacts change rarely, so the overwhelming majority of
+            // automatic syncs are exactly that case — and with backup pruning
+            // unimplemented, those snapshots accumulate forever.
+            //
+            // A backup exists to undo changes. No changes, nothing to undo.
+            let changes = computeChanges(
+                googleContacts: unifiedGoogleContacts,
+                macContacts: unifiedMacContacts,
+                direction: direction
+            )
+
+            if changes.isEmpty {
+                SyncHistory.shared.log(
+                    source: "SyncEngine",
+                    action: "sync.noChanges",
+                    details: "\(unifiedGoogleContacts.count) Google / \(unifiedMacContacts.count) Mac contacts — already in sync"
+                )
+            } else if AppSettings.shared.autoBackupEnabled {
                 _ = try await ContactBackupManager.shared.createPreSyncBackup(
                     googleContacts: unifiedGoogleContacts,
                     macContacts: unifiedMacContacts,
@@ -103,13 +121,6 @@ class SyncEngine: ObservableObject {
                     syncMode: "manual"
                 )
             }
-
-            // Compute differences
-            let changes = computeChanges(
-                googleContacts: unifiedGoogleContacts,
-                macContacts: unifiedMacContacts,
-                direction: direction
-            )
 
             // Create session with backup reference
             var session = SyncSession(
@@ -297,8 +308,15 @@ class SyncEngine: ObservableObject {
         )
 
         // Create post-sync backup with actual final state.
-        // Gated on AppSettings.autoBackupEnabled — same as the pre-sync snapshot.
-        if AppSettings.shared.autoBackupEnabled, let syncSessionId = session.syncSessionId {
+        //
+        // Also gated on something actually having been written: this re-fetches
+        // *both* address books in full, so running it after a no-op sync was the
+        // single most expensive thing an idle scheduled sync did — two complete
+        // fetches to snapshot a state identical to the one already on disk.
+        let wroteSomething = added + updated + deleted + merged > 0
+        if wroteSomething,
+           AppSettings.shared.autoBackupEnabled,
+           let syncSessionId = session.syncSessionId {
             do {
                 let googleContacts = try await googleConnector.fetchAllContacts()
                 // Off the main actor: see fetchAllContactsOffMainActor. Driving
