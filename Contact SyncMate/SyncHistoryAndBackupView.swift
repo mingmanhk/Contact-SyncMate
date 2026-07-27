@@ -83,6 +83,33 @@ struct SyncHistoryAndBackupView: View {
                 )
             }
         }
+        // The outcome was previously never shown: restoreSuccess and restoreError
+        // were published and nothing observed them, so a restore — the operation
+        // a user reaches for after losing data — gave no confirmation either way.
+        .alert("Contacts restored", isPresented: $viewModel.restoreSuccess) {
+            Button("OK") { viewModel.restoreSuccess = false }
+        } message: {
+            Text("Your contacts were rolled back to the selected backup.")
+        }
+        .alert("Restore incomplete",
+               isPresented: .constant(viewModel.restoreError != nil)) {
+            Button("OK") { viewModel.restoreError = nil }
+        } message: {
+            Text(viewModel.restoreError?.localizedDescription ?? "")
+        }
+        .overlay {
+            if viewModel.isRestoring {
+                // A restore rewrites the address book; blocking input while it
+                // runs prevents a second restore being started on top of it.
+                ZStack {
+                    Color.black.opacity(0.2).ignoresSafeArea()
+                    ProgressView("Restoring contacts…")
+                        .padding(24)
+                        .background(.regularMaterial,
+                                    in: RoundedRectangle(cornerRadius: 12))
+                }
+            }
+        }
     }
 }
 

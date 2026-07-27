@@ -610,6 +610,12 @@ T = {
     "OK": "好",
     "%lld failed": "%lld 項失敗",
     "No changes yet.": "尚無變更。",
+    "Contacts restored": "聯絡人已還原",
+    "Your contacts were rolled back to the selected backup.": "你的聯絡人已回復到所選備份的狀態。",
+    "Restore incomplete": "還原未完成",
+    "Restoring contacts…": "正在還原聯絡人…",
+    "Restored %lld contacts, but %lld could not be restored: %@":
+        "已還原 %1$lld 位聯絡人,但有 %2$lld 位無法還原：%3$@",
     "Clear Log…": "清除記錄…",
     "Delete All Events": "刪除所有事件",
     "Clear the sync log?": "要清除同步記錄嗎？",

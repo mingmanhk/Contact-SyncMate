@@ -61,27 +61,69 @@ class SyncHistoryViewModel: ObservableObject {
         loadHistory()
     }
 
+    /// Roll both address books back to the state captured in `backup`.
+    ///
+    /// This used to log "restore_backup_initiated" and then set
+    /// `restoreSuccess = true` without touching a single contact — so a user who
+    /// had just lost data would be told the restore worked when nothing had
+    /// happened. It now drives `SyncEngine.rollbackToBackup`, the real
+    /// implementation, and reports what actually succeeded.
     func restoreBackup(_ backup: BackupSession) {
         isRestoring = true
         restoreError = nil
         restoreSuccess = false
 
-        Task {
-            // This would integrate with your SyncEngine
-            // For now, we just log the action
-            SyncHistory.shared.log(
-                source: "SyncHistoryViewModel",
-                action: "restore_backup_initiated",
-                details: "Backup \(backup.id) - \(backup.contactVersions.count) contacts"
+        Task { @MainActor in
+            defer { isRestoring = false }
+
+            let engine = SyncEngine(
+                googleConnector: GoogleContactsConnector(),
+                macConnector: MacContactsConnector(),
+                mappingStore: ContactMappingStore()
             )
 
-            await MainActor.run {
-                self.isRestoring = false
-                self.restoreSuccess = true
+            do {
+                let result = try await engine.rollbackToBackup(backupId: backup.id)
+
+                // A partial restore is not a success. Saying so is the whole
+                // point of a restore feature: the user needs to know which
+                // contacts did not come back.
+                if result.failed.isEmpty {
+                    restoreSuccess = true
+                } else {
+                    let names = result.failed.prefix(3).map(\.name).joined(separator: ", ")
+                    let more = result.failed.count > 3 ? " and \(result.failed.count - 3) more" : ""
+                    restoreError = RestoreError.partial(
+                        restored: result.restored,
+                        failed: result.failed.count,
+                        detail: "\(names)\(more)"
+                    )
+                }
+            } catch {
+                restoreError = error
+                SyncHistory.shared.log(source: "SyncHistoryViewModel",
+                                       action: "restore.failed",
+                                       details: error.localizedDescription)
             }
 
-            // Refresh after restore
             loadHistory()
+        }
+    }
+
+    enum RestoreError: LocalizedError {
+        case partial(restored: Int, failed: Int, detail: String)
+
+        var errorDescription: String? {
+            switch self {
+            case let .partial(restored, failed, detail):
+                return String(
+                    format: NSLocalizedString(
+                        "Restored %lld contacts, but %lld could not be restored: %@",
+                        comment: "Partial backup restore result"
+                    ),
+                    restored, failed, detail
+                )
+            }
         }
     }
 

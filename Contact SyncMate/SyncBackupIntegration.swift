@@ -12,6 +12,7 @@
 //
 
 import Foundation
+@preconcurrency import Contacts
 import Combine
 
 // MARK: - Enhanced Sync Session with Backup Reference
@@ -122,18 +123,33 @@ extension SyncEngine {
                 )
             }
             do {
-                let macContact = ContactMapper.toMac(from: unified)
-                if unified.macContactIdentifier != nil {
-                    // CNMutableContact preserves the identifier when present;
-                    // updateContact will throw if the identifier is no longer
-                    // valid, in which case we save as new.
-                    do {
-                        try macConnector.updateContact(macContact)
-                    } catch {
-                        try macConnector.saveContact(macContact)
+                // Fetch the live record and mutate *that*, rather than mapping the
+                // snapshot into a fresh CNMutableContact.
+                //
+                // The previous code assumed "CNMutableContact preserves the
+                // identifier when present" — it does not. `ContactMapper.toMac`
+                // allocates a new `CNMutableContact()`, which has a new identifier,
+                // so `updateContact` could never match an existing record and every
+                // contact fell through to `saveContact`. Combined with the snapshot
+                // bug that left `macContactIdentifier` nil, a restore duplicated the
+                // entire address book instead of reverting it.
+                let connector = macConnector
+                let existing = try unified.macContactIdentifier.flatMap {
+                    try macConnector.fetchContact(withIdentifier: $0)
+                }
+
+                if let existing {
+                    let mutable = existing.mutableCopy() as! CNMutableContact
+                    ContactMapper.applyToMac(from: unified, to: mutable)
+                    try await MacContactsConnector.performWriteOffMain {
+                        try connector.updateContactSync(mutable)
                     }
                 } else {
-                    try macConnector.saveContact(macContact)
+                    // The contact was deleted since the backup — recreate it.
+                    let macContact = ContactMapper.toMac(from: unified)
+                    try await MacContactsConnector.performWriteOffMain {
+                        try connector.saveContactSync(macContact, to: nil)
+                    }
                 }
                 restoredCount += 1
             } catch {

@@ -49,6 +49,37 @@ struct ContactSnapshot: Codable {
     let imageData: Data? // Optional photo
     let customFields: [String: String]
 
+    // MARK: Fields added after the first release
+    //
+    // A snapshot is only as good as what it captured: these were missing, so a
+    // restore pushed empty values for them — and because the Google update mask
+    // includes urls, birthdays and nicknames, restoring actively *erased* those
+    // fields from every contact it touched.
+    //
+    // All optional so backups written by earlier builds still decode: Swift's
+    // synthesised Codable treats a missing key for an Optional as nil rather
+    // than a decoding failure.
+    let namePrefix: String?
+    let nameSuffix: String?
+    let nickname: String?
+    let phoneticGivenName: String?
+    let phoneticMiddleName: String?
+    let phoneticFamilyName: String?
+    let department: String?
+    let urls: [URLSnapshot]?
+    let birthday: DateComponents?
+
+    /// Identifier on the *other* side, when the contact was linked at capture
+    /// time. Lets a restore put a Mac contact back by its Mac identifier instead
+    /// of guessing — see `snapshotToUnifiedContact`.
+    let googleResourceName: String?
+    let macContactIdentifier: String?
+
+    struct URLSnapshot: Codable, Equatable {
+        let label: String?
+        let value: String
+    }
+
     struct PhoneSnapshot: Codable, Equatable {
         let label: String?
         let value: String
@@ -283,7 +314,9 @@ class ContactBackupManager: ObservableObject {
     /// Restore a specific contact version
     func restoreContactVersion(_ version: ContactVersion) -> UnifiedContact? {
         // Convert ContactSnapshot back to UnifiedContact
-        return snapshotToUnifiedContact(version.data, identifier: version.contactIdentifier)
+        return snapshotToUnifiedContact(version.data,
+                                        identifier: version.contactIdentifier,
+                                        source: version.source)
     }
 
     /// Restore entire backup session (returns all contacts as they were)
@@ -294,7 +327,9 @@ class ContactBackupManager: ObservableObject {
         var macContacts: [UnifiedContact] = []
 
         for version in session.contactVersions {
-            if let unified = snapshotToUnifiedContact(version.data, identifier: version.contactIdentifier) {
+            if let unified = snapshotToUnifiedContact(version.data,
+                                                      identifier: version.contactIdentifier,
+                                                      source: version.source) {
                 if version.source == .google {
                     googleContacts.append(unified)
                 } else {
@@ -424,26 +459,58 @@ class ContactBackupManager: ObservableObject {
             jobTitle: contact.jobTitle,
             notes: contact.note,
             imageData: contact.photoData,
-            customFields: [:]
+            customFields: [:],
+            namePrefix: contact.namePrefix,
+            nameSuffix: contact.nameSuffix,
+            nickname: contact.nickname,
+            phoneticGivenName: contact.phoneticGivenName,
+            phoneticMiddleName: contact.phoneticMiddleName,
+            phoneticFamilyName: contact.phoneticFamilyName,
+            department: contact.department,
+            urls: contact.urls.map { ContactSnapshot.URLSnapshot(label: $0.label, value: $0.value) },
+            birthday: contact.birthday,
+            // Both identifiers are captured so a restore can target the exact
+            // record on each side rather than creating a new one.
+            googleResourceName: contact.googleResourceName,
+            macContactIdentifier: contact.macContactIdentifier
         )
     }
 
-    private func snapshotToUnifiedContact(_ snapshot: ContactSnapshot, identifier: String) -> UnifiedContact? {
+    /// Rebuild a contact from a snapshot, targeting the record it came from.
+    ///
+    /// `source` matters: this used to hardcode `googleResourceName: identifier,
+    /// macContactIdentifier: nil` for *both* sources, so a restored Mac contact
+    /// arrived with no Mac identifier. The rollback then took the "no existing
+    /// record" branch and created a new one — turning a restore into a full
+    /// duplication of the address book.
+    ///
+    /// Prefers the identifiers captured in the snapshot and falls back to
+    /// `identifier` + `source` for backups written before those were stored.
+    private func snapshotToUnifiedContact(
+        _ snapshot: ContactSnapshot,
+        identifier: String,
+        source: ContactVersion.ContactSource
+    ) -> UnifiedContact? {
+        let googleID = snapshot.googleResourceName
+            ?? (source == .mac ? nil : identifier)
+        let macID = snapshot.macContactIdentifier
+            ?? (source == .mac ? identifier : nil)
+
         return UnifiedContact(
             id: UUID(),
-            googleResourceName: identifier,
-            macContactIdentifier: nil,
+            googleResourceName: googleID,
+            macContactIdentifier: macID,
             givenName: snapshot.givenName,
             middleName: snapshot.middleName,
             familyName: snapshot.familyName,
-            namePrefix: nil,
-            nameSuffix: nil,
-            nickname: nil,
-            phoneticGivenName: nil,
-            phoneticMiddleName: nil,
-            phoneticFamilyName: nil,
+            namePrefix: snapshot.namePrefix,
+            nameSuffix: snapshot.nameSuffix,
+            nickname: snapshot.nickname,
+            phoneticGivenName: snapshot.phoneticGivenName,
+            phoneticMiddleName: snapshot.phoneticMiddleName,
+            phoneticFamilyName: snapshot.phoneticFamilyName,
             organizationName: snapshot.organization,
-            department: nil,
+            department: snapshot.department,
             jobTitle: snapshot.jobTitle,
             phoneNumbers: snapshot.phoneNumbers.map { UnifiedContact.PhoneNumber(value: $0.value, label: $0.label) },
             emailAddresses: snapshot.emailAddresses.map { UnifiedContact.EmailAddress(value: $0.value, label: $0.label) },
@@ -456,8 +523,8 @@ class ContactBackupManager: ObservableObject {
                 countryCode: nil,
                 label: $0.label
             )},
-            urls: [],
-            birthday: nil,
+            urls: (snapshot.urls ?? []).map { UnifiedContact.Url(value: $0.value, label: $0.label) },
+            birthday: snapshot.birthday,
             note: snapshot.notes,
             photoData: snapshot.imageData,
             lastModified: Date()
