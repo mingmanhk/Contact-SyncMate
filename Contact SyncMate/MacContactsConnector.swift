@@ -269,6 +269,24 @@ class MacContactsConnector: ObservableObject {
         }
     }
 
+    /// `deleteContact` callable from the write queue. See `saveContactSync`.
+    nonisolated func deleteContactSync(withIdentifier identifier: String) throws {
+        guard let existing = try fetchContactSync(withIdentifier: identifier) else { return }
+
+        let request = CNSaveRequest()
+        request.delete(existing.mutableCopy() as! CNMutableContact)
+
+        do {
+            try Self.shared.execute(request)
+            SyncHistory.shared.log(source: "MacContacts", action: "deleteContact",
+                                   details: "id=\(identifier)")
+        } catch {
+            SyncHistory.shared.log(source: "MacContacts", action: "deleteContact.failed",
+                                   details: Self.diagnose(error))
+            throw error
+        }
+    }
+
     /// `updateContact` callable from the write queue. See `saveContactSync`.
     /// `fetchContact` callable from the write queue.
     ///

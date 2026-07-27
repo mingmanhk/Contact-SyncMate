@@ -7815,6 +7815,74 @@
           }
         }
       }
+    },
+    "Delete contacts added since this backup": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刪除此備份之後新增的聯絡人"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除此备份之后添加的联系人"
+          }
+        }
+      }
+    },
+    "Both address books will match this backup exactly. Contacts created after it — including any a faulty sync added — will be deleted.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "兩邊通訊錄將與此備份完全一致。之後建立的聯絡人 —— 包括錯誤同步所新增的 —— 都會被刪除。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "两边通讯录将与此备份完全一致。之后建立的联系人 —— 包括错误同步所添加的 —— 都会被删除。"
+          }
+        }
+      }
+    },
+    "Contacts created after this backup will be kept. Use this if you only want to recover changed or deleted contacts.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此備份之後建立的聯絡人會保留。若你只想復原被修改或刪除的聯絡人,請用這個選項。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此备份之后建立的联系人会保留。若你只想复原被修改或删除的联系人,请用这个选项。"
+          }
+        }
+      }
+    },
+    "A safety snapshot of the current state is taken first, so this restore can itself be undone.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系統會先為目前狀態建立安全快照,因此這次還原本身也可以復原。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系统会先为目前状态建立安全快照,因此这次还原本身也可以复原。"
+          }
+        }
+      }
     }
   },
   "version": "1.1"

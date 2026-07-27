@@ -615,6 +615,13 @@ T = {
     "waiting for an unmetered network": "等待非計量網路",
     "waiting until the Mac is idle": "等待 Mac 閒置",
     "Unnamed contact": "未命名聯絡人",
+    "Delete contacts added since this backup": "刪除此備份之後新增的聯絡人",
+    "Both address books will match this backup exactly. Contacts created after it — including any a faulty sync added — will be deleted.":
+        "兩邊通訊錄將與此備份完全一致。之後建立的聯絡人 —— 包括錯誤同步所新增的 —— 都會被刪除。",
+    "Contacts created after this backup will be kept. Use this if you only want to recover changed or deleted contacts.":
+        "此備份之後建立的聯絡人會保留。若你只想復原被修改或刪除的聯絡人,請用這個選項。",
+    "A safety snapshot of the current state is taken first, so this restore can itself be undone.":
+        "系統會先為目前狀態建立安全快照,因此這次還原本身也可以復原。",
     "Contacts restored": "聯絡人已還原",
     "Your contacts were rolled back to the selected backup.": "你的聯絡人已回復到所選備份的狀態。",
     "Restore incomplete": "還原未完成",

@@ -68,7 +68,8 @@ class SyncHistoryViewModel: ObservableObject {
     /// had just lost data would be told the restore worked when nothing had
     /// happened. It now drives `SyncEngine.rollbackToBackup`, the real
     /// implementation, and reports what actually succeeded.
-    func restoreBackup(_ backup: BackupSession) {
+    func restoreBackup(_ backup: BackupSession,
+                       extras: SyncEngine.ExtraContactPolicy = .keep) {
         isRestoring = true
         restoreError = nil
         restoreSuccess = false
@@ -83,11 +84,18 @@ class SyncHistoryViewModel: ObservableObject {
             )
 
             do {
-                let result = try await engine.rollbackToBackup(backupId: backup.id)
+                let result = try await engine.rollbackToBackup(backupId: backup.id,
+                                                              extras: extras)
 
                 // A partial restore is not a success. Saying so is the whole
                 // point of a restore feature: the user needs to know which
                 // contacts did not come back.
+                SyncHistory.shared.log(
+                    source: "SyncHistoryViewModel",
+                    action: "restore.finished",
+                    details: "restored \(result.restored), removed \(result.removed), failed \(result.failed.count)"
+                )
+
                 if result.failed.isEmpty {
                     restoreSuccess = true
                 } else {

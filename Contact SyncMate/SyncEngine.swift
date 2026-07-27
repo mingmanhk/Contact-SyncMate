@@ -20,7 +20,10 @@ private extension String {
 }
 
 /// Map a generic label string to a CNLabel constant where possible
-private func cnLabelFromString(_ label: String?) -> String? {
+///
+/// `nonisolated`: a pure lookup over constants, called from the Contacts write
+/// queue via `applyToMac`.
+private nonisolated func cnLabelFromString(_ label: String?) -> String? {
     guard let label = label?.lowercased() else { return nil }
     switch label {
     case "home":   return CNLabelHome
@@ -1386,7 +1389,11 @@ enum ContactMapper {
 
     /// Apply fields from a UnifiedContact onto an existing CNMutableContact (for updates)
     /// Preserves the contact's identifier — only overwrites changed fields.
-    static func applyToMac(from unified: UnifiedContact, to mac: CNMutableContact) {
+    ///
+    /// `nonisolated`: pure field copying with no shared state, and it has to run
+    /// on the Contacts write queue — hopping to the main actor mid-write would
+    /// reintroduce the priority inversion the queue exists to avoid.
+    nonisolated static func applyToMac(from unified: UnifiedContact, to mac: CNMutableContact) {
         if let v = unified.givenName          { mac.givenName          = v }
         if let v = unified.middleName         { mac.middleName         = v }
         if let v = unified.familyName         { mac.familyName         = v }

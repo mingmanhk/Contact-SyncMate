@@ -33,8 +33,21 @@ extension SyncEngine {
     /// Result of a rollback operation.
     struct RollbackResult {
         let restored: Int
+        /// Contacts deleted because they did not exist in the backup.
+        let removed: Int
         let failed: [(name: String, error: String)]
         var successful: Bool { failed.isEmpty }
+    }
+
+    /// What a rollback does about contacts added since the backup was taken.
+    enum ExtraContactPolicy {
+        /// Leave them. Safe, but the result is a *merge* of the backup and the
+        /// current state, not the state the backup captured.
+        case keep
+        /// Delete them, so both address books end up exactly as the snapshot
+        /// recorded. This is what "revert to this backup" normally means, and it
+        /// is the only option that undoes contacts a bad sync created.
+        case remove
     }
 
     /// Rollback to a previous backup state.
@@ -48,12 +61,17 @@ extension SyncEngine {
     ///   • For each Mac contact in the backup, look up by
     ///     `macContactIdentifier`; update if present, create otherwise.
     ///
-    /// **Limitation:** This does NOT delete contacts that were *added*
-    ///  after the backup was taken (it cannot tell new vs. moved). To do a
-    ///  full delete-on-rollback you would diff the current snapshot against
-    ///  the backup snapshot and issue deletes for the difference; that is
-    ///  intentionally not done here to avoid destructive surprises.
-    func rollbackToBackup(backupId: String) async throws -> RollbackResult {
+    /// With `extras == .remove`, contacts absent from the backup are deleted, so
+    /// both sides end up exactly as the snapshot recorded. Without it, a rollback
+    /// cannot undo contacts a bad sync created — which is the main reason anyone
+    /// reaches for a backup in the first place.
+    ///
+    /// A fresh safety backup is taken before anything is written, so the rollback
+    /// itself can be rolled back.
+    func rollbackToBackup(
+        backupId: String,
+        extras: ExtraContactPolicy = .keep
+    ) async throws -> RollbackResult {
         guard !isRunning else {
             throw SyncEngineError.syncAlreadyInProgress
         }
@@ -61,6 +79,20 @@ extension SyncEngine {
         guard let restored = ContactBackupManager.shared.restoreBackupSession(id: backupId) else {
             throw SyncEngineError.backupNotFound
         }
+
+        // Snapshot the current state first. Restoring is destructive — especially
+        // with `.remove` — and the user must be able to get back to where they
+        // were if the backup turns out to be the wrong one.
+        let liveGoogle = try await googleConnector.fetchAllContacts()
+        let liveMac = try await macConnector.fetchAllContactsOffMainActor()
+        let liveGoogleUnified = liveGoogle.map { ContactMapper.toUnified(from: $0) }
+        let liveMacUnified = liveMac.map { ContactMapper.toUnified(from: $0) }
+
+        _ = try? await ContactBackupManager.shared.createManualBackup(
+            googleContacts: liveGoogleUnified,
+            macContacts: liveMacUnified,
+            customNotes: "Safety snapshot taken before restoring backup \(backupId)"
+        )
 
         await MainActor.run {
             isRunning = true
@@ -157,14 +189,53 @@ extension SyncEngine {
             }
         }
 
+        // ── Remove contacts the backup does not contain ────────────────
+        //
+        // Without this a "restore" is really a merge: everything a bad sync added
+        // survives it. Matching is by identifier — the same one the backup stored
+        // — so a contact is only deleted when it demonstrably was not part of the
+        // snapshot.
+        var removedCount = 0
+
+        if case .remove = extras {
+            let backupGoogleIDs = Set(restored.google.compactMap(\.googleResourceName))
+            let backupMacIDs = Set(restored.mac.compactMap(\.macContactIdentifier))
+
+            for contact in liveGoogleUnified {
+                guard let gID = contact.googleResourceName,
+                      !backupGoogleIDs.contains(gID) else { continue }
+                do {
+                    try await googleConnector.deleteContact(resourceName: gID)
+                    mappingStore.deleteMapping(googleResourceName: gID)
+                    removedCount += 1
+                } catch {
+                    failed.append((contact.displayName, error.localizedDescription))
+                }
+            }
+
+            let connector = macConnector
+            for contact in liveMacUnified {
+                guard let mID = contact.macContactIdentifier,
+                      !backupMacIDs.contains(mID) else { continue }
+                do {
+                    try await MacContactsConnector.performWriteOffMain {
+                        try connector.deleteContactSync(withIdentifier: mID)
+                    }
+                    removedCount += 1
+                } catch {
+                    failed.append((contact.displayName, error.localizedDescription))
+                }
+            }
+        }
+
         // Log outcome
         SyncHistory.shared.log(
             source: "SyncEngine",
             action: failed.isEmpty ? "rollback.success" : "rollback.partial",
-            details: "Backup \(backupId): restored \(restoredCount), failed \(failed.count)"
+            details: "Backup \(backupId): restored \(restoredCount), removed \(removedCount), failed \(failed.count)"
         )
 
-        return RollbackResult(restored: restoredCount, failed: failed)
+        return RollbackResult(restored: restoredCount, removed: removedCount, failed: failed)
     }
 }
 

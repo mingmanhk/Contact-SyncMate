@@ -16,6 +16,10 @@ struct SyncHistoryAndBackupView: View {
     @StateObject private var viewModel = SyncHistoryViewModel()
     @State private var selectedBackup: BackupSession?
     @State private var showRestoreConfirmation = false
+    /// Off by default: deleting is irreversible from the user's point of view,
+    /// so it should be a deliberate choice rather than something that happens
+    /// because they clicked through a dialog.
+    @State private var removeContactsAddedSinceBackup = false
     @State private var selectedTab: HistoryTab = .timeline
 
     enum HistoryTab {
@@ -79,7 +83,13 @@ struct SyncHistoryAndBackupView: View {
                 RestoreBackupConfirmationView(
                     backup: backup,
                     isPresented: $showRestoreConfirmation,
-                    onRestore: { viewModel.restoreBackup(backup) }
+                    onRestore: {
+                        viewModel.restoreBackup(
+                            backup,
+                            extras: removeContactsAddedSinceBackup ? .remove : .keep
+                        )
+                    },
+                    removeExtras: $removeContactsAddedSinceBackup
                 )
             }
         }

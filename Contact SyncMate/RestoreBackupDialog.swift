@@ -13,6 +13,7 @@ struct RestoreBackupConfirmationView: View {
     let backup: BackupSession
     @Binding var isPresented: Bool
     let onRestore: () -> Void
+    @Binding var removeExtras: Bool
 
     @State private var isRestoring = false
     @State private var showBackupDetails = false
@@ -46,6 +47,31 @@ struct RestoreBackupConfirmationView: View {
                 // Content
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
+                        // Without this the restore is a merge, not a revert:
+                        // anything added since the backup survives it, so a
+                        // rollback cannot undo contacts a bad sync created —
+                        // which is usually the whole reason for restoring.
+                        VStack(alignment: .leading, spacing: 6) {
+                            Toggle("Delete contacts added since this backup",
+                                   isOn: $removeExtras)
+                                .toggleStyle(.checkbox)
+
+                            Text(removeExtras
+                                 ? "Both address books will match this backup exactly. Contacts created after it — including any a faulty sync added — will be deleted."
+                                 : "Contacts created after this backup will be kept. Use this if you only want to recover changed or deleted contacts.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(12)
+                        .background(Color.appSurfaceTinted)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                        Text("A safety snapshot of the current state is taken first, so this restore can itself be undone.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+
                         // Warning
                         VStack(spacing: 8) {
                             HStack(spacing: 12) {
@@ -402,7 +428,8 @@ struct RestoreBackupConfirmationView_Previews: PreviewProvider {
         RestoreBackupConfirmationView(
             backup: sampleBackup,
             isPresented: .constant(true),
-            onRestore: {}
+            onRestore: {},
+            removeExtras: .constant(false)
         )
     }
 }
