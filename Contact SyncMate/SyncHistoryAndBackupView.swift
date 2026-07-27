@@ -25,6 +25,10 @@ struct SyncHistoryAndBackupView: View {
     enum HistoryTab {
         case timeline
         case backups
+        /// Per-contact version history — separate from `backups` because
+        /// restoring one person is a much smaller decision than rolling both
+        /// address books back to a snapshot.
+        case contactVersions
         case statistics
     }
 
@@ -50,6 +54,7 @@ struct SyncHistoryAndBackupView: View {
                 Picker("View", selection: $selectedTab) {
                     Text("Timeline").tag(HistoryTab.timeline)
                     Text("Backups").tag(HistoryTab.backups)
+                    Text("Contacts").tag(HistoryTab.contactVersions)
                     Text("Stats").tag(HistoryTab.statistics)
                 }
                 .pickerStyle(.segmented)
@@ -68,6 +73,9 @@ struct SyncHistoryAndBackupView: View {
                     selectedBackup: $selectedBackup,
                     showRestoreConfirmation: $showRestoreConfirmation
                 )
+
+            case .contactVersions:
+                ContactVersionHistoryView()
 
             case .statistics:
                 BackupStatisticsView(backupManager: backupManager)

@@ -24,6 +24,23 @@
         }
       }
     },
+    "%@ was restored to version %lld.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 已还原至版本 %2$lld。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 已還原至版本 %2$lld。"
+          }
+        }
+      }
+    },
     "%@ • %@": {
       "localizations": {
         "en": {
@@ -421,6 +438,28 @@
         }
       }
     },
+    "%lld versions · %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$lld versions · %2$@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld 個版本 · %2$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld 个版本 · %2$@"
+          }
+        }
+      }
+    },
     "%lld%%": {
       "localizations": {
         "zh-Hans": {
@@ -562,6 +601,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "90 天"
+          }
+        }
+      }
+    },
+    "A safety snapshot of the current state is taken first, so this restore can itself be undone.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系统会先为目前状态建立安全快照,因此这次还原本身也可以复原。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系統會先為目前狀態建立安全快照,因此這次還原本身也可以復原。"
           }
         }
       }
@@ -1497,6 +1553,23 @@
         }
       }
     },
+    "Both address books will match this backup exactly. Contacts created after it — including any a faulty sync added — will be deleted.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "两边通讯录将与此备份完全一致。之后建立的联系人 —— 包括错误同步所添加的 —— 都会被删除。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "兩邊通訊錄將與此備份完全一致。之後建立的聯絡人 —— 包括錯誤同步所新增的 —— 都會被刪除。"
+          }
+        }
+      }
+    },
     "CSV…": {
       "localizations": {
         "zh-Hans": {
@@ -2219,6 +2292,22 @@
         }
       }
     },
+    "Contact restored": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "聯絡人已還原"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "联系人已还原"
+          }
+        }
+      }
+    },
     "Contact updated": {
       "extractionState": "manual",
       "localizations": {
@@ -2232,6 +2321,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "已更新聯絡人"
+          }
+        }
+      }
+    },
+    "Contacts": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "联系人"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "聯絡人"
+          }
+        }
+      }
+    },
+    "Contacts created after this backup will be kept. Use this if you only want to recover changed or deleted contacts.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此备份之后建立的联系人会保留。若你只想复原被修改或删除的联系人,请用这个选项。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此備份之後建立的聯絡人會保留。若你只想復原被修改或刪除的聯絡人,請用這個選項。"
           }
         }
       }
@@ -2282,6 +2405,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "已合併聯絡人"
+          }
+        }
+      }
+    },
+    "Contacts restored": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "联系人已还原"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "聯絡人已還原"
           }
         }
       }
@@ -2353,6 +2493,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "無法匯出記錄"
+          }
+        }
+      }
+    },
+    "Couldn't restore the contact": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法还原此联系人"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法還原此聯絡人"
           }
         }
       }
@@ -2516,6 +2673,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "刪除所有事件"
+          }
+        }
+      }
+    },
+    "Delete contacts added since this backup": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除此备份之后添加的联系人"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刪除此備份之後新增的聯絡人"
           }
         }
       }
@@ -3232,6 +3406,23 @@
         }
       }
     },
+    "Google access has expired. Please sign in again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 授权已过期,请重新登录。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 授權已過期,請重新登入。"
+          }
+        }
+      }
+    },
     "Google account is not connected. Open Contact SyncMate → Settings → Accounts to sign in.": {
       "localizations": {
         "zh-Hans": {
@@ -3458,6 +3649,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "評分機制說明"
+          }
+        }
+      }
+    },
+    "Import Backup": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入备份"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "匯入備份"
+          }
+        }
+      }
+    },
+    "Import Backup File…": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入备份文件…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "匯入備份檔案…"
           }
         }
       }
@@ -3702,6 +3927,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "淺色"
+          }
+        }
+      }
+    },
+    "Load a backup previously exported from Contact SyncMate": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "载入先前从 Contact SyncMate 导出的备份"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "載入先前從 Contact SyncMate 匯出的備份"
           }
         }
       }
@@ -4384,6 +4626,23 @@
         }
       }
     },
+    "No contacts match your search.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有符合搜寻的联系人。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有符合搜尋的聯絡人。"
+          }
+        }
+      }
+    },
     "No groups selected — the filter matches nothing. Select at least one group or label, or turn filtering off.": {
       "localizations": {
         "zh-Hans": {
@@ -4428,6 +4687,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "尚無同步記錄"
+          }
+        }
+      }
+    },
+    "No version history yet. It builds up as syncs create backups.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚无版本记录。随着同步建立备份会逐步累积。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚無版本記錄。隨著同步建立備份會逐步累積。"
           }
         }
       }
@@ -5486,6 +5762,23 @@
         }
       }
     },
+    "Restore This Version": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还原此版本"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "還原此版本"
+          }
+        }
+      }
+    },
     "Restore from Backup": {
       "localizations": {
         "zh-Hans": {
@@ -5498,6 +5791,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "從備份還原"
+          }
+        }
+      }
+    },
+    "Restore incomplete": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还原未完成"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "還原未完成"
+          }
+        }
+      }
+    },
+    "Restored %lld contacts, but %lld could not be restored: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已还原 %1$lld 位联系人,但有 %2$lld 位无法还原：%3$@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已還原 %1$lld 位聯絡人,但有 %2$lld 位無法還原：%3$@"
+          }
+        }
+      }
+    },
+    "Restoring contacts…": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在还原联系人…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在還原聯絡人…"
           }
         }
       }
@@ -5842,6 +6186,23 @@
         }
       }
     },
+    "Search contacts": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜寻联系人"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜尋聯絡人"
+          }
+        }
+      }
+    },
     "Search history": {
       "localizations": {
         "zh-Hans": {
@@ -5902,6 +6263,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "選擇聯絡人帳號"
+          }
+        }
+      }
+    },
+    "Select a contact to see its saved versions": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择联系人以查看其已保存的版本"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選擇聯絡人以查看其已儲存的版本"
           }
         }
       }
@@ -7176,6 +7554,23 @@
         }
       }
     },
+    "Unnamed contact": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未命名联系人"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未命名聯絡人"
+          }
+        }
+      }
+    },
     "Use monochrome menu bar icon": {
       "localizations": {
         "zh-Hans": {
@@ -7258,7 +7653,6 @@
       }
     },
     "Version %lld": {
-      "extractionState": "stale",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -7500,6 +7894,23 @@
         }
       }
     },
+    "Your contacts were rolled back to the selected backup.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你的联系人已回复到所选备份的状态。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你的聯絡人已回復到所選備份的狀態。"
+          }
+        }
+      }
+    },
     "Your decision:": {
       "localizations": {
         "zh-Hans": {
@@ -7560,6 +7971,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "sk-ant-…"
+          }
+        }
+      }
+    },
+    "waiting for AC power": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待接上电源"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待接上電源"
+          }
+        }
+      }
+    },
+    "waiting for an unmetered network": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待非计量网络"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待非計量網路"
+          }
+        }
+      }
+    },
+    "waiting until the Mac is idle": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待 Mac 闲置"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待 Mac 閒置"
           }
         }
       }
@@ -7642,295 +8104,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "繁體中文"
-          }
-        }
-      }
-    },
-    "Contacts restored": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "聯絡人已還原"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "联系人已还原"
-          }
-        }
-      }
-    },
-    "Your contacts were rolled back to the selected backup.": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "你的聯絡人已回復到所選備份的狀態。"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "你的联系人已回复到所选备份的状态。"
-          }
-        }
-      }
-    },
-    "Restore incomplete": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "還原未完成"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "还原未完成"
-          }
-        }
-      }
-    },
-    "Restoring contacts…": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在還原聯絡人…"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在还原联系人…"
-          }
-        }
-      }
-    },
-    "Restored %lld contacts, but %lld could not be restored: %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已還原 %1$lld 位聯絡人,但有 %2$lld 位無法還原：%3$@"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已还原 %1$lld 位联系人,但有 %2$lld 位无法还原：%3$@"
-          }
-        }
-      }
-    },
-    "Google access has expired. Please sign in again.": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Google 授權已過期,請重新登入。"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Google 授权已过期,请重新登录。"
-          }
-        }
-      }
-    },
-    "waiting for AC power": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "等待接上電源"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "等待接上电源"
-          }
-        }
-      }
-    },
-    "waiting for an unmetered network": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "等待非計量網路"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "等待非计量网络"
-          }
-        }
-      }
-    },
-    "waiting until the Mac is idle": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "等待 Mac 閒置"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "等待 Mac 闲置"
-          }
-        }
-      }
-    },
-    "Unnamed contact": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "未命名聯絡人"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "未命名联系人"
-          }
-        }
-      }
-    },
-    "Delete contacts added since this backup": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "刪除此備份之後新增的聯絡人"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "删除此备份之后添加的联系人"
-          }
-        }
-      }
-    },
-    "Both address books will match this backup exactly. Contacts created after it — including any a faulty sync added — will be deleted.": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "兩邊通訊錄將與此備份完全一致。之後建立的聯絡人 —— 包括錯誤同步所新增的 —— 都會被刪除。"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "两边通讯录将与此备份完全一致。之后建立的联系人 —— 包括错误同步所添加的 —— 都会被删除。"
-          }
-        }
-      }
-    },
-    "Contacts created after this backup will be kept. Use this if you only want to recover changed or deleted contacts.": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "此備份之後建立的聯絡人會保留。若你只想復原被修改或刪除的聯絡人,請用這個選項。"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "此备份之后建立的联系人会保留。若你只想复原被修改或删除的联系人,请用这个选项。"
-          }
-        }
-      }
-    },
-    "A safety snapshot of the current state is taken first, so this restore can itself be undone.": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "系統會先為目前狀態建立安全快照,因此這次還原本身也可以復原。"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "系统会先为目前状态建立安全快照,因此这次还原本身也可以复原。"
-          }
-        }
-      }
-    },
-    "Import Backup File…": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "匯入備份檔案…"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "导入备份文件…"
-          }
-        }
-      }
-    },
-    "Import Backup": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "匯入備份"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "导入备份"
-          }
-        }
-      }
-    },
-    "Load a backup previously exported from Contact SyncMate": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "載入先前從 Contact SyncMate 匯出的備份"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "载入先前从 Contact SyncMate 导出的备份"
           }
         }
       }

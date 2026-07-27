@@ -631,7 +631,9 @@ class MacContactsConnector: ObservableObject {
     // To re-enable Notes sync: get the entitlement approved, re-add the
     // key to the .entitlements file, and change this to `true` (or make
     // it read the entitlement at runtime).
-    static let notesFieldAvailable: Bool = false
+    /// `nonisolated`: a compile-time constant, consulted by the contact mappers
+    /// which run on the Contacts write queue.
+    nonisolated static let notesFieldAvailable: Bool = false
     
     // MARK: - Deduplication Support
     

@@ -1311,7 +1311,9 @@ enum ContactMapper {
         return google
     }
     
-    static func toMac(from unified: UnifiedContact) -> CNMutableContact {
+    /// `nonisolated` for the same reason as `applyToMac`: it is pure construction
+    /// and runs on the Contacts write queue.
+    nonisolated static func toMac(from unified: UnifiedContact) -> CNMutableContact {
         let mac = CNMutableContact()
         
         mac.givenName = unified.givenName ?? ""

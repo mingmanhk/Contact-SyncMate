@@ -143,8 +143,10 @@ class ContactBackupManager: ObservableObject {
     private var backupSessions: [BackupSession] = []
 
     private let appVersion = "1.0.0" // Should match app version
-    private let maxBackupSessions = 50 // Keep last 50 backup sessions
-    private let maxVersionsPerContact = 100
+    // Retention is driven by AppSettings.maxBackupCount (Settings → Backups →
+    // "Keep at most"). The former `maxBackupSessions`/`maxVersionsPerContact`
+    // constants disagreed with both that setting and each other, and neither was
+    // ever read — three limits, none enforced.
 
     /// UserDefaults key for custom backup directory
     private static let backupDirectoryKey = "customBackupDirectory"
@@ -159,6 +161,12 @@ class ContactBackupManager: ObservableObject {
     init() {
         customBackupPath = UserDefaults.standard.string(forKey: Self.backupDirectoryKey)
         loadBackupIndex()
+
+        // Apply retention on launch as well as after each backup: a limit lowered
+        // in Settings should take effect without waiting for the next sync, and
+        // existing installs carry files earlier builds orphaned.
+        pruneOldBackups()
+        removeOrphanedBackupFiles()
     }
 
     // MARK: - Public API
@@ -311,6 +319,37 @@ class ContactBackupManager: ObservableObject {
         return versions.sorted { $0.versionNumber < $1.versionNumber }
     }
 
+    /// Every contact that appears in any backup, newest name first.
+    ///
+    /// Version history was captured from the very first release but there was no
+    /// way to browse it: `getVersionHistory` needs an identifier, and nothing in
+    /// the app ever offered a list to pick one from.
+    func allVersionedContacts() -> [(identifier: String, name: String, versions: Int, latest: Date)] {
+        var byIdentifier: [String: (name: String, versions: Int, latest: Date)] = [:]
+
+        backupQueue.sync {
+            for session in backupSessions {
+                for version in session.contactVersions {
+                    let existing = byIdentifier[version.contactIdentifier]
+                    let isNewer = existing.map { version.timestamp > $0.latest } ?? true
+                    byIdentifier[version.contactIdentifier] = (
+                        // Keep the most recent name: a contact renamed since the
+                        // first backup should be findable under what it is called
+                        // now, not what it used to be.
+                        name: isNewer ? version.contactName : (existing?.name ?? version.contactName),
+                        versions: (existing?.versions ?? 0) + 1,
+                        latest: max(existing?.latest ?? .distantPast, version.timestamp)
+                    )
+                }
+            }
+        }
+
+        return byIdentifier
+            .map { (identifier: $0.key, name: $0.value.name,
+                    versions: $0.value.versions, latest: $0.value.latest) }
+            .sorted { $0.latest > $1.latest }
+    }
+
     /// Restore a specific contact version
     func restoreContactVersion(_ version: ContactVersion) -> UnifiedContact? {
         // Convert ContactSnapshot back to UnifiedContact
@@ -342,14 +381,87 @@ class ContactBackupManager: ObservableObject {
     }
 
     /// Delete old backup sessions (keeps specified count)
-    func pruneOldBackups(keepCount: Int = 30) {
+    /// Drop the oldest backups beyond the user's retention limit.
+    ///
+    /// Three things were wrong before, and together they meant backups grew
+    /// without bound despite Settings promising "Older backups are pruned
+    /// automatically once this limit is reached":
+    ///
+    ///  1. Nothing ever called this.
+    ///  2. It trimmed the in-memory index but never deleted the `<id>.json`
+    ///     files, so disk use kept climbing while the app reported fewer
+    ///     backups — and `calculateEstimatedSize()` stopped counting the
+    ///     orphans, making the size shown in Settings wrong too.
+    ///  3. It used a hardcoded 30, ignoring `AppSettings.maxBackupCount`.
+    ///
+    /// Runs on the barrier queue and is safe to call after every backup.
+    func pruneOldBackups(keepCount: Int? = nil) {
+        let limit = max(1, keepCount ?? AppSettings.shared.maxBackupCount)
+
         backupQueue.async(flags: .barrier) { [weak self] in
-            guard let self = self else { return }
-            if self.backupSessions.count > keepCount {
-                let sorted = self.backupSessions.sorted { $0.timestamp > $1.timestamp }
-                self.backupSessions = Array(sorted.prefix(keepCount))
-                try? self.saveBackupIndex()
+            guard let self else { return }
+            guard self.backupSessions.count > limit else { return }
+
+            let sorted = self.backupSessions.sorted { $0.timestamp > $1.timestamp }
+            let keep = Array(sorted.prefix(limit))
+            let drop = Array(sorted.dropFirst(limit))
+
+            self.backupSessions = keep
+            try? self.saveBackupIndex()
+
+            // Delete the files too, inside the sandbox grant.
+            self.withBackupDirectory { dir in
+                for session in drop {
+                    let file = dir.appendingPathComponent("\(session.id).json")
+                    try? FileManager.default.removeItem(at: file)
+                }
             }
+
+            SyncHistory.shared.log(
+                source: "BackupManager",
+                action: "backups.pruned",
+                details: "removed \(drop.count), kept \(keep.count) (limit \(limit))"
+            )
+
+            let size = self.calculateEstimatedSize()
+            let count = self.backupSessions.count
+            DispatchQueue.main.async { [weak self] in
+                self?.backupCount = count
+                self?.totalBackupSize = size
+            }
+        }
+    }
+
+    /// Delete backup files with no entry in the index.
+    ///
+    /// Earlier builds trimmed the index without removing files, so existing
+    /// installs carry orphans that nothing will ever read. Run at launch.
+    func removeOrphanedBackupFiles() {
+        backupQueue.async(flags: .barrier) { [weak self] in
+            guard let self else { return }
+            let known = Set(self.backupSessions.map { "\($0.id).json" })
+
+            let removed = self.withBackupDirectory { dir -> Int in
+                guard let files = try? FileManager.default.contentsOfDirectory(
+                    at: dir, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
+                ) else { return 0 }
+
+                var count = 0
+                for file in files where file.pathExtension == "json"
+                    && file.lastPathComponent != "backup_index.json"
+                    && !known.contains(file.lastPathComponent) {
+                    try? FileManager.default.removeItem(at: file)
+                    count += 1
+                }
+                return count
+            }
+
+            guard removed > 0 else { return }
+            SyncHistory.shared.log(source: "BackupManager", action: "backups.orphansRemoved",
+                                   details: "\(removed) file(s) with no index entry")
+
+            let size = self.calculateEstimatedSize()
+            DispatchQueue.main.async { [weak self] in self?.totalBackupSize = size }
         }
     }
 
@@ -798,6 +910,11 @@ class ContactBackupManager: ObservableObject {
             self?.backupCount = count
             self?.totalBackupSize = size
         }
+
+        // Enforce the retention limit now that a new backup exists. Async on the
+        // barrier queue, so it runs after this write completes rather than
+        // re-entering the lock we are already holding.
+        pruneOldBackups()
     }
 
     private func saveBackupIndex() throws {

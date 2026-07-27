@@ -30,6 +30,59 @@ extension SyncSession {
 
 extension SyncEngine {
 
+    /// Restore one contact to an earlier version, on the side it came from.
+    ///
+    /// `ContactBackupManager.restoreContactVersion` only decoded the snapshot back
+    /// into a `UnifiedContact` — it wrote nothing anywhere, so per-contact history
+    /// was captured on every sync and could never be acted on. This applies it.
+    ///
+    /// Scoped to a single contact on purpose: reverting one person's details is a
+    /// far smaller decision than rolling both address books back, and it should
+    /// not require the latter.
+    @discardableResult
+    func restoreContactVersion(_ version: ContactVersion) async throws -> String {
+        guard let unified = ContactBackupManager.shared.restoreContactVersion(version) else {
+            throw SyncEngineError.missingContactData(version.contactName)
+        }
+
+        switch version.source {
+        case .google, .merged:
+            guard let gID = unified.googleResourceName?.nonBlank else {
+                throw SyncEngineError.missingContactData(version.contactName)
+            }
+            var google = GoogleContact(id: gID)
+            ContactMapper.applyToGoogle(from: unified, to: &google)
+            google.etag = googleConnector.knownETag(for: gID)
+            _ = try await googleConnector.updateContact(google)
+
+        case .mac:
+            guard let mID = unified.macContactIdentifier?.nonBlank else {
+                throw SyncEngineError.missingContactData(version.contactName)
+            }
+            let connector = macConnector
+            try await MacContactsConnector.performWriteOffMain {
+                guard let existing = try connector.fetchContactSync(withIdentifier: mID) else {
+                    // Deleted since the backup — recreate rather than fail, which
+                    // is the case where restoring a version matters most.
+                    let fresh = ContactMapper.toMac(from: unified)
+                    try connector.saveContactSync(fresh, to: nil)
+                    return
+                }
+                let mutable = existing.mutableCopy() as! CNMutableContact
+                ContactMapper.applyToMac(from: unified, to: mutable)
+                try connector.updateContactSync(mutable)
+            }
+        }
+
+        SyncHistory.shared.log(
+            source: "SyncEngine",
+            action: "contactVersion.restored",
+            details: "\(version.contactName) → version \(version.versionNumber) (\(version.source.rawValue))"
+        )
+
+        return unified.displayName
+    }
+
     /// Result of a rollback operation.
     struct RollbackResult {
         let restored: Int
