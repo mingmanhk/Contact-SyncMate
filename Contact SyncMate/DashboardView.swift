@@ -662,6 +662,8 @@ struct DashboardView: View {
                 return "Missing contact data: \(detail)"
             case .backupNotFound:
                 return "Backup not found."
+            case .batchItemRejected(let name):
+                return "Google rejected \(name). Other contacts in the same batch were unaffected."
             }
         }
 

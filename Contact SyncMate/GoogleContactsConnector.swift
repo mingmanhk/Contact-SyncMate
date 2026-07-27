@@ -389,23 +389,31 @@ class GoogleContactsConnector: ObservableObject {
     
     // MARK: - Batch Operations
     
-    func batchCreateContacts(_ contacts: [GoogleContact]) async throws -> [GoogleContact] {
+    /// Create contacts in bulk, returning one slot per input in input order.
+    ///
+    /// The result is positional and `nil` marks a create the API did not return a
+    /// person for. The caller needs that correspondence: it has to write the new
+    /// resourceName into the contact mapping, and there is no other way back from
+    /// a created person to the Mac contact it came from. Returning a compacted
+    /// array — as this used to — silently shifts every later contact onto the
+    /// wrong mapping the moment one create fails.
+    func batchCreateContacts(_ contacts: [GoogleContact]) async throws -> [GoogleContact?] {
         guard isAuthenticated else {
             throw GoogleContactsError.notAuthenticated
         }
-        
+
         // Split into chunks of 200 (API limit)
-        var results: [GoogleContact] = []
+        var results: [GoogleContact?] = []
         let chunkSize = 200
-        
+
         for chunk in stride(from: 0, to: contacts.count, by: chunkSize) {
             let endIndex = min(chunk + chunkSize, contacts.count)
             let contactChunk = Array(contacts[chunk..<endIndex])
-            
+
             let batchResult = try await batchCreateChunk(contactChunk)
             results.append(contentsOf: batchResult)
         }
-        
+
         return results
     }
     
@@ -414,7 +422,7 @@ class GoogleContactsConnector: ObservableObject {
     /// Same defect as the update path: a `PeopleAPIPerson` struct was handed to
     /// `JSONSerialization`, which only accepts foundation JSON types, so this
     /// threw before sending. `readMask` is also required by the API.
-    private func batchCreateChunk(_ contacts: [GoogleContact]) async throws -> [GoogleContact] {
+    private func batchCreateChunk(_ contacts: [GoogleContact]) async throws -> [GoogleContact?] {
         let url = URL(string: "\(baseURL)/people:batchCreateContacts")!
 
         let payload = BatchCreateRequest(
@@ -426,26 +434,43 @@ class GoogleContactsConnector: ObservableObject {
         let (data, _) = try await makeRequest(url: url, method: "POST", body: body)
         let response = try JSONDecoder().decode(BatchCreateResponse.self, from: data)
 
-        return response.people.compactMap { $0.person.flatMap { convertToPerson($0) } }
+        // createdPeople comes back in request order. Pad to the request length so
+        // a short response cannot silently misalign the caller's mapping writes.
+        var created: [GoogleContact?] = response.people.map {
+            $0.person.flatMap { convertToPerson($0) }
+        }
+        if created.count < contacts.count {
+            created += Array(repeating: nil, count: contacts.count - created.count)
+        }
+        let aligned = Array(created.prefix(contacts.count))
+        cacheETags(from: aligned.compactMap { $0 })
+        return aligned
     }
     
-    func batchUpdateContacts(_ contacts: [GoogleContact]) async throws -> [GoogleContact] {
+    /// Update contacts in bulk, keyed by resourceName.
+    ///
+    /// A map rather than an array because that is the shape the API answers in and
+    /// the shape the caller needs — it has to know *which* updates succeeded in
+    /// order to record their mappings and report the rest as failures. An
+    /// unordered array could not tell it that.
+    func batchUpdateContacts(_ contacts: [GoogleContact]) async throws -> [String: GoogleContact] {
         guard isAuthenticated else {
             throw GoogleContactsError.notAuthenticated
         }
-        
+
         // Split into chunks of 200 (API limit)
-        var results: [GoogleContact] = []
+        var results: [String: GoogleContact] = [:]
         let chunkSize = 200
-        
+
         for chunk in stride(from: 0, to: contacts.count, by: chunkSize) {
             let endIndex = min(chunk + chunkSize, contacts.count)
             let contactChunk = Array(contacts[chunk..<endIndex])
-            
-            let batchResult = try await batchUpdateChunk(contactChunk)
-            results.append(contentsOf: batchResult)
+
+            for (name, updated) in try await batchUpdateChunk(contactChunk) {
+                results[name] = updated
+            }
         }
-        
+
         return results
     }
     
@@ -460,7 +485,7 @@ class GoogleContactsConnector: ObservableObject {
     ///
     /// Encoding through `JSONEncoder` keeps the Person shape in one place
     /// (`convertToAPIPerson`) instead of duplicating it as dictionaries.
-    private func batchUpdateChunk(_ contacts: [GoogleContact]) async throws -> [GoogleContact] {
+    private func batchUpdateChunk(_ contacts: [GoogleContact]) async throws -> [String: GoogleContact] {
         // Contacts with no etag cannot be updated — People API requires it for
         // optimistic concurrency and rejects the whole batch otherwise. Resolving
         // them one by one here would defeat the point of batching, so they fall
@@ -471,7 +496,7 @@ class GoogleContactsConnector: ObservableObject {
             if contact.etag != nil { batchable.append(contact) } else { needsETag.append(contact) }
         }
 
-        var results: [GoogleContact] = []
+        var results: [String: GoogleContact] = [:]
 
         if !batchable.isEmpty {
             let url = URL(string: "\(baseURL)/people:batchUpdateContacts")!
@@ -489,14 +514,20 @@ class GoogleContactsConnector: ObservableObject {
             let (data, _) = try await makeRequest(url: url, method: "POST", body: body)
             let response = try JSONDecoder().decode(BatchUpdateResponse.self, from: data)
 
-            // `updateResult` is a map keyed by resource name, not an array.
-            results += response.updateResult.values.compactMap {
-                $0.person.flatMap { convertToPerson($0) }
+            // `updateResult` is a map keyed by resource name, not an array. Keys
+            // that came back without a person failed — leaving them out of the
+            // result is what tells the caller to report them.
+            for (name, outcome) in response.updateResult {
+                if let person = outcome.person, let contact = convertToPerson(person) {
+                    results[name] = contact
+                }
             }
+            cacheETags(from: Array(results.values))
         }
 
         for contact in needsETag {
-            results.append(try await updateContact(contact))
+            let updated = try await updateContact(contact)
+            results[updated.resourceName] = updated
         }
 
         return results

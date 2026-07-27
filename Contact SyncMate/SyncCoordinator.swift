@@ -340,6 +340,8 @@ final class SyncCoordinator: ObservableObject {
                 return "Missing contact data: \(detail)"
             case .backupNotFound:
                 return "Backup not found. Check Settings → Backups."
+            case .batchItemRejected(let name):
+                return "Google rejected \(name). Other contacts in the same batch were unaffected."
             }
         }
 

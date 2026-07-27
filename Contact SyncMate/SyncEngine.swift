@@ -195,7 +195,12 @@ class SyncEngine: ObservableObject {
         var merged = 0
         var skipped = 0
         var errors: [SyncError] = []
-        
+
+        // Google-bound writes go out in bulk first; the loop below then walks the
+        // same changes for counting, history and the Mac side. Anything already
+        // written here is skipped rather than sent twice.
+        let batched = await applyGoogleBatches(session: session)
+
         // Execute each change
         for (index, change) in session.contactChanges.enumerated() {
             // Update progress
@@ -218,29 +223,37 @@ class SyncEngine: ObservableObject {
             // rewritten. The counters and history still run so the report is
             // identical to a real sync, minus the writes.
             let isDryRun = settings.dryRunMode
+            // Already written by the batch pre-pass — count and log it, but do not
+            // send it a second time.
+            let alreadyWritten = batched.applied.contains(change.id)
+            let shouldWrite = !isDryRun && !alreadyWritten
 
             do {
+                // Surface a batch rejection here so it goes through the same error
+                // accounting and abort check as a per-contact failure.
+                if let batchError = batched.failures[change.id] { throw batchError }
+
                 switch action {
                 case .add:
-                    if !isDryRun {
+                    if shouldWrite {
                         try await performAdd(change: change, direction: session.direction)
                     }
                     added += 1
 
                 case .update:
-                    if !isDryRun {
+                    if shouldWrite {
                         try await performUpdate(change: change, direction: session.direction)
                     }
                     updated += 1
 
                 case .delete:
-                    if !isDryRun {
+                    if shouldWrite {
                         try await performDelete(change: change, direction: session.direction)
                     }
                     deleted += 1
 
                 case .merge:
-                    if !isDryRun {
+                    if shouldWrite {
                         try await performMerge(change: change, direction: session.direction)
                     }
                     merged += 1
@@ -816,6 +829,168 @@ class SyncEngine: ObservableObject {
     }
 
     // MARK: - Apply Changes
+
+    // MARK: - Batched Google writes
+
+    /// What the batch pre-pass managed to do, keyed by `ContactChange.id`.
+    ///
+    /// Deliberately not a "results" array: `executeSync` still owns all counting,
+    /// history logging and abort logic, and it walks the changes in order. This
+    /// only tells it which changes are already written and which the API refused.
+    private struct BatchOutcome {
+        var applied: Set<UUID> = []
+        var failures: [UUID: Error] = [:]
+    }
+
+    /// Below this, batching costs the same number of requests as the per-contact
+    /// path but loses its per-contact error messages and stale-etag retry.
+    private static let minimumBatchSize = 2
+
+    /// Whether a change writes to Google, resolving `.twoWay` the way the
+    /// per-contact apply paths do.
+    ///
+    /// Adds and updates push toward the side that lacks the contact; a delete
+    /// removes it from the side that still has it — which is why `.delete`
+    /// inverts the test rather than sharing it.
+    private static func writesToGoogle(_ change: ContactChange,
+                                       action: SyncAction,
+                                       session: SyncSession) -> Bool {
+        switch session.direction {
+        case .macToGoogle: return true
+        case .googleToMac: return false
+        case .twoWay:
+            guard let source = change.sourceContact else { return false }
+            let hasGoogleID = source.googleResourceName?.nonBlank != nil
+            return action == .delete ? hasGoogleID : !hasGoogleID
+        }
+    }
+
+    /// Apply every Google-bound add/update/delete through the People API batch
+    /// endpoints before the per-contact loop runs.
+    ///
+    /// Google is the rate-limited side of this sync — a 300-contact run was 300
+    /// requests, which is what produced the wall of refresh-token failures. The
+    /// batch endpoints take 200 writes (500 deletes) per call, so the same run
+    /// becomes a handful. Mac writes stay per-contact: they go to a local serial
+    /// queue, not a quota.
+    ///
+    /// Merges are excluded on purpose. They write to *both* sides and the two
+    /// writes have to stay together, so splitting the Google half into a batch
+    /// would let one half land without the other.
+    private func applyGoogleBatches(session: SyncSession) async -> BatchOutcome {
+        var outcome = BatchOutcome()
+        guard settings.batchGoogleUpdates, !settings.dryRunMode else { return outcome }
+
+        typealias Pending = (id: UUID, name: String, macID: String?, contact: GoogleContact)
+        var creates: [Pending] = []
+        var updates: [Pending] = []
+        var deletes: [(id: UUID, resourceName: String)] = []
+
+        for change in session.contactChanges {
+            let action = change.userOverride ?? change.action
+            guard Self.writesToGoogle(change, action: action, session: session),
+                  let rawSource = change.sourceContact else { continue }
+            let source = applyFieldSettings(to: rawSource)
+
+            switch action {
+            case .add:
+                creates.append((change.id, change.contactName, source.macContactIdentifier,
+                                ContactMapper.toGoogle(from: source)))
+
+            case .update:
+                guard let gID = change.targetContact?.googleResourceName?.nonBlank else { continue }
+                var googleContact = GoogleContact(id: gID)
+                ContactMapper.applyToGoogle(from: source, to: &googleContact)
+                googleContact.etag = googleConnector.knownETag(for: gID)
+                updates.append((change.id, change.contactName,
+                                source.macContactIdentifier, googleContact))
+
+            case .delete:
+                guard let gID = source.googleResourceName?.nonBlank else { continue }
+                deletes.append((change.id, gID))
+
+            case .merge, .skip:
+                continue
+            }
+        }
+
+        await runCreateBatch(creates, into: &outcome)
+        await runUpdateBatch(updates, into: &outcome)
+        await runDeleteBatch(deletes, into: &outcome)
+
+        if !outcome.applied.isEmpty || !outcome.failures.isEmpty {
+            SyncHistory.shared.log(
+                source: "SyncEngine", action: "batch.summary",
+                details: "applied=\(outcome.applied.count) rejected=\(outcome.failures.count) "
+                       + "(created=\(creates.count) updated=\(updates.count) deleted=\(deletes.count))"
+            )
+        }
+        return outcome
+    }
+
+    private func runCreateBatch(_ creates: [(id: UUID, name: String, macID: String?, contact: GoogleContact)],
+                                into outcome: inout BatchOutcome) async {
+        guard creates.count >= Self.minimumBatchSize else { return }
+        do {
+            let created = try await googleConnector.batchCreateContacts(creates.map(\.contact))
+            for (index, item) in creates.enumerated() {
+                // Positional: batchCreateContacts pads its result to the request
+                // length precisely so this index stays meaningful.
+                guard index < created.count, let person = created[index] else {
+                    outcome.failures[item.id] = SyncEngineError.batchItemRejected(item.name)
+                    continue
+                }
+                if let macID = item.macID {
+                    mappingStore.saveMapping(ContactMapping(
+                        googleResourceName: person.resourceName,
+                        macContactIdentifier: macID,
+                        lastSyncedAt: Date()))
+                }
+                outcome.applied.insert(item.id)
+            }
+        } catch {
+            // One failed call fails its whole chunk. Attributing the error to every
+            // contact in it lets executeSync report and, for auth failures, abort.
+            for item in creates { outcome.failures[item.id] = error }
+        }
+    }
+
+    private func runUpdateBatch(_ updates: [(id: UUID, name: String, macID: String?, contact: GoogleContact)],
+                                into outcome: inout BatchOutcome) async {
+        guard updates.count >= Self.minimumBatchSize else { return }
+        do {
+            let updated = try await googleConnector.batchUpdateContacts(updates.map(\.contact))
+            for item in updates {
+                guard updated[item.contact.resourceName] != nil else {
+                    outcome.failures[item.id] = SyncEngineError.batchItemRejected(item.name)
+                    continue
+                }
+                if let macID = item.macID {
+                    mappingStore.saveMapping(ContactMapping(
+                        googleResourceName: item.contact.resourceName,
+                        macContactIdentifier: macID,
+                        lastSyncedAt: Date()))
+                }
+                outcome.applied.insert(item.id)
+            }
+        } catch {
+            for item in updates { outcome.failures[item.id] = error }
+        }
+    }
+
+    private func runDeleteBatch(_ deletes: [(id: UUID, resourceName: String)],
+                               into outcome: inout BatchOutcome) async {
+        guard deletes.count >= Self.minimumBatchSize else { return }
+        do {
+            try await googleConnector.batchDeleteContacts(resourceNames: deletes.map(\.resourceName))
+            for item in deletes {
+                mappingStore.deleteMapping(googleResourceName: item.resourceName)
+                outcome.applied.insert(item.id)
+            }
+        } catch {
+            for item in deletes { outcome.failures[item.id] = error }
+        }
+    }
 
     private func performAdd(change: ContactChange, direction: SyncDirection) async throws {
         guard let rawSource = change.sourceContact else {
@@ -1595,6 +1770,7 @@ enum SyncEngineError: LocalizedError {
     case notImplemented
     case missingContactData(String)
     case backupNotFound
+    case batchItemRejected(String)
 
     var errorDescription: String? {
         switch self {
@@ -1610,6 +1786,8 @@ enum SyncEngineError: LocalizedError {
             return "Missing contact data for: \(name)"
         case .backupNotFound:
             return "Backup session not found."
+        case .batchItemRejected(let name):
+            return "Google rejected this contact in a batch request: \(name)"
         }
     }
 }
