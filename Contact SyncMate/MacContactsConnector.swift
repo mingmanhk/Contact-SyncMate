@@ -270,6 +270,24 @@ class MacContactsConnector: ObservableObject {
     }
 
     /// `updateContact` callable from the write queue. See `saveContactSync`.
+    /// `fetchContact` callable from the write queue.
+    ///
+    /// The sync applies changes by fetching the live record and mutating it, so
+    /// the fetch sits on the same hot path as the write. Leaving it main-actor
+    /// isolated kept the priority inversion alive for exactly the operation the
+    /// off-main write queue was built to protect.
+    nonisolated func fetchContactSync(withIdentifier identifier: String) throws -> CNContact? {
+        do {
+            return try Self.shared.unifiedContact(withIdentifier: identifier,
+                                                  keysToFetch: Self.nonisolatedKeysToFetch())
+        } catch let error as NSError {
+            if error.domain == CNErrorDomain && error.code == CNError.recordDoesNotExist.rawValue {
+                return nil
+            }
+            throw error
+        }
+    }
+
     nonisolated func updateContactSync(_ contact: CNMutableContact) throws {
         let history = SyncHistory.shared
         let request = CNSaveRequest()
@@ -364,7 +382,7 @@ class MacContactsConnector: ObservableObject {
     /// Deliberately excludes `CNContactNoteKey`: reading it needs the
     /// com.apple.developer.contacts.notes entitlement, which this app does not
     /// hold, and requesting it makes the fetch itself fail.
-    nonisolated private static func nonisolatedKeysToFetch() -> [CNKeyDescriptor] {
+    nonisolated static func nonisolatedKeysToFetch() -> [CNKeyDescriptor] {
         // Must stay a superset of everything ContactMapper.toUnified reads.
         // Reading an unfetched property raises CNContactPropertyNotFetchedException
         // — an ObjC exception, so it is not catchable as a Swift error and takes

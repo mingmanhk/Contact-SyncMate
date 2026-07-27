@@ -68,6 +68,34 @@ final class UnifiedContactTests: XCTestCase {
         XCTAssertEqual(c.displayName, "blank@example.com")
     }
 
+    /// The bug that pushed 229 duplicates into Google: a Mac contact that already
+    /// exists on the other side must be matched, not re-added.
+    func test_identityKeys_matchOnEmailAndPhone() {
+        let mac = UnifiedContact.make(phones: ["+852 9123 4567"], emails: ["Person@Example.COM"])
+        let google = UnifiedContact.make(phones: ["91234567"], emails: ["person@example.com"])
+
+        let macKeys = Set(SyncEngine.identityKeys(for: mac))
+        let googleKeys = Set(SyncEngine.identityKeys(for: google))
+
+        XCTAssertFalse(macKeys.isDisjoint(with: googleKeys),
+                       "same person stored with different case and country code must still match")
+        XCTAssertTrue(macKeys.contains("email:person@example.com"))
+        XCTAssertTrue(macKeys.contains("phone:91234567"))
+    }
+
+    /// Names are deliberately not identity keys — two different "David Chan"
+    /// records must not be fused, which loses data rather than merely duplicating.
+    func test_identityKeys_ignoreNames() {
+        let c = UnifiedContact.make(givenName: "David", familyName: "Chan")
+        XCTAssertTrue(SyncEngine.identityKeys(for: c).isEmpty)
+    }
+
+    /// A short extension is not enough to identify a person.
+    func test_identityKeys_ignoreShortNumbers() {
+        let c = UnifiedContact.make(phones: ["1234"])
+        XCTAssertTrue(SyncEngine.identityKeys(for: c).isEmpty)
+    }
+
     func test_displayName_fallsBackToPhoneWhenNoName() {
         let c = UnifiedContact.make(phones: ["+1 555 0101"])
         XCTAssertEqual(c.displayName, "+1 555 0101")

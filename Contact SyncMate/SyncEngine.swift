@@ -558,6 +558,26 @@ class SyncEngine: ObservableObject {
         }
 
         // --- Step 3: New on Mac, not yet mapped ---
+        //
+        // Identity index over *every* Google contact, not just the unmapped ones.
+        //
+        // Step 2 checks for a match before creating a Mac contact; Step 3 did not,
+        // and blindly pushed every unmapped Mac contact to Google as new. On a
+        // first sync between two address books that already hold the same people —
+        // the normal case — there are no mappings yet, so this duplicated the
+        // entire address book into Google. It produced 229 spurious adds here.
+        //
+        // Matching against all Google contacts (not only unprocessed ones) matters:
+        // a Mac contact can correspond to a Google contact that Step 1 already
+        // handled under a different mapping, and adding it again would duplicate
+        // regardless.
+        var googleIdentityIndex: [String: (String, UnifiedContact)] = [:]
+        for (gID, gContact) in googleByResourceName {
+            for key in Self.identityKeys(for: gContact) where googleIdentityIndex[key] == nil {
+                googleIdentityIndex[key] = (gID, gContact)
+            }
+        }
+
         for (_, mContact) in macByIdentifier where !processedMac.contains(mContact.macContactIdentifier ?? "") {
             // Empty rows are not worth propagating: pushing one to Google creates
             // a permanent blank contact there, and it will come back as a
@@ -571,6 +591,21 @@ class SyncEngine: ObservableObject {
                 continue
             }
 
+            // Already on the other side? Link them instead of creating a copy.
+            let match = Self.identityKeys(for: mContact)
+                .lazy
+                .compactMap { googleIdentityIndex[$0] }
+                .first
+
+            if let (_, gContact) = match {
+                changes.append(ContactChange(
+                    contactName: mContact.displayName, action: .merge,
+                    direction: .twoWay,
+                    changes: ["Matched an existing Google contact — linking instead of adding a duplicate"],
+                    sourceContact: gContact, targetContact: mContact))
+                continue
+            }
+
             changes.append(ContactChange(
                 contactName: mContact.displayName, action: .add,
                 direction: .macToGoogle, changes: ["New contact from Mac"],
@@ -578,6 +613,37 @@ class SyncEngine: ObservableObject {
         }
 
         return changes
+    }
+
+    /// Strong identity keys for cross-matching a contact between providers.
+    ///
+    /// Only signals that identify a *person*, never a shared attribute: a company
+    /// switchboard or a shared family address would otherwise fuse unrelated
+    /// people together, which is worse than a duplicate because it destroys data.
+    ///
+    /// Names alone are excluded for the same reason — two different "David Chan"
+    /// entries are common. `findFuzzyMatch` may still pair on a name, but that path
+    /// produces a reviewable merge rather than a silent link.
+    static func identityKeys(for contact: UnifiedContact) -> [String] {
+        var keys: [String] = []
+
+        for email in contact.emailAddresses {
+            if let normalized = email.value.nonBlank?.lowercased() {
+                keys.append("email:\(normalized)")
+            }
+        }
+
+        for phone in contact.phoneNumbers {
+            // Compare the last 8 digits: the same number is routinely stored as
+            // +852 9123 4567 on one side and 91234567 on the other, and a literal
+            // string comparison would miss every one of them.
+            let digits = phone.value.filter(\.isNumber)
+            if digits.count >= 8 {
+                keys.append("phone:\(String(digits.suffix(8)))")
+            }
+        }
+
+        return keys
     }
 
     // MARK: - 1-Way Diff
@@ -811,14 +877,27 @@ class SyncEngine: ObservableObject {
         case .googleToMac:
             // Update Mac contact with Google data
             guard let mID = change.targetContact?.macContactIdentifier else { return }
-            guard let existing = try macConnector.fetchContact(withIdentifier: mID) else { return }
-            let mutableContact = existing.mutableCopy() as! CNMutableContact
-            ContactMapper.applyToMac(from: source, to: mutableContact)
-            let c = macConnector; try await MacContactsConnector.performWriteOffMain { try c.updateContactSync(mutableContact) }
-            mappingStore.saveMapping(ContactMapping(
-                googleResourceName: source.googleResourceName ?? "",
-                macContactIdentifier: mID,
-                lastSyncedAt: Date()))
+            // Fetch and write on the same off-main queue: the fetch is XPC too,
+            // and doing it here kept a priority inversion on the hot path.
+            let c = macConnector
+            let unified = source
+            try await MacContactsConnector.performWriteOffMain {
+                guard let existing = try c.fetchContactSync(withIdentifier: mID) else { return }
+                let mutableContact = existing.mutableCopy() as! CNMutableContact
+                ContactMapper.applyToMac(from: unified, to: mutableContact)
+                try c.updateContactSync(mutableContact)
+            }
+
+            // Only store a mapping when there is a real Google id to store.
+            // `?? ""` poisoned the store with an empty key that matches no Google
+            // contact — and on the next two-way sync that looks like "deleted on
+            // Google", which can delete a live Mac contact.
+            if let gID = source.googleResourceName?.nonBlank {
+                mappingStore.saveMapping(ContactMapping(
+                    googleResourceName: gID,
+                    macContactIdentifier: mID,
+                    lastSyncedAt: Date()))
+            }
 
         case .macToGoogle:
             // Update Google contact with Mac data, preserving the existing resource name
