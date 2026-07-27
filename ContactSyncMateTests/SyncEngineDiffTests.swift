@@ -35,25 +35,31 @@ final class SyncEngineDiffTests: XCTestCase {
     // reads so tests stay hermetic regardless of what the user changed in
     // the running app.
     private var savedConflict: ConflictResolutionDefault!
-    private var savedMerge2Way: Bool!
     private var savedForceUpdate: Bool!
+    private var savedPostalCodes: Bool!
+    private var savedFilterByGroups: Bool!
 
     override func setUp() {
         super.setUp()
         let s = AppSettings.shared
-        savedConflict    = s.defaultConflictResolution
-        savedMerge2Way   = s.mergeContacts2Way
-        savedForceUpdate = s.forceUpdateAll
+        savedConflict       = s.defaultConflictResolution
+        savedForceUpdate    = s.forceUpdateAll
+        savedPostalCodes    = s.syncPostalCountryCodes
+        savedFilterByGroups = s.filterByGroups
+        // `mergeContacts2Way` was pinned here too. It is now the `.mergeBoth`
+        // case of defaultConflictResolution, which this already pins.
         s.defaultConflictResolution = .alwaysAsk
-        s.mergeContacts2Way = true
         s.forceUpdateAll = false
+        s.syncPostalCountryCodes = true
+        s.filterByGroups = false
     }
 
     override func tearDown() {
         let s = AppSettings.shared
         s.defaultConflictResolution = savedConflict
-        s.mergeContacts2Way = savedMerge2Way
         s.forceUpdateAll = savedForceUpdate
+        s.syncPostalCountryCodes = savedPostalCodes
+        s.filterByGroups = savedFilterByGroups
         super.tearDown()
     }
 
@@ -63,6 +69,90 @@ final class SyncEngineDiffTests: XCTestCase {
             macConnector: MacContactsConnector(),
             mappingStore: ContactMappingStore()
         )
+    }
+
+    // MARK: - Photo diff convergence
+
+    /// A photo only the Mac has cannot be pushed: the People API rejects
+    /// `photos` in an update mask. Reporting it produced an update that wrote
+    /// nothing and came back identical on the next sync, forever.
+    func test_photoOnlyOnMac_isNotReportedAsAChange() {
+        let gID = "people/photo-mac-only"
+        let mID = "mac/photo-mac-only"
+        let store = ContactMappingStore()
+        store.saveMapping(ContactMapping(
+            googleResourceName: gID, macContactIdentifier: mID,
+            lastSyncedAt: Date(timeIntervalSince1970: 0)))
+        Thread.sleep(forTimeInterval: 0.05)
+
+        var google = UnifiedContact.diffMake(givenName: "Pat", googleResourceName: gID)
+        google.lastModified = Date()
+        var mac = UnifiedContact.diffMake(givenName: "Pat", macContactIdentifier: mID)
+        mac.photoData = Data([0x01, 0x02])
+        mac.lastModified = Date()
+
+        let engine = SyncEngine(
+            googleConnector: GoogleContactsConnector(),
+            macConnector: MacContactsConnector(),
+            mappingStore: store)
+        let changes = engine.computeChanges(
+            googleContacts: [google], macContacts: [mac], direction: .twoWay)
+
+        XCTAssertFalse(
+            changes.flatMap(\.changes).contains { $0.contains("Photo") },
+            "A Mac-only photo cannot be written to Google, so it must not be diffed")
+    }
+
+    /// The direction that *can* be applied still is.
+    func test_photoOnlyOnGoogle_isReported() {
+        let gID = "people/photo-google-only"
+        let mID = "mac/photo-google-only"
+        let store = ContactMappingStore()
+        store.saveMapping(ContactMapping(
+            googleResourceName: gID, macContactIdentifier: mID,
+            lastSyncedAt: Date(timeIntervalSince1970: 0)))
+        Thread.sleep(forTimeInterval: 0.05)
+
+        var google = UnifiedContact.diffMake(givenName: "Pat", googleResourceName: gID)
+        google.photoData = Data([0x01, 0x02])
+        google.lastModified = Date()
+        var mac = UnifiedContact.diffMake(givenName: "Pat", macContactIdentifier: mID)
+        mac.lastModified = Date(timeIntervalSince1970: 0)
+
+        let engine = SyncEngine(
+            googleConnector: GoogleContactsConnector(),
+            macConnector: MacContactsConnector(),
+            mappingStore: store)
+        let changes = engine.computeChanges(
+            googleContacts: [google], macContacts: [mac], direction: .twoWay)
+
+        XCTAssertTrue(
+            changes.flatMap(\.changes).contains { $0.contains("Photo") },
+            "Google → Mac is the direction photos can travel, so it must be diffed")
+    }
+
+    // MARK: - Postal country normalisation
+
+    func test_countryName_yieldsISOCode() {
+        let address = UnifiedContact.PostalAddress(
+            street: "1 Infinite Loop", city: "Cupertino",
+            country: "United States", countryCode: nil)
+        let normalized = SyncEngine.normalizingCountry(address)
+        XCTAssertEqual(normalized.countryCode, "US")
+    }
+
+    func test_lowercaseISOCode_isUppercasedAndNamed() {
+        let address = UnifiedContact.PostalAddress(country: nil, countryCode: "hk")
+        let normalized = SyncEngine.normalizingCountry(address)
+        XCTAssertEqual(normalized.countryCode, "HK")
+        XCTAssertNotNil(normalized.country)
+    }
+
+    func test_unrecognisedCountry_isLeftAlone() {
+        let address = UnifiedContact.PostalAddress(country: "Freedonia", countryCode: nil)
+        let normalized = SyncEngine.normalizingCountry(address)
+        XCTAssertNil(normalized.countryCode)
+        XCTAssertEqual(normalized.country, "Freedonia")
     }
 
     // MARK: - Empty inputs

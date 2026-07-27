@@ -85,9 +85,9 @@ class AppSettings: ObservableObject {
         }
     }
     
-    @Published var mergeContacts2Way: Bool = UserDefaults.standard.object(forKey: "mergeContacts2Way") as? Bool ?? true {
-        didSet { UserDefaults.standard.set(mergeContacts2Way, forKey: "mergeContacts2Way") }
-    }
+    // `mergeContacts2Way` used to live here, unread. It decided the same thing
+    // as `defaultConflictResolution` — what happens when both sides changed — so
+    // the two settings could disagree. It is now the `.mergeBoth` case there.
     
     @Published var mergeContacts1Way: Bool = UserDefaults.standard.bool(forKey: "mergeContacts1Way") {
         didSet { UserDefaults.standard.set(mergeContacts1Way, forKey: "mergeContacts1Way") }
@@ -448,7 +448,6 @@ class AppSettings: ObservableObject {
         syncDeletedContacts = false
         syncPhotos = true
         filterByGroups = false
-        mergeContacts2Way = true
         mergeContacts1Way = false
         syncPostalCountryCodes = true
         batchGoogleUpdates = true
@@ -669,12 +668,20 @@ enum ConflictResolutionDefault: String, CaseIterable {
     case alwaysAsk  = "alwaysAsk"
     case preferGoogle = "preferGoogle"
     case preferMac    = "preferMac"
+    /// Combine both sides: each side keeps its own values and gains whatever the
+    /// other has that it is missing.
+    ///
+    /// Absorbed from the separate "Merge during 2-way sync" toggle, which was a
+    /// second control over this same decision and was never read. Two settings
+    /// that answer the same question can disagree; one enum cannot.
+    case mergeBoth = "mergeBoth"
 
     var displayName: String {
         switch self {
         case .alwaysAsk:    return "Always Ask"
         case .preferGoogle: return "Prefer Google"
         case .preferMac:    return "Prefer Mac"
+        case .mergeBoth:    return "Merge Both"
         }
     }
 
@@ -683,6 +690,7 @@ enum ConflictResolutionDefault: String, CaseIterable {
         case .alwaysAsk:    return "Show the conflict review sheet each time"
         case .preferGoogle: return "Silently keep the Google value when fields differ"
         case .preferMac:    return "Silently keep the Mac value when fields differ"
+        case .mergeBoth:    return "Combine both sides — neither loses a field the other has"
         }
     }
 
@@ -691,6 +699,7 @@ enum ConflictResolutionDefault: String, CaseIterable {
         case .alwaysAsk:    return "questionmark.circle"
         case .preferGoogle: return "g.circle.fill"
         case .preferMac:    return "desktopcomputer"
+        case .mergeBoth:    return "arrow.triangle.merge"
         }
     }
 }

@@ -170,7 +170,7 @@ class GoogleContactsConnector: ObservableObject {
         var allContacts: [GoogleContact] = []
         var pageToken: String?
         
-        let personFields = "names,emailAddresses,phoneNumbers,addresses,organizations,photos,birthdays,urls,nicknames,metadata"
+        let personFields = "names,emailAddresses,phoneNumbers,addresses,organizations,photos,birthdays,urls,nicknames,metadata,memberships"
         
         repeat {
             var components = URLComponents(string: "\(baseURL)/people/me/connections")!
@@ -207,7 +207,7 @@ class GoogleContactsConnector: ObservableObject {
             throw GoogleContactsError.notAuthenticated
         }
         
-        let personFields = "names,emailAddresses,phoneNumbers,addresses,organizations,photos,birthdays,urls,nicknames,metadata"
+        let personFields = "names,emailAddresses,phoneNumbers,addresses,organizations,photos,birthdays,urls,nicknames,metadata,memberships"
         
         var components = URLComponents(string: "\(baseURL)/\(resourceName)")!
         components.queryItems = [
@@ -679,6 +679,11 @@ class GoogleContactsConnector: ObservableObject {
         if let bio = apiPerson.biographies?.first {
             contact.note = bio.value
         }
+
+        // Label membership, for group filtering.
+        contact.groupResourceNames = apiPerson.memberships?.compactMap {
+            $0.contactGroupMembership?.contactGroupResourceName
+        } ?? []
         
         // Update time
         if let metadata = apiPerson.metadata,
@@ -812,7 +817,13 @@ struct GoogleContact: Identifiable, Codable {
     var note: String?
     var photoUrl: String?
     var photoData: Data? // For local caching
-    
+
+    /// contactGroups/… resource names this contact belongs to.
+    ///
+    /// Populated on read only; never written back, so filtering by label cannot
+    /// reorganise the user's labels as a side effect.
+    var groupResourceNames: [String] = []
+
     // Metadata
     var updateTime: Date?
 }
@@ -917,6 +928,19 @@ struct PeopleAPIPerson: Codable {
     var photos: [PersonPhoto]?
     var urls: [PersonUrl]?
     var biographies: [PersonBiography]?
+    /// Which contact groups (labels) this person belongs to.
+    ///
+    /// Read-only here — it is requested in `personFields` so group filtering can
+    /// work, and deliberately left out of the update mask so a sync never
+    /// reorganises the user's labels.
+    var memberships: [PersonMembership]?
+}
+
+struct PersonMembership: Codable {
+    struct ContactGroupMembership: Codable {
+        let contactGroupResourceName: String?
+    }
+    let contactGroupMembership: ContactGroupMembership?
 }
 
 struct PersonMetadata: Codable {

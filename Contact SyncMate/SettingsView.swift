@@ -837,8 +837,10 @@ struct CommonSyncSettingsView: View {
 
             // ── Merge Behaviour ────────────────────────────────────────
             Section {
-                Toggle("Merge during 2-way sync", isOn: $settings.mergeContacts2Way)
-                    .help("Combine fields from both sides rather than overwriting")
+                // "Merge during 2-way sync" is gone: it answered the same question
+                // as Conflict Resolution ("what happens when both sides changed"),
+                // which means the two could contradict each other. It is now the
+                // Merge Both option there.
                 Toggle("Merge during 1-way sync", isOn: $settings.mergeContacts1Way)
                     .help("Merge fields during 1-way sync instead of full replacement")
                 Toggle("Sync deleted contacts", isOn: $settings.syncDeletedContacts)

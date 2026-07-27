@@ -395,6 +395,34 @@ class MacContactsConnector: ObservableObject {
         return contacts
     }
 
+    /// Identifiers of every contact belonging to any of `groupIDs`.
+    ///
+    /// Group membership is not a property of `CNContact`; it is queried with
+    /// `predicateForContactsInGroup`. Fetching identifiers only keeps this cheap —
+    /// the caller already has the full contacts and just needs to know which of
+    /// them are in scope.
+    ///
+    /// A group that no longer exists is skipped rather than failing the sync: a
+    /// deleted group in the saved filter should not stop contacts syncing.
+    nonisolated static func contactIdentifiers(inGroups groupIDs: [String]) -> Set<String> {
+        var identifiers: Set<String> = []
+        for groupID in groupIDs {
+            let request = CNContactFetchRequest(
+                keysToFetch: [CNContactIdentifierKey as CNKeyDescriptor])
+            request.predicate = CNContact.predicateForContactsInGroup(withIdentifier: groupID)
+            do {
+                try shared.enumerateContacts(with: request) { contact, _ in
+                    identifiers.insert(contact.identifier)
+                }
+            } catch {
+                SyncHistory.shared.log(
+                    source: "MacContacts", action: "groupFilter.skippedGroup",
+                    details: "\(groupID): \(error.localizedDescription)")
+            }
+        }
+        return identifiers
+    }
+
     /// Key set for `fetchAllContactsOffMain`.
     ///
     /// Deliberately excludes `CNContactNoteKey`: reading it needs the

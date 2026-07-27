@@ -88,8 +88,17 @@ class SyncEngine: ObservableObject {
             let macContacts = try await macConnector.fetchAllContactsOffMainActor()
 
             // Convert to unified format
-            let unifiedGoogleContacts = googleContacts.map { ContactMapper.toUnified(from: $0) }
-            let unifiedMacContacts = macContacts.map { ContactMapper.toUnified(from: $0) }
+            var unifiedGoogleContacts = googleContacts.map { ContactMapper.toUnified(from: $0) }
+            var unifiedMacContacts = macContacts.map { ContactMapper.toUnified(from: $0) }
+
+            // Restrict to the selected groups / labels, if the user asked for that.
+            if settings.filterByGroups {
+                (unifiedGoogleContacts, unifiedMacContacts) = await applyGroupFilter(
+                    google: unifiedGoogleContacts,
+                    googleSource: googleContacts,
+                    mac: unifiedMacContacts
+                )
+            }
 
             // Create sync session ID for backup linkage
             let syncSessionId = UUID().uuidString
@@ -554,6 +563,15 @@ class SyncEngine: ObservableObject {
                             direction: .macToGoogle,
                             changes: fieldDiffs + ["Auto-resolved: Mac preferred"],
                             sourceContact: m, targetContact: g))
+                    case .mergeBoth:
+                        // Auto-resolve by combining: performMerge writes the union
+                        // to both sides, so neither loses a field the other has.
+                        changes.append(ContactChange(
+                            contactName: g.displayName, action: .merge,
+                            direction: .twoWay,
+                            changes: fieldDiffs + ["Auto-resolved: merged both sides"],
+                            userOverride: .merge,
+                            sourceContact: g, targetContact: m))
                     }
                 } else if gChanged {
                     changes.append(ContactChange(
@@ -719,10 +737,19 @@ class SyncEngine: ObservableObject {
                 if let targetContact = target[targetID] {
                     let diffs = diffFields(sourceContact, targetContact)
                     if !diffs.isEmpty {
+                        // "Merge during 1-way sync": a 1-way sync normally
+                        // replaces the target from the source, which clears any
+                        // field the target has and the source does not. Merging
+                        // first keeps those. The setting was stored and never
+                        // read, so the choice did not exist.
+                        let payload = settings.mergeContacts1Way
+                            ? mergeContacts(primary: sourceContact, secondary: targetContact)
+                            : sourceContact
+
                         changes.append(ContactChange(
                             contactName: sourceContact.displayName,
                             action: .update, direction: direction, changes: diffs,
-                            sourceContact: sourceContact, targetContact: targetContact))
+                            sourceContact: payload, targetContact: targetContact))
                     }
                 } else if settings.syncDeletedContacts {
                     changes.append(ContactChange(
@@ -748,6 +775,14 @@ class SyncEngine: ObservableObject {
     /// Only includes fields that are enabled in the user's per-field sync settings.
     private func diffFields(_ a: UnifiedContact, _ b: UnifiedContact) -> [String] {
         var diffs: [String] = []
+
+        // "Force update all contacts" — write every mapped contact even when the
+        // fields look identical. The setting existed and was read nowhere, so the
+        // one thing it is for (repairing a side whose contents drifted from what
+        // the mappings claim) could not be done.
+        if settings.forceUpdateAll {
+            diffs.append("Forced update")
+        }
 
         func check<T: Equatable>(_ label: String, _ lhs: T?, _ rhs: T?) {
             if lhs != rhs { diffs.append("\(label) changed") }
@@ -786,7 +821,24 @@ class SyncEngine: ObservableObject {
         }
 
         if settings.syncPhotos {
-            if (a.photoData == nil) != (b.photoData == nil) { diffs.append("Photo changed") }
+            // Photos only travel Google → Mac.
+            //
+            // The People API rejects `photos` in an update mask — it has a
+            // separate updateContactPhoto endpoint — so a photo that exists only
+            // on the Mac side cannot be pushed. The old test was symmetric
+            // (`(a.photoData == nil) != (b.photoData == nil)`), so every
+            // Mac-only photo produced a "Photo changed" entry, an update that
+            // wrote nothing, and the identical entry again on the next sync.
+            // Forever, for the same contacts.
+            //
+            // Reporting only the direction that can actually be applied means
+            // the diff converges: one sync copies the photo to the Mac, and the
+            // next sync has nothing to say about it.
+            let google = a.googleResourceName != nil ? a : b
+            let mac    = a.macContactIdentifier != nil ? a : b
+            if google.photoData != nil && mac.photoData == nil {
+                diffs.append("Photo changed")
+            }
         }
 
         return diffs
@@ -810,10 +862,49 @@ class SyncEngine: ObservableObject {
         if !settings.syncJobTitle  { c.jobTitle        = nil }
         if !settings.syncPhotos    { c.photoData       = nil }
 
+        // "Normalise postal country codes". Google returns ISO codes, the Mac
+        // stores whatever was typed, so the same address round-trips as
+        // "US" / "United States" / "usa" and reads as a change every sync. When
+        // the setting is off the raw values are written through unchanged.
+        if settings.syncPostalCountryCodes {
+            c.postalAddresses = c.postalAddresses.map(Self.normalizingCountry)
+        }
+
         if settings.nameFormattingEnabled {
             NameFormattingEngine.applyToContact(&c, convention: settings.nameCasingConvention)
         }
         return c
+    }
+
+    /// Fill in a missing ISO country code, and align the country name with it.
+    ///
+    /// Uses Foundation's locale data rather than a hand-written country table:
+    /// the mapping is large, changes over time, and is already on the system.
+    nonisolated static func normalizingCountry(_ address: UnifiedContact.PostalAddress)
+        -> UnifiedContact.PostalAddress {
+        var normalized = address
+
+        if let code = address.countryCode?.nonBlank?.uppercased(),
+           Locale.Region.isoRegions.contains(where: { $0.identifier == code }) {
+            normalized.countryCode = code
+            if let name = Locale.current.localizedString(forRegionCode: code) {
+                normalized.country = name
+            }
+            return normalized
+        }
+
+        // No usable code — try to derive one from the country name.
+        guard let country = address.country?.nonBlank else { return normalized }
+        let match = Locale.Region.isoRegions.first { region in
+            Locale.current.localizedString(forRegionCode: region.identifier)?
+                .compare(country, options: .caseInsensitive) == .orderedSame
+        }
+        if let match {
+            normalized.countryCode = match.identifier
+            normalized.country = Locale.current.localizedString(forRegionCode: match.identifier)
+                ?? country
+        }
+        return normalized
     }
 
     // MARK: - Fuzzy Match
@@ -844,6 +935,59 @@ class SyncEngine: ObservableObject {
     }
 
     // MARK: - Apply Changes
+
+    // MARK: - Group / label filtering
+
+    /// Narrow both sides to the groups and labels the user selected.
+    ///
+    /// "Filter sync by groups / labels" had a full picker behind it — Mac groups
+    /// and Google labels, loaded from both services — and the selections were
+    /// saved. Nothing ever read them, so the filter was purely decorative and a
+    /// user who set it still synced their entire address book.
+    ///
+    /// An enabled filter with nothing selected on a side leaves that side
+    /// untouched. The alternative — treating "no selection" as "match nothing" —
+    /// would silently turn every contact on that side into a deletion candidate.
+    private func applyGroupFilter(
+        google: [UnifiedContact],
+        googleSource: [GoogleContact],
+        mac: [UnifiedContact]
+    ) async -> (google: [UnifiedContact], mac: [UnifiedContact]) {
+        var filteredGoogle = google
+        var filteredMac = mac
+
+        let selectedLabels = Set(settings.selectedGoogleLabels)
+        if !selectedLabels.isEmpty {
+            let allowed = Set(
+                googleSource
+                    .filter { !Set($0.groupResourceNames).isDisjoint(with: selectedLabels) }
+                    .map(\.resourceName)
+            )
+            filteredGoogle = google.filter {
+                guard let id = $0.googleResourceName else { return true }
+                return allowed.contains(id)
+            }
+        }
+
+        let selectedGroups = settings.selectedMacGroups
+        if !selectedGroups.isEmpty {
+            // Off the main actor with every other Contacts query.
+            let allowed = await Task.detached(priority: .userInitiated) {
+                MacContactsConnector.contactIdentifiers(inGroups: selectedGroups)
+            }.value
+            filteredMac = mac.filter {
+                guard let id = $0.macContactIdentifier else { return true }
+                return allowed.contains(id)
+            }
+        }
+
+        SyncHistory.shared.log(
+            source: "SyncEngine", action: "groupFilter.applied",
+            details: "google \(google.count)→\(filteredGoogle.count), "
+                   + "mac \(mac.count)→\(filteredMac.count)"
+        )
+        return (filteredGoogle, filteredMac)
+    }
 
     // MARK: - Batched Google writes
 
