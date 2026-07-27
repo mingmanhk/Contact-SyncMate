@@ -19,7 +19,14 @@ struct RestoreBackupConfirmationView: View {
     @State private var showBackupDetails = false
 
     var body: some View {
-        NavigationView {
+        // No NavigationView here.
+        //
+        // It used to wrap this whole dialog, and on macOS NavigationView is a
+        // split view: inside a sheet with no size proposed to it, it collapsed to
+        // a sliver showing nothing but two truncated buttons. There is no
+        // navigation in this dialog to justify it. An explicit frame is what a
+        // macOS sheet needs — the same approach SyncPreviewView uses.
+        Group {
             VStack(spacing: 0) {
                 // Header
                 VStack(alignment: .leading, spacing: 12) {
@@ -189,12 +196,14 @@ struct RestoreBackupConfirmationView: View {
                     .buttonStyle(.bordered)
 
                     Button(action: {
+                        // Hand off and close. The old code showed a spinner for a
+                        // hard-coded 2 seconds — "simulate restore time" — which
+                        // had nothing to do with the actual restore and finished
+                        // long before it did. The presenting view owns the real
+                        // progress overlay and the success/failure alerts.
                         isRestoring = true
                         onRestore()
-                        // Simulate restore time
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                            isPresented = false
-                        }
+                        isPresented = false
                     }) {
                         if isRestoring {
                             ProgressView()
@@ -219,6 +228,7 @@ struct RestoreBackupConfirmationView: View {
                 BackupDetailsView(backup: backup)
             }
         }
+        .frame(width: 560, height: 620)
     }
 }
 

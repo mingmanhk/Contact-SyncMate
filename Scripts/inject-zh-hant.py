@@ -513,6 +513,28 @@ T = {
     "Allow silent auto-merge of duplicates": "允許靜默自動合併重複項",
     "Show a confirmation dialog when clicking Sync Now":
         "點選「立即同步」時顯示確認對話框",
+    "Delete all sync events?":
+        "刪除所有同步事件？",
+    "Google account is not connected":
+        "尚未連接 Google 帳戶",
+    "Delete all recorded sync events. Backups and contacts are not affected.":
+        "刪除所有已記錄的同步事件。備份與聯絡人不受影響。",
+    "Delete all recorded sync events. Backups are not affected.":
+        "刪除所有已記錄的同步事件。備份不受影響。",
+    "This clears the recorded activity log only. Your backups and contacts are not affected.":
+        "這只會清除活動記錄，你的備份與聯絡人不受影響。",
+    "Reload sync events and backups now":
+        "立即重新載入同步事件與備份",
+    "Refresh":
+        "重新整理",
+    "Apply Changes Directly":
+        "直接套用變更",
+    "Review Before Applying":
+        "套用前先檢視",
+    "Sync Now applies every change immediately":
+        "「立即同步」會直接套用所有變更",
+    "Automatic syncs will not delete contacts. Deletions are listed for you to apply from Sync Now.":
+        "自動同步不會刪除聯絡人。待刪除的項目會列出，由你在「立即同步」中檢視後套用。",
     "Show a confirmation dialog before a restore rewrites contacts":
         "還原覆寫聯絡人前顯示確認對話框",
     "Apply high-confidence duplicate merges without asking. Off = always review.":

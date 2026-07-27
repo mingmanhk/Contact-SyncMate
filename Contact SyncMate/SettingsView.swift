@@ -181,25 +181,34 @@ struct SettingsView: View {
     }
 
     private func sidebarRow(_ section: SettingsSection) -> some View {
-        Label {
-            Text(section.rawValue)
-                .font(.subheadline)
-        } icon: {
-            Image(systemName: section.icon)
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(iconColor(for: section))
-                .frame(width: 20)
-        }
-        .padding(.vertical, 1)
-        // Highlight Accounts row if not connected
-        .overlay(alignment: .trailing) {
+        // The "not connected" dot used to be an .overlay(alignment: .trailing) on
+        // the Label. A Label is only as wide as its content, so its trailing edge
+        // is the last letter — the dot landed on top of the word ("Accoun●s")
+        // and read as a rendering glitch rather than a status. A Spacer pushes it
+        // to the edge of the row, which is where a status badge belongs.
+        HStack(spacing: 0) {
+            Label {
+                Text(section.rawValue)
+                    .font(.subheadline)
+            } icon: {
+                Image(systemName: section.icon)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(iconColor(for: section))
+                    .frame(width: 20)
+            }
+
+            Spacer(minLength: 8)
+
             if section == .accounts && !oauthManager.isAuthenticated {
                 Circle()
                     .fill(Palette.warning)
                     .frame(width: 7, height: 7)
-                    .padding(.trailing, 4)
+                    // An unlabelled dot explains nothing on its own.
+                    .help("Google account is not connected")
+                    .accessibilityLabel("Google account is not connected")
             }
         }
+        .padding(.vertical, 1)
     }
 
     private func iconColor(for section: SettingsSection) -> Color {
@@ -618,10 +627,11 @@ struct GeneralSettingsView: View {
             Section {
                 Toggle("Ask before Sync Now", isOn: $settings.confirmBeforeSyncNow)
                     .help("Show a confirmation dialog when clicking Sync Now")
-                Toggle("Ask before restoring a backup", isOn: $settings.confirmBeforeRestore)
-                    .help("Show a confirmation dialog before a restore rewrites contacts")
+                // No "Ask before restoring": the restore sheet is not optional.
+                // It collects a required decision — whether to delete contacts
+                // added since the backup — so there is no version of it to skip.
                 Toggle("Ask before deleting contacts", isOn: $settings.confirmPendingDeletions)
-                    .help("Show pending deletions for review before they are applied")
+                    .help("Automatic syncs will not delete contacts. Deletions are listed for you to apply from Sync Now.")
                 Toggle("Allow silent auto-merge of duplicates", isOn: $settings.allowSilentAutoMerge)
                     .help("Apply high-confidence duplicate merges without asking. Off = always review.")
             } header: {
@@ -716,10 +726,8 @@ struct GeneralSettingsView: View {
 
     private func syncTypeIcon(_ type: SyncType) -> String {
         switch type {
-        case .twoWay:      return "arrow.triangle.2.circlepath"
-        case .googleToMac: return "arrow.down.circle"
-        case .macToGoogle: return "arrow.up.circle"
-        case .manual:      return "hand.tap"
+        case .automatic: return "bolt"
+        case .manual:    return "hand.tap"
         }
     }
 
@@ -881,10 +889,10 @@ struct ManualSyncSettingsView: View {
                 }
                 .help("Scan for duplicate contacts before changes are applied")
 
-                Toggle(isOn: $settings.confirmPendingDeletions) {
-                    Label("Confirm pending deletions", systemImage: "trash.badge.clock")
-                }
-                .help("Show a confirmation sheet for contacts that will be deleted")
+                // "Confirm pending deletions" used to sit here as a second Toggle
+                // bound to the same confirmPendingDeletions value as the one under
+                // General → Confirmations. Two controls for one setting, in two
+                // places, with no indication they were the same switch.
             } header: {
                 Label("Safety", systemImage: "checkmark.shield")
             } footer: {

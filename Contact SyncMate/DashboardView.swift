@@ -23,6 +23,7 @@ struct DashboardView: View {
 
     // Sync feedback (derived from sync.phase — see onChange below)
     @State private var syncResultBanner: SyncResultBanner?
+    @State private var showClearHistoryConfirmation = false
     @State private var syncErrorMessage: String?
 
     // MARK: Computed helpers
@@ -119,11 +120,32 @@ struct DashboardView: View {
         .animation(.easeInOut(duration: 0.2), value: appState.isSyncing)
         .sheet(isPresented: $showSyncPreview) {
             if let session = appState.currentSyncSession {
-                SyncPreviewView(session: session, isPresented: $showSyncPreview)
+                SyncPreviewView(session: session, isPresented: $showSyncPreview) { reviewed in
+                    applyReviewedSession(reviewed)
+                }
             }
         }
         .sheet(isPresented: $showHistoryView) {
             SyncHistoryAndBackupView()
+        }
+        .confirmationDialog("Delete all sync events?",
+                            isPresented: $showClearHistoryConfirmation,
+                            titleVisibility: .visible) {
+            Button("Delete All Events", role: .destructive) {
+                SyncHistory.shared.clear()
+                recentEvents = []
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This clears the recorded activity log only. Your backups and contacts are not affected.")
+        }
+        // Review mode reaches here from any entry point — menu bar, Settings or
+        // the Dashboard button — because they all run through SyncCoordinator.
+        .onChange(of: sync.sessionAwaitingReview?.id) { _, id in
+            guard id != nil, let session = sync.sessionAwaitingReview else { return }
+            appState.currentSyncSession = session
+            showSyncPreview = true
+            sync.sessionAwaitingReview = nil
         }
         .onAppear {
             recentEvents = Self.interestingEvents(from: SyncHistory.shared.events())
@@ -510,6 +532,17 @@ struct DashboardView: View {
                 Text("Recent Changes")
                     .font(.headline)
                 Spacer()
+                if !recentEvents.isEmpty {
+                    Button("Clear") { showClearHistoryConfirmation = true }
+                        .font(.subheadline)
+                        .foregroundStyle(Color.accentColor)
+                        .buttonStyle(.plain)
+                        .help("Delete all recorded sync events. Backups and contacts are not affected.")
+
+                    Text("·")
+                        .font(.subheadline)
+                        .foregroundStyle(.tertiary)
+                }
                 Button("View History & Backups") {
                     showHistoryView = true
                 }
@@ -594,6 +627,49 @@ struct DashboardView: View {
         } else {
             // All other modes: delegate to the shared SyncCoordinator.
             Task { await sync.runSync() }
+        }
+    }
+
+    /// Apply a session the user reviewed in the preview sheet.
+    ///
+    /// The Apply button used to be a TODO that just closed the sheet, so manual
+    /// mode showed the user exactly what it was going to do and then did nothing.
+    private func applyReviewedSession(_ session: SyncSession) {
+        appState.isSyncing = true
+
+        Task {
+            do {
+                let engine = SyncEngine(
+                    googleConnector: GoogleContactsConnector(),
+                    macConnector: MacContactsConnector(),
+                    mappingStore: ContactMappingStore()
+                )
+                let result = try await engine.executeSync(session: session)
+
+                await MainActor.run {
+                    appState.isSyncing = false
+                    appState.currentSyncSession = nil
+                    withAnimation {
+                        syncErrorMessage = nil
+                        syncResultBanner = SyncResultBanner(
+                            icon: result.successful
+                                ? "checkmark.circle.fill"
+                                : "exclamationmark.triangle.fill",
+                            color: result.successful ? .green : .orange,
+                            title: result.successful
+                                ? "Sync Completed"
+                                : "Sync Completed with Errors",
+                            detail: result.summary
+                        )
+                    }
+                    recentEvents = Self.interestingEvents(from: SyncHistory.shared.events())
+                }
+            } catch {
+                await MainActor.run {
+                    appState.isSyncing = false
+                    handleSyncError(error)
+                }
+            }
         }
     }
 

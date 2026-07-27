@@ -30,6 +30,9 @@ private enum ChangeFilter: String, CaseIterable {
 struct SyncPreviewView: View {
     let session: SyncSession
     @Binding var isPresented: Bool
+    /// Applies the reviewed session. Supplied by the presenter so this view does
+    /// not own a SyncEngine.
+    var onApply: ((SyncSession) -> Void)? = nil
 
     @State private var activeFilter: ChangeFilter = .all
     @State private var skipped: Set<UUID> = []
@@ -46,6 +49,23 @@ struct SyncPreviewView: View {
     private var updatedCount:  Int { session.contactChanges.filter { $0.action == .update }.count }
     private var deletedCount:  Int { session.contactChanges.filter { $0.action == .delete }.count }
     private var conflictCount: Int { session.contactChanges.filter { $0.action == .merge  }.count }
+
+    /// The session as the user left it: rows they unchecked become explicit
+    /// skips, and the whole session is marked reviewed.
+    ///
+    /// `userReviewed` is what releases held-back deletions — the point of the
+    /// "Ask before deleting contacts" setting is that a human saw this list.
+    private func reviewedSession() -> SyncSession {
+        var reviewed = session
+        reviewed.userReviewed = true
+        reviewed.contactChanges = session.contactChanges.map { change in
+            guard skipped.contains(change.id) else { return change }
+            var skippedChange = change
+            skippedChange.userOverride = .skip
+            return skippedChange
+        }
+        return reviewed
+    }
 
     private func count(for filter: ChangeFilter) -> Int {
         let base = session.contactChanges.filter { !skipped.contains($0.id) }
@@ -172,7 +192,7 @@ struct SyncPreviewView: View {
                     }
 
                     Button {
-                        // TODO: feed into SyncEngine
+                        onApply?(reviewedSession())
                         isPresented = false
                     } label: {
                         Label(

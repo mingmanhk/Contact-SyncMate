@@ -446,16 +446,16 @@
             "value": "%1$lld versions · %2$@"
           }
         },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$lld 個版本 · %2$@"
-          }
-        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "%1$lld 个版本 · %2$@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld 個版本 · %2$@"
           }
         }
       }
@@ -1036,6 +1036,23 @@
         }
       }
     },
+    "Apply Changes Directly": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直接套用变更"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直接套用變更"
+          }
+        }
+      }
+    },
     "Apply Decision": {
       "localizations": {
         "zh-Hans": {
@@ -1133,6 +1150,7 @@
       }
     },
     "Ask before restoring a backup": {
+      "extractionState": "stale",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -1275,6 +1293,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "自動合併"
+          }
+        }
+      }
+    },
+    "Automatic syncs will not delete contacts. Deletions are listed for you to apply from Sync Now.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动同步不会删除联系人。待删除的项目会列出，由你在「立即同步」中查看后套用。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動同步不會刪除聯絡人。待刪除的項目會列出，由你在「立即同步」中檢視後套用。"
           }
         }
       }
@@ -1803,7 +1837,6 @@
       }
     },
     "Clear": {
-      "extractionState": "stale",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -1952,6 +1985,7 @@
       }
     },
     "Confirm pending deletions": {
+      "extractionState": "stale",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -2294,16 +2328,16 @@
     },
     "Contact restored": {
       "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "聯絡人已還原"
-          }
-        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "联系人已还原"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "聯絡人已還原"
           }
         }
       }
@@ -2477,6 +2511,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "慣例"
+          }
+        }
+      }
+    },
+    "Couldn't encode the log.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法编码记录。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法編碼記錄。"
           }
         }
       }
@@ -2673,6 +2724,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "刪除所有事件"
+          }
+        }
+      }
+    },
+    "Delete all recorded sync events. Backups and contacts are not affected.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除所有已记录的同步事件。备份与联系人不受影响。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刪除所有已記錄的同步事件。備份與聯絡人不受影響。"
+          }
+        }
+      }
+    },
+    "Delete all recorded sync events. Backups are not affected.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除所有已记录的同步事件。备份不受影响。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刪除所有已記錄的同步事件。備份不受影響。"
+          }
+        }
+      }
+    },
+    "Delete all sync events?": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除所有同步事件？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刪除所有同步事件？"
           }
         }
       }
@@ -3423,6 +3522,22 @@
         }
       }
     },
+    "Google account is not connected": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未連接 Google 帳戶"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未连接 Google 帐户"
+          }
+        }
+      }
+    },
     "Google account is not connected. Open Contact SyncMate → Settings → Accounts to sign in.": {
       "localizations": {
         "zh-Hans": {
@@ -3632,6 +3747,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "隱藏 API 密鑰"
+          }
+        }
+      }
+    },
+    "Hide contact names": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏联系人姓名"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隱藏聯絡人姓名"
           }
         }
       }
@@ -5503,6 +5635,22 @@
         }
       }
     },
+    "Refresh": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新整理"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新整理"
+          }
+        }
+      }
+    },
     "Refresh contact count": {
       "localizations": {
         "zh-Hans": {
@@ -5515,6 +5663,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "重新整理聯絡人數量"
+          }
+        }
+      }
+    },
+    "Reload sync events and backups now": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "立即重新载入同步事件与备份"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "立即重新載入同步事件與備份"
           }
         }
       }
@@ -5548,6 +5712,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "記住此選擇並套用於類似配對"
+          }
+        }
+      }
+    },
+    "Replaces names with placeholders so the log can be shared safely": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以占位符取代姓名,让记录可以安全分享"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以佔位符取代姓名,讓記錄可以安全分享"
           }
         }
       }
@@ -5939,6 +6120,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "在 Finder 中顯示"
+          }
+        }
+      }
+    },
+    "Review Before Applying": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "套用前先查看"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "套用前先檢視"
           }
         }
       }
@@ -6382,6 +6580,7 @@
       }
     },
     "Show a confirmation dialog before a restore rewrites contacts": {
+      "extractionState": "stale",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -6414,6 +6613,7 @@
       }
     },
     "Show a confirmation sheet for contacts that will be deleted": {
+      "extractionState": "stale",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -6478,6 +6678,7 @@
       }
     },
     "Show pending deletions for review before they are applied": {
+      "extractionState": "stale",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -7018,6 +7219,23 @@
         }
       }
     },
+    "Sync Now applies every change immediately": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「立即同步」会直接套用所有变更"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「立即同步」會直接套用所有變更"
+          }
+        }
+      }
+    },
     "Sync Preview": {
       "localizations": {
         "zh-Hans": {
@@ -7403,6 +7621,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "建議保留這些防護。關閉可加快同步,但會提高資料遺失的風險。"
+          }
+        }
+      }
+    },
+    "This clears the recorded activity log only. Your backups and contacts are not affected.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这只会清除活动记录，你的备份与联系人不受影响。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這只會清除活動記錄，你的備份與聯絡人不受影響。"
           }
         }
       }
@@ -8104,57 +8338,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "繁體中文"
-          }
-        }
-      }
-    },
-    "Hide contact names": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "隱藏聯絡人姓名"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "隐藏联系人姓名"
-          }
-        }
-      }
-    },
-    "Replaces names with placeholders so the log can be shared safely": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "以佔位符取代姓名,讓記錄可以安全分享"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "以占位符取代姓名,让记录可以安全分享"
-          }
-        }
-      }
-    },
-    "Couldn't encode the log.": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "無法編碼記錄。"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法编码记录。"
           }
         }
       }

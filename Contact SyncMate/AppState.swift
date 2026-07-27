@@ -79,15 +79,25 @@ struct SyncResult {
     var merged: Int
     var skipped: Int
     var errors: [SyncError]
-    
+
+    /// Deletions held back because the run was not user-reviewed and
+    /// "Ask before deleting contacts" is on. Counted inside `skipped` as well;
+    /// this names *why* they were skipped so the UI can offer a review.
+    var deferredDeletions: Int = 0
+
     var successful: Bool {
         errors.isEmpty
     }
-    
+
     var summary: String {
-        """
+        var text = """
         Added: \(added), Updated: \(updated), Deleted: \(deleted), Merged: \(merged), Skipped: \(skipped)
         """
+        if deferredDeletions > 0 {
+            text += "\nHeld back for review: \(deferredDeletions) deletion"
+                 + (deferredDeletions == 1 ? "" : "s")
+        }
+        return text
     }
 }
 
@@ -105,6 +115,15 @@ struct SyncSession: Identifiable {
     var direction: SyncDirection
     var startTime: Date
     var contactChanges: [ContactChange]
+
+    /// True once the user has seen these changes and pressed Apply.
+    ///
+    /// Read by `SyncEngine` for the "Ask before deleting contacts" setting: an
+    /// unreviewed run records what it would delete and leaves it, rather than
+    /// deleting on a schedule with nobody watching. Additions and updates are
+    /// recoverable from a backup; deletions across two address books are the
+    /// change users actually get hurt by.
+    var userReviewed: Bool = false
 }
 
 struct ContactChange: Identifiable {

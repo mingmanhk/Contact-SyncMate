@@ -16,7 +16,31 @@ class AppSettings: ObservableObject {
     static let shared = AppSettings()
     
     private init() {
-        // Private initializer to ensure singleton
+        migrateLegacySyncType()
+    }
+
+    /// Carry a pre-split `selectedSyncType` over to the settings that replaced it.
+    ///
+    /// `SyncType` used to hold a direction and a mode in one value. Anyone who had
+    /// chosen a direction tile has that raw value on disk, and it no longer
+    /// decodes — the property initialiser would quietly fall back to `.manual`
+    /// and drop their choice. This moves the direction to `autoSyncDirection`
+    /// (where it is actually read) and sets the mode to `.automatic`, which is
+    /// what those tiles meant.
+    private func migrateLegacySyncType() {
+        let defaults = UserDefaults.standard
+        guard let raw = defaults.string(forKey: "selectedSyncType"),
+              SyncType(rawValue: raw) == nil else { return }
+
+        if let direction = SyncDirection(rawValue: raw) {
+            autoSyncDirection = direction
+        }
+        selectedSyncType = .automatic
+
+        SyncHistory.shared.log(
+            source: "AppSettings", action: "settings.migratedSyncType",
+            details: "'\(raw)' → mode=automatic, direction=\(autoSyncDirection.rawValue)"
+        )
     }
     
     // MARK: - Common Sync Settings
@@ -291,10 +315,10 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(confirmBeforeSyncNow, forKey: "confirmBeforeSyncNow") }
     }
 
-    /// Ask before restoring a backup. Default ON — restore rewrites contacts.
-    @Published var confirmBeforeRestore: Bool = UserDefaults.standard.object(forKey: "confirmBeforeRestore") as? Bool ?? true {
-        didSet { UserDefaults.standard.set(confirmBeforeRestore, forKey: "confirmBeforeRestore") }
-    }
+    // `confirmBeforeRestore` used to live here and was never read. It could not
+    // be honoured either way: the restore sheet is not a yes/no prompt, it is
+    // where the user decides whether to delete contacts added since the backup.
+    // Skipping it would mean picking one of those outcomes for them silently.
 
     /// Allow high-confidence duplicate merges to apply WITHOUT asking.
     /// Default OFF — auto-merge only runs silently when the user opts in.
@@ -468,7 +492,7 @@ class AppSettings: ObservableObject {
         maxBackupCount = 30
 
         confirmBeforeSyncNow = false
-        confirmBeforeRestore = true
+        confirmPendingDeletions = true
         allowSilentAutoMerge = false
 
         nameFormattingEnabled = false
@@ -570,33 +594,35 @@ extension Notification.Name {
 
 // MARK: - Supporting Enums
 
+/// Whether Sync Now applies changes directly or shows them for review first.
+///
+/// This used to carry `twoWay` / `googleToMac` / `macToGoogle` alongside
+/// `manual`, which conflated *direction* with *mode*. Direction already lived in
+/// `autoSyncDirection`, and that is the value every sync path actually read — so
+/// the three direction tiles in Settings changed nothing but a button label. A
+/// user who picked "Google → Mac" there and left the direction picker on 2-Way
+/// got a two-way sync.
+///
+/// Legacy raw values are migrated in `AppSettings.migrateLegacySyncType()`.
 enum SyncType: String, CaseIterable, Codable {
-    case twoWay = "twoWay"
-    case googleToMac = "googleToMac"
-    case macToGoogle = "macToGoogle"
+    /// Apply the computed changes without stopping.
+    case automatic = "automatic"
+    /// Show the changes and wait for the user to approve them.
     case manual = "manual"
-    
+
     var displayName: String {
         switch self {
-        case .twoWay:
-            return String(localized: "2-Way Sync")
-        case .googleToMac:
-            return String(localized: "Google → Mac")
-        case .macToGoogle:
-            return String(localized: "Mac → Google")
+        case .automatic:
+            return String(localized: "Apply Changes Directly")
         case .manual:
-            return String(localized: "Manual Sync…")
+            return String(localized: "Review Before Applying")
         }
     }
 
     var description: String {
         switch self {
-        case .twoWay:
-            return String(localized: "Sync changes in both directions automatically")
-        case .googleToMac:
-            return String(localized: "Google contacts are the master, changes sync to Mac only")
-        case .macToGoogle:
-            return String(localized: "Mac contacts are the master, changes sync to Google only")
+        case .automatic:
+            return String(localized: "Sync Now applies every change immediately")
         case .manual:
             return String(localized: "Preview and approve each change before syncing")
         }

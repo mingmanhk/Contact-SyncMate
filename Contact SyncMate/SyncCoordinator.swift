@@ -91,6 +91,13 @@ final class SyncCoordinator: ObservableObject {
     @Published private(set) var stepLabel: String = ""
     @Published private(set) var progress: Double = 0
 
+    /// A prepared session waiting for the user to approve it.
+    ///
+    /// Set instead of applying when the mode is `.manual`. Whichever view is on
+    /// screen presents the preview; the coordinator does not own UI, so it
+    /// publishes the session rather than showing a sheet itself.
+    @Published var sessionAwaitingReview: SyncSession?
+
     // MARK: Weak refs (set by AppDelegate after launch)
 
     weak var appState: AppState?
@@ -187,6 +194,26 @@ final class SyncCoordinator: ObservableObject {
                         SyncNotifier.notifyConflictsNeedReview(count: n)
                     }
                 }
+            }
+
+            // Review mode: hand the session to the UI instead of applying it.
+            //
+            // Only the Dashboard used to branch on this, so "Sync Now" from the
+            // menu bar or from Settings applied everything immediately even with
+            // Review Before Applying selected. Deciding it here means every entry
+            // point behaves the same, because they all come through runSync.
+            if settings.selectedSyncType == .manual {
+                progressCancellable?.cancel()
+                appState?.currentSyncSession = session
+                appState?.isSyncing = false
+                appState?.syncProgress = nil
+                setPhase(.idle)
+                sessionAwaitingReview = session
+                SyncHistory.shared.log(
+                    source: "SyncCoordinator", action: "sync.awaitingReview",
+                    details: "\(session.contactChanges.count) changes prepared for review"
+                )
+                return
             }
 
             // Execute

@@ -194,6 +194,7 @@ class SyncEngine: ObservableObject {
         var deleted = 0
         var merged = 0
         var skipped = 0
+        var deferredDeletions = 0
         var errors: [SyncError] = []
 
         // Google-bound writes go out in bulk first; the loop below then walks the
@@ -214,6 +215,19 @@ class SyncEngine: ObservableObject {
             
             // Use override if set, otherwise use planned action
             let action = change.userOverride ?? change.action
+
+            // "Ask before deleting contacts": record it, do not do it. The user
+            // applies held-back deletions from the sync preview.
+            if Self.deletionIsHeldBack(action: action, session: session, settings: settings) {
+                skipped += 1
+                deferredDeletions += 1
+                SyncHistory.shared.log(
+                    source: "SyncEngine", action: "delete.heldForReview",
+                    details: "\(change.contactName) — enable Sync Now review to apply, "
+                           + "or turn off Settings → Confirmations → Ask before deleting contacts"
+                )
+                continue
+            }
 
             // Dry run: count what would happen, write nothing.
             //
@@ -320,7 +334,8 @@ class SyncEngine: ObservableObject {
             deleted: deleted,
             merged: merged,
             skipped: skipped,
-            errors: errors
+            errors: errors,
+            deferredDeletions: deferredDeletions
         )
 
         // Create post-sync backup with actual final state.
@@ -846,6 +861,21 @@ class SyncEngine: ObservableObject {
     /// path but loses its per-contact error messages and stale-etag retry.
     private static let minimumBatchSize = 2
 
+    /// Whether "Ask before deleting contacts" should hold this deletion back.
+    ///
+    /// The setting existed and was never read, so a scheduled sync could delete
+    /// on both sides with nobody watching. Rather than block on a dialog that a
+    /// 4-hourly background run has no way to show, an unreviewed run records the
+    /// deletion and leaves it: the user applies it from the sync preview, where
+    /// they can see exactly what would go. Adds and updates are recoverable from
+    /// a backup; a deletion propagated to both address books is the change that
+    /// actually costs people data.
+    static func deletionIsHeldBack(action: SyncAction,
+                                   session: SyncSession,
+                                   settings: AppSettings) -> Bool {
+        action == .delete && settings.confirmPendingDeletions && !session.userReviewed
+    }
+
     /// Whether a change writes to Google, resolving `.twoWay` the way the
     /// per-contact apply paths do.
     ///
@@ -888,7 +918,8 @@ class SyncEngine: ObservableObject {
 
         for change in session.contactChanges {
             let action = change.userOverride ?? change.action
-            guard Self.writesToGoogle(change, action: action, session: session),
+            guard !Self.deletionIsHeldBack(action: action, session: session, settings: settings),
+                  Self.writesToGoogle(change, action: action, session: session),
                   let rawSource = change.sourceContact else { continue }
             let source = applyFieldSettings(to: rawSource)
 

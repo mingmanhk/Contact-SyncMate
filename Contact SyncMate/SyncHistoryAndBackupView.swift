@@ -21,6 +21,8 @@ struct SyncHistoryAndBackupView: View {
     /// because they clicked through a dialog.
     @State private var removeContactsAddedSinceBackup = false
     @State private var selectedTab: HistoryTab = .timeline
+    @State private var showClearHistoryConfirmation = false
+    @State private var refreshSpin: Double = 0
 
     enum HistoryTab {
         case timeline
@@ -43,11 +45,33 @@ struct SyncHistoryAndBackupView: View {
 
                     Spacer()
 
-                    // Refresh button
-                    Button(action: { viewModel.refresh() }) {
+                    // Clearing lived only in the other history view, which is not
+                    // the one this window shows — so from here the log could be
+                    // read but never cleared.
+                    if selectedTab == .timeline && !viewModel.syncEvents.isEmpty {
+                        Button(role: .destructive) {
+                            showClearHistoryConfirmation = true
+                        } label: {
+                            Label("Clear", systemImage: "trash")
+                        }
+                        .help("Delete all recorded sync events. Backups are not affected.")
+                    }
+
+                    // Refresh button.
+                    //
+                    // It always worked — the list also reloads on a 5-second timer,
+                    // so a click landed on data that was already current and looked
+                    // dead. The spin is the acknowledgement that was missing.
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.6)) { refreshSpin += 360 }
+                        viewModel.refresh()
+                    } label: {
                         Image(systemName: "arrow.clockwise")
                             .foregroundStyle(Color.appAccent)
+                            .rotationEffect(.degrees(refreshSpin))
                     }
+                    .help("Reload sync events and backups now")
+                    .accessibilityLabel("Refresh")
                 }
 
                 // Tab selector
@@ -84,6 +108,22 @@ struct SyncHistoryAndBackupView: View {
             Spacer()
         }
         .background(Color(nsColor: .controlBackgroundColor))
+        // A macOS sheet sizes itself to its content unless told otherwise. With
+        // no frame this window collapsed to roughly the height of its header, so
+        // the Contacts tab showed its search field and nothing else — the list
+        // underneath had no room to draw and looked like a broken search.
+        .frame(minWidth: 720, idealWidth: 860, minHeight: 520, idealHeight: 620)
+        .confirmationDialog("Delete all sync events?",
+                            isPresented: $showClearHistoryConfirmation,
+                            titleVisibility: .visible) {
+            Button("Delete All Events", role: .destructive) {
+                SyncHistory.shared.clear()
+                viewModel.refresh()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This clears the recorded activity log only. Your backups and contacts are not affected.")
+        }
         .sheet(isPresented: $showRestoreConfirmation, onDismiss: {
             selectedBackup = nil
         }) {

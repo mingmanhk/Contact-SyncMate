@@ -14,8 +14,18 @@ class GoogleContactsConnector: ObservableObject {
     @Published var currentAccountEmail: String?
     
     private let oauthManager = GoogleOAuthManager.shared
-    private var syncToken: String? // For incremental sync
-    
+
+    // An incremental-fetch path (syncToken / fetchChangedContacts) used to live
+    // here, unused. It was removed rather than wired up: connections are fetched
+    // 1000 per page, so a full fetch of a normal address book is a single request
+    // — the same one an incremental fetch would cost. It saved nothing, while
+    // requiring a locally cached copy of every Google contact for the diff to run
+    // against. A stale or drifted cache feeding the diff is how contacts get
+    // wrongly deleted, which is not a risk worth taking for zero saved requests.
+    //
+    // The request count that actually mattered was one write per contact; that is
+    // fixed by the batch endpoints (see batchCreateContacts).
+
     // Google People API base URL
     private let baseURL = "https://people.googleapis.com/v1"
     
@@ -37,7 +47,7 @@ class GoogleContactsConnector: ObservableObject {
     
     func signOut() {
         oauthManager.signOut()
-        syncToken = nil
+        etagCache.removeAll()
     }
     
     // MARK: - API Request Helper
@@ -190,50 +200,6 @@ class GoogleContactsConnector: ObservableObject {
         } while pageToken != nil
         
         return allContacts
-    }
-    
-    func fetchChangedContacts(since syncToken: String) async throws -> GoogleContactsChanges {
-        guard isAuthenticated else {
-            throw GoogleContactsError.notAuthenticated
-        }
-        
-        let personFields = "names,emailAddresses,phoneNumbers,addresses,organizations,photos,birthdays,urls,nicknames,metadata"
-        
-        var components = URLComponents(string: "\(baseURL)/people/me/connections")!
-        components.queryItems = [
-            URLQueryItem(name: "personFields", value: personFields),
-            URLQueryItem(name: "syncToken", value: syncToken),
-            URLQueryItem(name: "requestSyncToken", value: "true")
-        ]
-        
-        let (data, _) = try await makeRequest(url: components.url!)
-        let response = try JSONDecoder().decode(PeopleAPIResponse.self, from: data)
-        
-        let added: [GoogleContact] = []
-        var updated: [GoogleContact] = []
-        var deleted: [String] = []
-        
-        if let connections = response.connections {
-            for person in connections {
-                if let contact = convertToPerson(person) {
-                    // Check if deleted
-                    if person.metadata?.deleted == true {
-                        deleted.append(contact.id)
-                    } else {
-                        // Determine if new or updated based on metadata
-                        // For simplicity, treat all as updated in incremental sync
-                        updated.append(contact)
-                    }
-                }
-            }
-        }
-        
-        return GoogleContactsChanges(
-            added: added,
-            updated: updated,
-            deleted: deleted,
-            newSyncToken: response.nextSyncToken ?? syncToken
-        )
     }
     
     func fetchContact(resourceName: String) async throws -> GoogleContact {
@@ -892,13 +858,6 @@ struct GoogleContactGroup: Identifiable, Codable {
     var resourceName: String { id }
     var name: String
     var memberCount: Int?
-}
-
-struct GoogleContactsChanges {
-    var added: [GoogleContact]
-    var updated: [GoogleContact]
-    var deleted: [String] // resourceNames
-    var newSyncToken: String
 }
 
 struct GoogleDuplicateSet: Identifiable {
