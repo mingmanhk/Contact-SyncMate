@@ -110,7 +110,9 @@ class MacContactsExporter: ObservableObject {
 
             // Always pass a specific container to avoid "All Accounts"
             if let container = targetContainer {
-                return try await self.connector.fetchAllContacts(in: container)
+                // Nonisolated variant: the awaited main-actor one would hop back
+                // and re-introduce the inversion this detached task exists to avoid.
+                return try MacContactsConnector.fetchAllContactsOffMain(in: container)
             } else {
                 // If no container found at all, return empty array rather than querying all accounts
                 return []

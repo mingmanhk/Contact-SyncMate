@@ -188,10 +188,17 @@ class DeduplicationCoordinator: ObservableObject {
                 _ = try await googleConnector.updateContact(googleContact)
             }
             if let mID = merged.macContactIdentifier, !mID.isEmpty {
-                if let existing = try macConnector.fetchContact(withIdentifier: mID) {
+                // Fetch + write together, off the main actor. CNContactStore is
+                // synchronous XPC to contactsd at background QoS; driving it from
+                // the main actor inverts priority and the resulting contention
+                // shows up as Cocoa 134092 during faulting.
+                let c = macConnector
+                let unified = merged
+                try await MacContactsConnector.performWriteOffMain {
+                    guard let existing = try c.fetchContactSync(withIdentifier: mID) else { return }
                     let mutable = existing.mutableCopy() as! CNMutableContact
-                    ContactMapper.applyToMac(from: merged, to: mutable)
-                    try macConnector.updateContact(mutable)
+                    ContactMapper.applyToMac(from: unified, to: mutable)
+                    try c.updateContactSync(mutable)
                 }
             }
 
@@ -201,7 +208,10 @@ class DeduplicationCoordinator: ObservableObject {
                     try? await googleConnector.deleteContact(resourceName: gID)
                 }
                 if other.source == .mac, let mID = other.contact.macContactIdentifier {
-                    try? macConnector.deleteContact(withIdentifier: mID)
+                    let c = macConnector
+                    try? await MacContactsConnector.performWriteOffMain {
+                        try c.deleteContactSync(withIdentifier: mID)
+                    }
                 }
             }
 

@@ -425,6 +425,11 @@ class MacContactsConnector: ObservableObject {
             // com.apple.developer.contacts.notes entitlement, and requesting it
             // without one makes the fetch itself fail.
         ].map { $0 as CNKeyDescriptor }
+        // Callers that format a display name go through CNContactFormatter, which
+        // has its own required-key descriptor. Omitting it raises
+        // CNContactPropertyNotFetchedException — an ObjC exception, so it kills
+        // the process rather than surfacing as a Swift error.
+        + [CNContactFormatter.descriptorForRequiredKeys(for: .fullName)]
     }
 
     // A field-bisecting `probeSaveFailure` used to live here. It saved

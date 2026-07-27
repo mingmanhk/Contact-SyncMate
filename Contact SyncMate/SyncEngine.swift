@@ -941,7 +941,13 @@ class SyncEngine: ObservableObject {
         case .googleToMac:
             // Delete from Mac (Google side was deleted)
             if let mID = source.macContactIdentifier {
-                try macConnector.deleteContact(withIdentifier: mID)
+                // Off-main like every other Contacts mutation: `deleteContact`
+                // fetches the live record first, and that fetch is the same
+                // synchronous XPC hop that inverts priority from the main actor.
+                let c = macConnector
+                try await MacContactsConnector.performWriteOffMain {
+                    try c.deleteContactSync(withIdentifier: mID)
+                }
                 if let gID = source.googleResourceName {
                     mappingStore.deleteMapping(googleResourceName: gID)
                 }
@@ -1002,10 +1008,16 @@ class SyncEngine: ObservableObject {
 
         // Write merged result to Mac side
         if let mID = target.macContactIdentifier ?? source.macContactIdentifier {
-            if let existing = try macConnector.fetchContact(withIdentifier: mID) {
+            // Fetch, mutate and write inside one off-main block. Fetching on the
+            // main actor and only writing off it still leaves the inversion on
+            // the hot path — the fetch is XPC too.
+            let c = macConnector
+            let unified = finalMerged
+            try await MacContactsConnector.performWriteOffMain {
+                guard let existing = try c.fetchContactSync(withIdentifier: mID) else { return }
                 let mutable = existing.mutableCopy() as! CNMutableContact
-                ContactMapper.applyToMac(from: finalMerged, to: mutable)
-                let c = macConnector; try await MacContactsConnector.performWriteOffMain { try c.updateContactSync(mutable) }
+                ContactMapper.applyToMac(from: unified, to: mutable)
+                try c.updateContactSync(mutable)
             }
         }
 

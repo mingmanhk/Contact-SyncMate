@@ -218,22 +218,22 @@ extension SyncEngine {
                 // contact fell through to `saveContact`. Combined with the snapshot
                 // bug that left `macContactIdentifier` nil, a restore duplicated the
                 // entire address book instead of reverting it.
+                // Look-up and write happen in one off-main block. The lookup is a
+                // synchronous XPC call like the write is, so leaving it on the
+                // main actor kept the priority inversion alive for the whole
+                // restore.
                 let connector = macConnector
-                let existing = try unified.macContactIdentifier.flatMap {
-                    try macConnector.fetchContact(withIdentifier: $0)
-                }
-
-                if let existing {
-                    let mutable = existing.mutableCopy() as! CNMutableContact
-                    ContactMapper.applyToMac(from: unified, to: mutable)
-                    try await MacContactsConnector.performWriteOffMain {
+                let snapshot = unified
+                let macID = unified.macContactIdentifier
+                try await MacContactsConnector.performWriteOffMain {
+                    if let macID,
+                       let existing = try connector.fetchContactSync(withIdentifier: macID) {
+                        let mutable = existing.mutableCopy() as! CNMutableContact
+                        ContactMapper.applyToMac(from: snapshot, to: mutable)
                         try connector.updateContactSync(mutable)
-                    }
-                } else {
-                    // The contact was deleted since the backup — recreate it.
-                    let macContact = ContactMapper.toMac(from: unified)
-                    try await MacContactsConnector.performWriteOffMain {
-                        try connector.saveContactSync(macContact, to: nil)
+                    } else {
+                        // The contact was deleted since the backup — recreate it.
+                        try connector.saveContactSync(ContactMapper.toMac(from: snapshot), to: nil)
                     }
                 }
                 restoredCount += 1
