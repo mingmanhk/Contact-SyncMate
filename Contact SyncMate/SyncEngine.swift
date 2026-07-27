@@ -795,6 +795,10 @@ class SyncEngine: ObservableObject {
             guard let gID = change.targetContact?.googleResourceName else { return }
             var googleContact = GoogleContact(id: gID)
             ContactMapper.applyToGoogle(from: source, to: &googleContact)
+            // Reuse the etag captured during the initial fetch. Without it,
+            // updateContact pays an extra GET per contact — and the change cannot
+            // qualify for batching either.
+            googleContact.etag = googleConnector.knownETag(for: gID)
             _ = try await googleConnector.updateContact(googleContact)
             if let mID = source.macContactIdentifier {
                 mappingStore.saveMapping(ContactMapping(
@@ -897,6 +901,7 @@ class SyncEngine: ObservableObject {
         if let gID = target.googleResourceName ?? source.googleResourceName {
             var googleContact = GoogleContact(id: gID)
             ContactMapper.applyToGoogle(from: finalMerged, to: &googleContact)
+            googleContact.etag = googleConnector.knownETag(for: gID)
             _ = try await googleConnector.updateContact(googleContact)
         }
 

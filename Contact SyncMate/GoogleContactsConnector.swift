@@ -53,6 +53,11 @@ class GoogleContactsConnector: ObservableObject {
     private static let updatablePersonFields =
         "names,emailAddresses,phoneNumbers,addresses,organizations,birthdays,urls,nicknames"
 
+    /// Fields requested back from batch calls. Kept identical to the update mask
+    /// plus `metadata`, which carries the fresh etag every subsequent update needs.
+    private static let readablePersonFields =
+        "names,emailAddresses,phoneNumbers,addresses,organizations,birthdays,urls,nicknames,metadata"
+
     /// How many times a request is retried before the error is surfaced.
     ///
     /// Google's People API applies a **per-minute** quota, so a sync touching a
@@ -174,7 +179,11 @@ class GoogleContactsConnector: ObservableObject {
             let response = try JSONDecoder().decode(PeopleAPIResponse.self, from: data)
             
             if let connections = response.connections {
-                allContacts.append(contentsOf: connections.compactMap { convertToPerson($0) })
+                let page = connections.compactMap { convertToPerson($0) }
+                // Harvest etags while we have them: every update later in this
+                // sync needs one, and without this each would pay its own GET.
+                cacheETags(from: page)
+                allContacts.append(contentsOf: page)
             }
             
             pageToken = response.nextPageToken
@@ -299,13 +308,43 @@ class GoogleContactsConnector: ObservableObject {
             // a concurrent edit costs a round trip instead of a failed sync.
             SyncHistory.shared.log(source: "GoogleAPI", action: "update.refreshingStaleETag",
                                    details: contact.resourceName)
-            contact.etag = try await currentETag(for: contact.resourceName)
+            // Cache-bypassing on purpose: the cached value is precisely what the
+            // server just rejected as stale.
+            etagCache[contact.resourceName] = nil
+            contact.etag = try await fetchETagFromServer(contact.resourceName)
             return try await performUpdate(contact)
         }
     }
 
+    /// etags seen during the last full fetch, keyed by resourceName.
+    ///
+    /// `updateContact` needs an etag, and a `GoogleContact` rebuilt from a
+    /// `UnifiedContact` has none — so each update was preceded by its own GET,
+    /// doubling the request count for the most common operation. Every sync
+    /// already fetches all Google contacts first, and those carry etags, so the
+    /// information is on hand: caching it removes one round trip per update and
+    /// is what lets contacts qualify for batching at all.
+    private var etagCache: [String: String] = [:]
+
+    /// Record etags from a freshly fetched page.
+    func cacheETags(from contacts: [GoogleContact]) {
+        for contact in contacts where contact.etag != nil {
+            etagCache[contact.resourceName] = contact.etag
+        }
+    }
+
+    /// Best known etag for a contact — cached first, network only as a fallback.
+    func knownETag(for resourceName: String) -> String? {
+        etagCache[resourceName]
+    }
+
     /// Read the server's current etag for a person.
     private func currentETag(for resourceName: String) async throws -> String? {
+        if let cached = etagCache[resourceName] { return cached }
+        return try await fetchETagFromServer(resourceName)
+    }
+
+    private func fetchETagFromServer(_ resourceName: String) async throws -> String? {
         var components = URLComponents(string: "\(baseURL)/\(resourceName)")!
         components.queryItems = [URLQueryItem(name: "personFields", value: "metadata")]
 
@@ -370,21 +409,24 @@ class GoogleContactsConnector: ObservableObject {
         return results
     }
     
+    /// One `people:batchCreateContacts` call for up to 200 contacts.
+    ///
+    /// Same defect as the update path: a `PeopleAPIPerson` struct was handed to
+    /// `JSONSerialization`, which only accepts foundation JSON types, so this
+    /// threw before sending. `readMask` is also required by the API.
     private func batchCreateChunk(_ contacts: [GoogleContact]) async throws -> [GoogleContact] {
         let url = URL(string: "\(baseURL)/people:batchCreateContacts")!
-        
-        let requests = contacts.map { contact -> [String: Any] in
-            let person = convertToAPIPerson(contact)
-            return ["contactPerson": person]
-        }
-        
-        let bodyDict: [String: Any] = ["contacts": requests]
-        let body = try JSONSerialization.data(withJSONObject: bodyDict)
-        
+
+        let payload = BatchCreateRequest(
+            contacts: contacts.map { BatchCreateRequest.Item(contactPerson: convertToAPIPerson($0)) },
+            readMask: Self.readablePersonFields
+        )
+
+        let body = try JSONEncoder().encode(payload)
         let (data, _) = try await makeRequest(url: url, method: "POST", body: body)
         let response = try JSONDecoder().decode(BatchCreateResponse.self, from: data)
-        
-        return response.createdPeople.compactMap { convertToPerson($0.person) }
+
+        return response.people.compactMap { $0.person.flatMap { convertToPerson($0) } }
     }
     
     func batchUpdateContacts(_ contacts: [GoogleContact]) async throws -> [GoogleContact] {
@@ -407,32 +449,57 @@ class GoogleContactsConnector: ObservableObject {
         return results
     }
     
+    /// One `people:batchUpdateContacts` call for up to 200 contacts.
+    ///
+    /// The previous implementation could never have worked: it built the body with
+    /// `JSONSerialization.data(withJSONObject:)` while embedding a `PeopleAPIPerson`
+    /// *struct* as a value — not a JSON-representable type, so the call threw
+    /// before reaching the network. It also used the wrong request shape entirely:
+    /// `contacts` is a **map** of resourceName → Person with a single top-level
+    /// `updateMask`, not an array of per-contact request objects.
+    ///
+    /// Encoding through `JSONEncoder` keeps the Person shape in one place
+    /// (`convertToAPIPerson`) instead of duplicating it as dictionaries.
     private func batchUpdateChunk(_ contacts: [GoogleContact]) async throws -> [GoogleContact] {
-        let url = URL(string: "\(baseURL)/people:batchUpdateContacts")!
-        
-        // `photos` is NOT a valid updatePersonFields path — People API rejects the
-        // whole request with
-        //   400 "Invalid updatePersonFields mask path: \"photos\""
-        // because photos are written through people.updateContactPhoto instead.
-        // Including it here failed every single update, whatever else changed.
-        let updateFields = Self.updatablePersonFields
-        
-        let requests = contacts.map { contact -> [String: Any] in
-            let person = convertToAPIPerson(contact)
-            return [
-                "resourceName": contact.resourceName,
-                "person": person,
-                "updatePersonFields": updateFields
-            ]
+        // Contacts with no etag cannot be updated — People API requires it for
+        // optimistic concurrency and rejects the whole batch otherwise. Resolving
+        // them one by one here would defeat the point of batching, so they fall
+        // back to the single-contact path (which does fetch an etag).
+        var batchable: [GoogleContact] = []
+        var needsETag: [GoogleContact] = []
+        for contact in contacts {
+            if contact.etag != nil { batchable.append(contact) } else { needsETag.append(contact) }
         }
-        
-        let bodyDict: [String: Any] = ["contacts": requests]
-        let body = try JSONSerialization.data(withJSONObject: bodyDict)
-        
-        let (data, _) = try await makeRequest(url: url, method: "POST", body: body)
-        let response = try JSONDecoder().decode(BatchUpdateResponse.self, from: data)
-        
-        return response.updateResult.compactMap { convertToPerson($0.person) }
+
+        var results: [GoogleContact] = []
+
+        if !batchable.isEmpty {
+            let url = URL(string: "\(baseURL)/people:batchUpdateContacts")!
+
+            let payload = BatchUpdateRequest(
+                contacts: Dictionary(
+                    batchable.map { ($0.resourceName, convertToAPIPerson($0)) },
+                    uniquingKeysWith: { _, latest in latest }
+                ),
+                updateMask: Self.updatablePersonFields,
+                readMask: Self.readablePersonFields
+            )
+
+            let body = try JSONEncoder().encode(payload)
+            let (data, _) = try await makeRequest(url: url, method: "POST", body: body)
+            let response = try JSONDecoder().decode(BatchUpdateResponse.self, from: data)
+
+            // `updateResult` is a map keyed by resource name, not an array.
+            results += response.updateResult.values.compactMap {
+                $0.person.flatMap { convertToPerson($0) }
+            }
+        }
+
+        for contact in needsETag {
+            results.append(try await updateContact(contact))
+        }
+
+        return results
     }
     
     func batchDeleteContacts(resourceNames: [String]) async throws {
@@ -963,19 +1030,48 @@ struct ContactGroupAPI: Codable {
     let memberCount: Int?
 }
 
+// MARK: - Batch request/response shapes
+//
+// Modelled directly on the People API reference rather than assembled as
+// dictionaries — the previous hand-built bodies had the wrong shape *and* could
+// not be serialised at all.
+
+struct BatchCreateRequest: Codable {
+    struct Item: Codable {
+        let contactPerson: PeopleAPIPerson
+    }
+    let contacts: [Item]
+    /// Required by the API; determines which fields come back on the created people.
+    let readMask: String
+}
+
 struct BatchCreateResponse: Codable {
-    let createdPeople: [CreatedPerson]
+    let createdPeople: [CreatedPerson]?
+
+    /// Absent when every create failed, so the array must be optional — decoding
+    /// a partial failure should surface as an empty result, not a thrown
+    /// `keyNotFound` that hides the real API error.
+    var people: [CreatedPerson] { createdPeople ?? [] }
 }
 
 struct CreatedPerson: Codable {
-    let person: PeopleAPIPerson
+    let person: PeopleAPIPerson?
+}
+
+struct BatchUpdateRequest: Codable {
+    /// Keyed by resourceName — the API takes a map here, not a list.
+    let contacts: [String: PeopleAPIPerson]
+    let updateMask: String
+    let readMask: String
 }
 
 struct BatchUpdateResponse: Codable {
-    let updateResult: [UpdateResult]
+    /// Also a map keyed by resourceName. Decoding it as an array was guaranteed
+    /// to throw on the first real response.
+    let updateResult: [String: UpdateResult]
 }
 
 struct UpdateResult: Codable {
-    let person: PeopleAPIPerson
+    let person: PeopleAPIPerson?
 }
 
