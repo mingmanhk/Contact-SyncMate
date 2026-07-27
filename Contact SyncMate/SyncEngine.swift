@@ -1886,6 +1886,18 @@ class ContactMappingStore {
         }
     }
 
+    /// Forget every Google ↔ Mac pairing.
+    ///
+    /// The next sync then treats both address books as unseen and re-matches by
+    /// identity. That is what makes a retest a genuine first run — with the
+    /// mappings still on disk, a "fresh" install behaves like an established one.
+    func deleteAllMappings() {
+        queue.sync(flags: .barrier) {
+            self.mappings.removeAll()
+            self.saveToDisk()
+        }
+    }
+
     // MARK: - Persistence
 
     private func saveToDisk() {

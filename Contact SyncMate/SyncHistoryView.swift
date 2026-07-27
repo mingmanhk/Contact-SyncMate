@@ -48,6 +48,16 @@ private enum HistoryFilter: String, CaseIterable {
 // MARK: - Sync History View
 
 struct SyncHistoryView: View {
+    /// Hide the built-in title bar and use the container's instead.
+    ///
+    /// There used to be two history screens: this one behind ⌘2, and a second,
+    /// weaker timeline inside Sync History & Backups. Same data, two
+    /// implementations, and only this one had search, filtering, export and name
+    /// redaction — which is why a Clear button added to one of them was
+    /// invisible from the other. This one is now the only timeline; embedding it
+    /// just means the surrounding window owns the header.
+    var embedded: Bool = false
+
     @State private var allEvents: [SyncEvent] = []
     @State private var activeFilter: HistoryFilter = .all
     @State private var searchText = ""
@@ -143,6 +153,7 @@ struct SyncHistoryView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Toolbar
+            if !embedded {
             HStack {
                 Text("Sync History")
                     .font(.title2)
@@ -183,6 +194,7 @@ struct SyncHistoryView: View {
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
+            }
 
             // Search + filter
             VStack(spacing: 8) {
@@ -243,7 +255,7 @@ struct SyncHistoryView: View {
                 .listStyle(.sidebar)
             }
         }
-        .frame(minWidth: 540, minHeight: 480)
+        .frame(minWidth: embedded ? nil : 540, minHeight: embedded ? nil : 480)
         .onAppear { allEvents = SyncHistory.shared.events() }
     }
 

@@ -291,127 +291,10 @@ struct GeneralSettingsView: View {
     @EnvironmentObject private var appState: AppState
     @State private var showingResetConfirmation = false
     @State private var pendingLanguageRelaunch = false
-    @State private var recentChanges: [SyncEvent] = []
-    @State private var isLogExpanded = false
-
-    /// Sync Mode used to be selectable here with no way to act on the choice —
-    /// picking "Manual Sync…" set a preference and then left the user with
-    /// nothing to press. This puts the state and the action next to the setting
-    /// that governs them.
-    private var canSync: Bool {
-        appState.isGoogleConnected
-            && appState.isMacContactsAuthorized
-            && !sync.isRunning
-    }
-
-    /// The last handful of contact-level writes, newest first.
-    ///
-    /// Cached in `@State` rather than computed in the body: `SyncHistory.events()`
-    /// takes a lock and copies the whole event array, and SwiftUI re-evaluates a
-    /// body far more often than this data changes. Refreshed on appear and when a
-    /// sync finishes — the only two moments it can differ.
-    private static func loadRecentChanges() -> [SyncEvent] {
-        SyncHistory.shared.events()
-            .reversed()
-            // `change.*` is the namespace SyncEngine uses for actual mutations,
-            // so lifecycle noise like `sync.start` never crowds out the thing
-            // the user wants to see.
-            .filter { $0.action.lowercased().hasPrefix("change.") }
-            // 20, not 5: the list only renders inside the expanded disclosure, and
-            // when a sync is going wrong you need enough rows to see the pattern
-            // rather than the last handful.
-            .prefix(20)
-            .map { $0 }
-    }
-
-    /// The expandable body — shared by the running and idle states so the log
-    /// looks identical whether you open it mid-sync or afterwards.
-    @ViewBuilder
-    private var changeLogList: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            if recentChanges.isEmpty {
-                Text("No changes yet.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            ForEach(recentChanges) { event in
-                HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: changeIcon(for: event.action))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(changeTint(for: event.action))
-                        .frame(width: 14)
-
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(event.details ?? event.action)
-                            .font(.caption)
-                            // Failures carry the reason, and a truncated reason is
-                            // useless — that is the whole point of opening this.
-                            .lineLimit(isFailure(event.action) ? 3 : 1)
-                            .truncationMode(.middle)
-                            .textSelection(.enabled)
-
-                        if isFailure(event.action) {
-                            Text(friendlyActionLabel(event.action))
-                                .font(.caption2)
-                                .foregroundStyle(Color.appError)
-                        }
-                    }
-
-                    Spacer(minLength: 8)
-
-                    Text(event.timestamp, style: .time)
-                        .font(.caption2)
-                        .monospacedDigit()
-                        .foregroundStyle(.tertiary)
-                }
-            }
-
-            Button("View History & Backups") {
-                NotificationCenter.default.post(name: .openHistoryWindow, object: nil)
-            }
-            .buttonStyle(.link)
-            .font(.caption)
-            .padding(.top, 2)
-        }
-        .padding(.top, 2)
-    }
-
-    private func isFailure(_ action: String) -> Bool {
-        let lowered = action.lowercased()
-        return lowered.contains("fail") || lowered.contains("error")
-    }
-
-    private func friendlyActionLabel(_ action: String) -> String {
-        switch action.lowercased() {
-        case "change.failed": return String(localized: "Change failed")
-        default:              return action
-        }
-    }
-
-    private var failureCount: Int {
-        recentChanges.filter { isFailure($0.action) }.count
-    }
-
-    private func changeIcon(for action: String) -> String {
-        switch action.lowercased() {
-        case let a where a.contains("add"):    return "plus.circle.fill"
-        case let a where a.contains("update"): return "pencil.circle.fill"
-        case let a where a.contains("delete"): return "minus.circle.fill"
-        case let a where a.contains("merge"):  return "arrow.triangle.merge"
-        case let a where a.contains("fail"):   return "xmark.circle.fill"
-        default:                                return "circle.fill"
-        }
-    }
-
-    private func changeTint(for action: String) -> Color {
-        switch action.lowercased() {
-        case let a where a.contains("fail"):   return Color.appError
-        case let a where a.contains("delete"): return Color.appWarning
-        case let a where a.contains("add"):    return Color.appSuccess
-        default:                                return Color.appInfo
-        }
-    }
+    // The inline change log used to live here: a cached recentChanges array,
+    // an expandable list, failure counts, and icon/tint helpers for each action
+    // kind. All of it duplicated the Dashboard's Recent Changes card and the
+    // Sync History window, and none of it belongs in a settings pane.
 
     private var statusIcon: String {
         guard appState.lastSyncDate != nil else { return "clock" }
@@ -437,87 +320,47 @@ struct GeneralSettingsView: View {
 
     var body: some View {
         Form {
-            // ── Sync Status ────────────────────────────────────────────
+            // ── Status, condensed ──────────────────────────────────────
+            //
+            // This section used to be a second Dashboard: live progress, a
+            // Sync Now button, an expandable Recent Changes log and the Sync
+            // Mode tiles — all of it a duplicate of the main window, and one
+            // that could not work properly. The Review… button here ran a sync
+            // whose preview sheet only the Dashboard knew how to present.
+            //
+            // Settings configures. The Dashboard operates. What is left here is
+            // a read-only status line and a way to get to the window that owns
+            // the action.
             Section {
-                if sync.isRunning {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ProgressView(value: sync.progress)
-                            .progressViewStyle(.linear)
-                        HStack {
-                            Text(sync.stepLabel.isEmpty ? sync.phase.label : sync.stepLabel)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Text("\(Int(sync.progress * 100))%")
-                                .font(.caption)
-                                .monospacedDigit()
-                                .foregroundStyle(.tertiary)
-                        }
-
-                        // A percentage says how far along it is but nothing about
-                        // what it is doing to your address book. Expanding streams
-                        // the per-contact writes as they land, so a failing sync is
-                        // visible while it runs instead of only afterwards.
-                        DisclosureGroup(isExpanded: $isLogExpanded) {
-                            changeLogList
-                        } label: {
-                            Text("Details")
-                                .font(.caption)
-                        }
-                        .padding(.top, 2)
-                    }
-                    .padding(.vertical, 2)
-                } else {
-                    HStack {
-                        Label {
-                            Text(lastSyncSummary)
-                        } icon: {
-                            Image(systemName: statusIcon)
-                                .symbolRenderingMode(.hierarchical)
-                                .foregroundStyle(statusTint)
-                        }
-
-                        Spacer()
-
-                        Button(settings.selectedSyncType == .manual ? "Review…" : "Sync Now") {
-                            // Same single execution path as the menu bar and
-                            // Dashboard — never a second copy of sync logic.
-                            Task { await SyncCoordinator.shared.runSync() }
-                        }
-                        .disabled(!canSync)
-                        .help(canSync
-                              ? "Run a sync now using the mode selected below"
-                              : "Connect a Google account and grant Contacts access first")
+                HStack {
+                    Label {
+                        Text(lastSyncSummary)
+                    } icon: {
+                        Image(systemName: statusIcon)
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(statusTint)
                     }
 
-                    // "Last synced 5 minutes ago" says nothing about what moved.
-                    if !recentChanges.isEmpty {
-                        Divider()
-                        DisclosureGroup(isExpanded: $isLogExpanded) {
-                            changeLogList
-                        } label: {
-                            HStack(spacing: 6) {
-                                Text("Recent Changes")
-                                    .font(.caption)
-                                if failureCount > 0 {
-                                    // Surfaced on the collapsed row: a sync that
-                                    // "completed" while every write failed should
-                                    // not look identical to one that worked.
-                                    Text("\(failureCount) failed")
-                                        .font(.caption2)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 1)
-                                        .background(Color.appError.opacity(0.15))
-                                        .foregroundStyle(Color.appError)
-                                        .clipShape(Capsule())
-                                }
-                            }
+                    Spacer()
+
+                    if sync.isRunning {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Button("Open Dashboard") {
+                            NotificationCenter.default.post(
+                                name: .openDashboardWindow, object: nil)
                         }
                     }
                 }
             } header: {
                 Label("Sync Status", systemImage: "clock.arrow.circlepath")
+            } footer: {
+                Text("Run a sync, review pending changes and read the activity log in the Dashboard (⌘1).")
+                    .font(.caption)
+                    .foregroundStyle(Palette.secondaryText)
             }
+
 
             // ── Sync Mode ──────────────────────────────────────────────
             Section {
@@ -690,30 +533,29 @@ struct GeneralSettingsView: View {
                     isPresented: $showingResetConfirmation,
                     titleVisibility: .visible
                 ) {
-                    Button("Reset Settings", role: .destructive) { settings.resetToDefaults() }
+                    Button("Reset Settings Only", role: .destructive) {
+                        settings.resetToDefaults()
+                    }
+                    // Resetting preferences alone does not give a clean retest:
+                    // the contact mappings, the sync log and the onboarding flag
+                    // survive it, so the next run behaves like an established
+                    // install. This is the option that actually starts over.
+                    Button("Reset Everything for Testing", role: .destructive) {
+                        settings.resetForTesting()
+                    }
                     Button("Cancel", role: .cancel) {}
                 } message: {
-                    Text("All preferences will return to defaults. Your Google account connection will not be affected.")
+                    Text("Reset Settings Only restores preferences. Reset Everything for Testing also clears contact mappings, the sync log and onboarding, so the next sync starts from scratch. Neither touches your contacts, your backups or your Google sign-in.")
                 }
             } header: {
                 Label("Data & History", systemImage: "internaldrive")
             }
         }
         .formStyle(.grouped)
-        .onAppear { recentChanges = Self.loadRecentChanges() }
-        .onChange(of: sync.phase) { _, phase in
-            if case .completed = phase { recentChanges = Self.loadRecentChanges() }
-        }
-        // `sync.progress` ticks per contact, which makes it the natural clock for
-        // streaming the log — no timer to own, and nothing polls while idle.
-        // Guarded on `isLogExpanded` so a collapsed section costs nothing.
-        .onChange(of: sync.progress) { _, _ in
-            guard isLogExpanded, sync.isRunning else { return }
-            recentChanges = Self.loadRecentChanges()
-        }
-        .onChange(of: isLogExpanded) { _, expanded in
-            if expanded { recentChanges = Self.loadRecentChanges() }
-        }
+        // The log-streaming observers that used to hang here went with the log.
+        // They polled SyncHistory on every progress tick — which takes a lock and
+        // copies the whole event array — to feed a list that duplicated the
+        // Dashboard's.
         .alert("Restart to change the language?", isPresented: $pendingLanguageRelaunch) {
             Button("Restart Now") { LanguageManager.shared.relaunch() }
             Button("Later", role: .cancel) {}

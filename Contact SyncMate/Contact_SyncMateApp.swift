@@ -414,11 +414,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        let controller = NSHostingController(rootView: SyncHistoryView())
+        // The same window the Dashboard's "View History & Backups" opens. ⌘2 used
+        // to open a different, timeline-only screen, so the two entry points led
+        // to different features — and a button added to one was missing from the
+        // other.
+        let controller = NSHostingController(rootView: SyncHistoryAndBackupView())
         let window = NSWindow(contentViewController: controller)
-        window.title = "Sync History"
+        window.title = "Sync History & Backups"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        window.setContentSize(NSSize(width: 580, height: 520))
+        window.setContentSize(NSSize(width: 860, height: 620))
         window.center()
         window.isReleasedWhenClosed = false
         historyWindow = window

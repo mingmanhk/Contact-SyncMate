@@ -517,6 +517,14 @@ T = {
         "刪除所有同步事件？",
     "Google account is not connected":
         "尚未連接 Google 帳戶",
+    "Reset Settings Only":
+        "僅重設偏好設定",
+    "Reset Everything for Testing":
+        "完整重設以便重新測試",
+    "Reset Settings Only restores preferences. Reset Everything for Testing also clears contact mappings, the sync log and onboarding, so the next sync starts from scratch. Neither touches your contacts, your backups or your Google sign-in.":
+        "「僅重設偏好設定」只還原設定。「完整重設以便重新測試」還會清除聯絡人配對、同步記錄與導覽狀態，讓下次同步從零開始。兩者都不會動到你的聯絡人、備份或 Google 登入。",
+    "Run a sync, review pending changes and read the activity log in the Dashboard (⌘1).":
+        "同步、檢視待處理變更與活動記錄，都在儀表板（⌘1）中進行。",
     "Delete all recorded sync events. Backups and contacts are not affected.":
         "刪除所有已記錄的同步事件。備份與聯絡人不受影響。",
     "Delete all recorded sync events. Backups are not affected.":

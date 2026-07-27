@@ -504,6 +504,42 @@ class AppSettings: ObservableObject {
         menuBarShowFeedbackBanner = true
         menuBarShowNavigationLinks = true
     }
+
+    /// Return the app to a first-launch state for testing.
+    ///
+    /// `resetToDefaults()` only resets preferences, which is not enough to
+    /// retest: the contact mappings, the sync log, the onboarding flag and the
+    /// last-sync record all survive it, so the next run behaves like an
+    /// established install rather than a new one.
+    ///
+    /// Deliberately does NOT touch contacts or backups. Backups are the record
+    /// of what previous syncs did — the one thing worth keeping when a test goes
+    /// wrong. Google sign-out is left to the caller, since re-authorising is
+    /// often not what you want between runs.
+    func resetForTesting(signOutGoogle: Bool = false) {
+        resetToDefaults()
+
+        ContactMappingStore().deleteAllMappings()
+        SyncHistory.shared.clear()
+
+        hasCompletedOnboarding = false
+        hasCompletedInitialSync = false
+        googleAccountEmail = signOutGoogle ? nil : googleAccountEmail
+
+        let defaults = UserDefaults.standard
+        for key in ["lastSyncDate", "lastSyncResultSummary", "nextScheduledSync"] {
+            defaults.removeObject(forKey: key)
+        }
+
+        if signOutGoogle {
+            GoogleOAuthManager.shared.signOut()
+        }
+
+        SyncHistory.shared.log(
+            source: "AppSettings", action: "reset.forTesting",
+            details: signOutGoogle ? "settings, mappings, history, Google sign-out"
+                                   : "settings, mappings, history")
+    }
 }
 
 // MARK: - UI Customisation Enums

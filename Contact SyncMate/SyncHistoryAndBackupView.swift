@@ -89,7 +89,8 @@ struct SyncHistoryAndBackupView: View {
             // Content
             switch selectedTab {
             case .timeline:
-                SyncTimelineView(viewModel: viewModel)
+                // The one timeline implementation, shared with the ⌘2 window.
+                SyncHistoryView(embedded: true)
 
             case .backups:
                 BackupListView(
@@ -171,47 +172,11 @@ struct SyncHistoryAndBackupView: View {
     }
 }
 
-// MARK: - Sync Timeline View
+// SyncTimelineView used to live here — a second, weaker rendering of the same
+// events as SyncHistoryView, with no search, no filtering, no export and no
+// name redaction. The timeline tab now uses SyncHistoryView(embedded:) so there
+// is one implementation to fix when something is wrong with it.
 
-struct SyncTimelineView: View {
-    @ObservedObject var viewModel: SyncHistoryViewModel
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                if viewModel.syncEvents.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "clock.badge.xmark")
-                            .font(.system(size: 48))
-                            .foregroundStyle(Color.appTextTertiary)
-
-                        Text("No Sync History")
-                            .font(.headline)
-
-                        Text("Sync history will appear here")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding()
-                } else {
-                    ForEach(viewModel.groupedEvents.keys.sorted(by: >), id: \.self) { date in
-                        SectionDateHeader(date: date)
-
-                        VStack(spacing: 0) {
-                            ForEach(viewModel.groupedEvents[date] ?? [], id: \.id) { event in
-                                SyncEventRow(event: event)
-                                Divider()
-                                    .padding(.leading, 60)
-                            }
-                        }
-                    }
-                }
-            }
-            .padding()
-        }
-    }
-}
 
 // MARK: - Backup List View
 
@@ -584,77 +549,9 @@ struct StatisticCard: View {
         .cornerRadius(8)
     }
 }
+// SectionDateHeader and SyncEventRow went with SyncTimelineView — they had no
+// other callers.
 
-// MARK: - Supporting Views
-
-struct SectionDateHeader: View {
-    let date: Date
-
-    var body: some View {
-        HStack {
-            Text(date.formatted(date: .abbreviated, time: .omitted))
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(.secondary)
-
-            Spacer()
-        }
-        .padding(.vertical, 8)
-    }
-}
-
-struct SyncEventRow: View {
-    let event: SyncEvent
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Circle()
-                .fill(eventColor)
-                .frame(width: 12, height: 12)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(event.action)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-
-                HStack(spacing: 8) {
-                    Text(event.source)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    if let details = event.details {
-                        Text("•")
-                            .foregroundColor(.secondary)
-
-                        Text(details)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-            }
-
-            Spacer()
-
-            Text(event.timestamp.formatted(date: .omitted, time: .shortened))
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .padding(12)
-    }
-
-    private var eventColor: Color {
-        if event.action.contains("error") || event.action.contains("failed") {
-            return .red
-        } else if event.action.contains("warning") {
-            return .orange
-        } else if event.action.contains("success") || event.action.contains("complete") {
-            return .green
-        } else {
-            return .blue
-        }
-    }
-}
 
 // MARK: - Preview
 
