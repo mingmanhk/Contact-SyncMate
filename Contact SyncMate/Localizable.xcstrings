@@ -7883,6 +7883,57 @@
           }
         }
       }
+    },
+    "Import Backup File…": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "匯入備份檔案…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入备份文件…"
+          }
+        }
+      }
+    },
+    "Import Backup": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "匯入備份"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入备份"
+          }
+        }
+      }
+    },
+    "Load a backup previously exported from Contact SyncMate": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "載入先前從 Contact SyncMate 匯出的備份"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "载入先前从 Contact SyncMate 导出的备份"
+          }
+        }
+      }
     }
   },
   "version": "1.1"

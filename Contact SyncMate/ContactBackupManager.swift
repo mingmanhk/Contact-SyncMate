@@ -566,12 +566,14 @@ class ContactBackupManager: ObservableObject {
 
     /// List all backup JSON files on disk, newest first
     func listBackupFiles() -> [(name: String, url: URL, size: Int64, date: Date)] {
-        let dir = backupDirectoryURL()
-        guard let files = try? FileManager.default.contentsOfDirectory(
-            at: dir,
-            includingPropertiesForKeys: [.fileSizeKey, .creationDateKey],
-            options: [.skipsHiddenFiles]
-        ) else { return [] }
+        let files = withBackupDirectory { dir in
+            (try? FileManager.default.contentsOfDirectory(
+                at: dir,
+                includingPropertiesForKeys: [.fileSizeKey, .creationDateKey],
+                options: [.skipsHiddenFiles]
+            )) ?? []
+        }
+        guard !files.isEmpty else { return [] }
 
         return files
             .filter { $0.pathExtension == "json" && $0.lastPathComponent != "backup_index.json" }
@@ -601,6 +603,58 @@ class ContactBackupManager: ObservableObject {
         }
     }
 
+    /// Bring a backup file created by `exportBackupToFile` back into the app.
+    ///
+    /// Export existed with no counterpart, so an exported backup was a file the
+    /// app could produce and never read — useless for the case backups exist for:
+    /// a reinstall, a lost index, or moving to another Mac. This closes the loop.
+    ///
+    /// The picked file carries its own sandbox grant from `NSOpenPanel`, so no
+    /// bookmark is involved.
+    @MainActor
+    @discardableResult
+    func importBackupFromFile() -> Result<BackupSession, Error>? {
+        let panel = NSOpenPanel()
+        panel.title = String(localized: "Import Backup")
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
+
+        do {
+            let data = try Data(contentsOf: url)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let session = try decoder.decode(BackupSession.self, from: data)
+
+            // Re-importing the same file must not create a second entry — the id
+            // is the session's identity, and a duplicate would show as two
+            // restore targets holding identical data.
+            if getBackupSession(id: session.id) != nil {
+                SyncHistory.shared.log(source: "BackupManager", action: "import.alreadyPresent",
+                                       details: session.id)
+                return .success(session)
+            }
+
+            try backupQueue.sync(flags: .barrier) {
+                try saveBackupSession(session)
+            }
+
+            SyncHistory.shared.log(
+                source: "BackupManager",
+                action: "import.succeeded",
+                details: "\(session.id) — \(session.contactVersions.count) contacts from \(session.timestamp)"
+            )
+            return .success(session)
+
+        } catch {
+            SyncHistory.shared.log(source: "BackupManager", action: "import.failed",
+                                   details: error.localizedDescription)
+            return .failure(error)
+        }
+    }
+
     /// Resolve the folder backups are written to.
     ///
     /// Sandbox-aware resolution order:
@@ -611,18 +665,45 @@ class ContactBackupManager: ObservableObject {
     ///      `~/Library/Containers/<bundle-id>/Data/Documents`, which is always
     ///      writable without any entitlement.
     ///   3. Temp directory as a last resort.
-    private func backupDirectoryURL() -> URL {
+    /// Run `body` with the backup folder, holding sandbox access open for its
+    /// whole duration.
+    ///
+    /// `backupDirectoryURL()` opened the security scope and then closed it in a
+    /// `defer` *before returning* — so every caller received a URL whose access
+    /// had already been released, and every read or write to a user-chosen folder
+    /// was denied by the sandbox. Because those writes all used `try?`, backups
+    /// to a custom folder failed silently.
+    ///
+    /// Access must span the file operation, not the lookup, which is exactly what
+    /// `SecurityScopedBookmark.withAccess` provides.
+    @discardableResult
+    private func withBackupDirectory<T>(_ body: (URL) throws -> T) rethrows -> T {
         let fm = FileManager.default
 
-        // 1. User-chosen folder via bookmark
-        if let url = SecurityScopedBookmark.resolve(.backupFolder) {
-            let didStart = url.startAccessingSecurityScopedResource()
-            defer { if didStart { url.stopAccessingSecurityScopedResource() } }
+        if let result = try SecurityScopedBookmark.withAccess(to: .backupFolder, { url -> T in
             if !fm.fileExists(atPath: url.path) {
                 try? fm.createDirectory(at: url, withIntermediateDirectories: true)
             }
+            return try body(url)
+        }) {
+            return result
+        }
+
+        // No bookmark, or it no longer resolves — fall back to the container.
+        return try body(containerBackupDirectory())
+    }
+
+    private func backupDirectoryURL() -> URL {
+        // Retained for callers that only need the path for display. File I/O must
+        // go through `withBackupDirectory` so the sandbox grant is held.
+        if let url = SecurityScopedBookmark.resolve(.backupFolder) {
             return url
         }
+        return containerBackupDirectory()
+    }
+
+    private func containerBackupDirectory() -> URL {
+        let fm = FileManager.default
 
         // 2. Container Documents (sandbox-safe default)
         if let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first {
@@ -694,15 +775,19 @@ class ContactBackupManager: ObservableObject {
         // Perform file I/O synchronously
         backupSessions.append(session)
 
-        // Save individual session file
-        let sessionFile = backupDirectoryURL().appendingPathComponent("\(session.id).json")
+        // Save individual session file and index inside one scoped access, so a
+        // custom folder is written to with its sandbox grant actually held.
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(session)
-        try data.write(to: sessionFile, options: [.atomic])
+        let indexData = try encoder.encode(backupSessions)
 
-        // Update index
-        try saveBackupIndex()
+        try withBackupDirectory { dir in
+            try data.write(to: dir.appendingPathComponent("\(session.id).json"),
+                           options: [.atomic])
+            try indexData.write(to: dir.appendingPathComponent("backup_index.json"),
+                                options: [.atomic])
+        }
 
         // Update published properties on main thread
         let count = backupSessions.count
@@ -719,7 +804,10 @@ class ContactBackupManager: ObservableObject {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         let indexData = try encoder.encode(backupSessions)
-        try indexData.write(to: backupIndexURL, options: [.atomic])
+        try withBackupDirectory { dir in
+            try indexData.write(to: dir.appendingPathComponent("backup_index.json"),
+                                options: [.atomic])
+        }
     }
 
     private func loadBackupIndex() {
@@ -727,7 +815,9 @@ class ContactBackupManager: ObservableObject {
         decoder.dateDecodingStrategy = .iso8601
 
         do {
-            let data = try Data(contentsOf: backupIndexURL)
+            let data = try withBackupDirectory { dir in
+                try Data(contentsOf: dir.appendingPathComponent("backup_index.json"))
+            }
             let loaded = try decoder.decode([BackupSession].self, from: data)
             backupQueue.async(flags: .barrier) { [weak self] in
                 self?.backupSessions = loaded

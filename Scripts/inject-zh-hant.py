@@ -615,6 +615,9 @@ T = {
     "waiting for an unmetered network": "等待非計量網路",
     "waiting until the Mac is idle": "等待 Mac 閒置",
     "Unnamed contact": "未命名聯絡人",
+    "Import Backup File…": "匯入備份檔案…",
+    "Import Backup": "匯入備份",
+    "Load a backup previously exported from Contact SyncMate": "載入先前從 Contact SyncMate 匯出的備份",
     "Delete contacts added since this backup": "刪除此備份之後新增的聯絡人",
     "Both address books will match this backup exactly. Contacts created after it — including any a faulty sync added — will be deleted.":
         "兩邊通訊錄將與此備份完全一致。之後建立的聯絡人 —— 包括錯誤同步所新增的 —— 都會被刪除。",

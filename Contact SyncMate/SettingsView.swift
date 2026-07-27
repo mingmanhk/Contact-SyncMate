@@ -1961,6 +1961,25 @@ struct BackupAndRecoverySettingsView: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(isCreatingManualBackup)
 
+                // Export had no counterpart, so an exported backup could never be
+                // brought back — which is exactly the situation backups exist for
+                // (a reinstall, a lost index, a different Mac).
+                Button {
+                    switch backupManager.importBackupFromFile() {
+                    case .success(let session):
+                        backupResult = .success(count: session.contactVersions.count)
+                    case .failure(let error):
+                        backupResult = .error(error.localizedDescription)
+                    case nil:
+                        break   // user cancelled the panel
+                    }
+                } label: {
+                    Label("Import Backup File…", systemImage: "square.and.arrow.down")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .help("Load a backup previously exported from Contact SyncMate")
+
                 // Result banner
                 if let result = backupResult {
                     HStack(spacing: 8) {
