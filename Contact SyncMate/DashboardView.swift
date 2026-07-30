@@ -732,8 +732,6 @@ struct DashboardView: View {
                 return "Auto-sync is disabled in settings."
             case .conditionsNotMet:
                 return "Sync conditions not met — check power, network, and idle settings."
-            case .notImplemented:
-                return "This sync feature is not yet available."
             case .missingContactData(let detail):
                 return "Missing contact data: \(detail)"
             case .backupNotFound:

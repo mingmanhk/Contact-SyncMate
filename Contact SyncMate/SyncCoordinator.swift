@@ -361,8 +361,6 @@ final class SyncCoordinator: ObservableObject {
                 return "Auto-sync is disabled. Enable it in Settings → Auto Sync."
             case .conditionsNotMet:
                 return "Sync conditions not met — check power, network, and idle settings."
-            case .notImplemented:
-                return "This sync mode is not yet available."
             case .missingContactData(let detail):
                 return "Missing contact data: \(detail)"
             case .backupNotFound:

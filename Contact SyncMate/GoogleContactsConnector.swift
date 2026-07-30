@@ -880,7 +880,6 @@ struct GoogleDuplicateSet: Identifiable {
 
 enum GoogleContactsError: LocalizedError {
     case notAuthenticated
-    case notImplemented
     case networkError(Error)
     case apiError(statusCode: Int, message: String)
     case rateLimitExceeded
@@ -890,8 +889,6 @@ enum GoogleContactsError: LocalizedError {
         switch self {
         case .notAuthenticated:
             return "Not signed in to Google. Please authenticate first."
-        case .notImplemented:
-            return "This feature is not yet implemented."
         case .networkError(let error):
             return "Network error: \(error.localizedDescription)"
         case .apiError(let statusCode, let message):

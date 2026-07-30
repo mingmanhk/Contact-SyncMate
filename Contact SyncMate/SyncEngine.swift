@@ -1954,7 +1954,6 @@ enum SyncEngineError: LocalizedError {
     case syncAlreadyInProgress
     case autoSyncDisabled
     case conditionsNotMet
-    case notImplemented
     case missingContactData(String)
     case backupNotFound
     case batchItemRejected(String)
@@ -1967,8 +1966,6 @@ enum SyncEngineError: LocalizedError {
             return "Automatic sync is disabled in settings."
         case .conditionsNotMet:
             return "Auto-sync conditions not met (check power/network/idle settings)."
-        case .notImplemented:
-            return "This feature is not yet implemented."
         case .missingContactData(let name):
             return "Missing contact data for: \(name)"
         case .backupNotFound:
