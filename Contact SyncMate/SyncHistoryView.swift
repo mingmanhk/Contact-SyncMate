@@ -203,10 +203,7 @@ struct SyncHistoryView: View {
                     TextField("Search history", text: $searchText)
                         .textFieldStyle(.plain)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Color.secondary.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .controlSurface()
 
                 // Segmented control rather than custom chips: three mutually
                 // exclusive views of one list is exactly what NSSegmentedControl
@@ -227,21 +224,16 @@ struct SyncHistoryView: View {
 
             // Events list
             if groupedEvents.isEmpty {
-                Spacer()
-                VStack(spacing: 8) {
-                    Image(systemName: searchText.isEmpty ? "clock.arrow.circlepath" : "magnifyingglass")
-                        .font(.largeTitle)
-                        .foregroundStyle(.tertiary)
-                    Text(searchText.isEmpty ? "No sync history yet" : "No results for \"\(searchText)\"")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    if searchText.isEmpty {
-                        Text("Run your first sync to see activity here.")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
+                if searchText.isEmpty {
+                    EmptyState(icon: "clock.arrow.circlepath",
+                               title: "No sync history yet",
+                               message: "Run your first sync to see activity here.")
+                } else {
+                    // Interpolated, so it cannot be a LocalizedStringKey literal.
+                    EmptyState(icon: "magnifyingglass",
+                               verbatimTitle: String(
+                                   localized: "No results for \"\(searchText)\""))
                 }
-                Spacer()
             } else {
                 List {
                     ForEach(groupedEvents, id: \.0) { (group, events) in

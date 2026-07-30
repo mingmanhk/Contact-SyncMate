@@ -517,6 +517,16 @@ T = {
         "刪除所有同步事件？",
     "Google account is not connected":
         "尚未連接 Google 帳戶",
+    "No backups yet":
+        "尚無備份",
+    "Backups are created automatically during syncs.":
+        "備份會在同步時自動建立。",
+    "No version history yet":
+        "尚無版本記錄",
+    "It builds up as syncs create backups.":
+        "隨著同步建立備份，版本記錄會逐步累積。",
+    "No contacts match your search":
+        "沒有符合搜尋的聯絡人",
     "Reset Settings Only":
         "僅重設偏好設定",
     "Reset Everything for Testing":

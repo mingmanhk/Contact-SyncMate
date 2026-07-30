@@ -552,19 +552,10 @@ struct DashboardView: View {
             }
 
             if recentEvents.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "clock.arrow.circlepath")
-                        .font(.largeTitle)
-                        .foregroundStyle(.tertiary)
-                    Text("No sync history yet")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Text("Run your first sync to see activity here.")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 32)
+                EmptyState(icon: "clock.arrow.circlepath",
+                           title: "No sync history yet",
+                           message: "Run your first sync to see activity here.",
+                           fill: false)
             } else {
                 VStack(spacing: 0) {
                     ForEach(recentEvents) { event in

@@ -59,22 +59,18 @@ struct ContactVersionHistoryView: View {
                 TextField("Search contacts", text: $searchText)
                     .textFieldStyle(.plain)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Color.secondary.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .controlSurface()
             .padding(12)
 
             if filteredContacts.isEmpty {
-                Spacer()
-                Text(contacts.isEmpty
-                     ? "No version history yet. It builds up as syncs create backups."
-                     : "No contacts match your search.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-                Spacer()
+                if contacts.isEmpty {
+                    EmptyState(icon: "clock.arrow.circlepath",
+                               title: "No version history yet",
+                               message: "It builds up as syncs create backups.")
+                } else {
+                    EmptyState(icon: "magnifyingglass",
+                               title: "No contacts match your search")
+                }
             } else {
                 List(filteredContacts, id: \.identifier, selection: $selectedIdentifier) { contact in
                     VStack(alignment: .leading, spacing: 2) {
@@ -100,15 +96,8 @@ struct ContactVersionHistoryView: View {
     @ViewBuilder
     private var versionDetail: some View {
         if versions.isEmpty {
-            VStack(spacing: 8) {
-                Image(systemName: "clock.arrow.circlepath")
-                    .font(.largeTitle)
-                    .foregroundStyle(.tertiary)
-                Text("Select a contact to see its saved versions")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            EmptyState(icon: "clock.arrow.circlepath",
+                       title: "Select a contact to see its saved versions")
         } else {
             List(versions) { version in
                 VStack(alignment: .leading, spacing: 6) {

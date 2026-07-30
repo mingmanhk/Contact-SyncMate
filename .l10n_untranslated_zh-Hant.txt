@@ -1,1 +1,1 @@
-Automatic syncs will not delete contacts. Deletions are listed for you to apply from Sync Now.
+A card groups related content.

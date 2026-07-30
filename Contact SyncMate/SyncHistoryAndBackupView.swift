@@ -190,21 +190,9 @@ struct BackupListView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 if backups.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "externaldrive.badge.xmark")
-                            .font(.system(size: 48))
-                            .foregroundStyle(Color.appTextTertiary)
-
-                        Text("No Backups")
-                            .font(.headline)
-
-                        Text("Backups will be created automatically during syncs")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding()
+                    EmptyState(icon: "externaldrive.badge.xmark",
+                               title: "No backups yet",
+                               message: "Backups are created automatically during syncs.")
                 } else {
                     ForEach(backups) { backup in
                         BackupRowView(
