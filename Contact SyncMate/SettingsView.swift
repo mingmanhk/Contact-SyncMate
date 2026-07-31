@@ -536,12 +536,13 @@ struct GeneralSettingsView: View {
                     Button("Reset Settings Only", role: .destructive) {
                         settings.resetToDefaults()
                     }
-                    // Resetting preferences alone does not give a clean retest:
-                    // the contact mappings, the sync log and the onboarding flag
+                    // Resetting preferences alone does not start over: the
+                    // contact mappings, sync log, backups and onboarding flag all
                     // survive it, so the next run behaves like an established
-                    // install. This is the option that actually starts over.
-                    Button("Reset Everything for Testing", role: .destructive) {
-                        settings.resetForTesting()
+                    // install. This is the one that actually starts over — and
+                    // it is named for what it does, without a qualifier.
+                    Button("Reset Everything", role: .destructive) {
+                        settings.resetEverything()
                         // AppState holds the session's sync record in memory, not
                         // in UserDefaults, so AppSettings cannot clear it. Without
                         // this the status line keeps reporting the sync that the
@@ -553,7 +554,7 @@ struct GeneralSettingsView: View {
                     }
                     Button("Cancel", role: .cancel) {}
                 } message: {
-                    Text("Reset Settings Only restores preferences. Reset Everything for Testing also clears contact mappings, the sync log and onboarding, so the next sync starts from scratch. Neither touches your contacts, your backups or your Google sign-in.")
+                    Text("Reset Settings Only restores preferences. Reset Everything also deletes every backup, the sync log and the contact mappings — deleted backups cannot be recovered, so nothing will be left to undo a past sync with. Neither option touches your contacts or your Google sign-in.")
                 }
             } header: {
                 Label("Data & History", systemImage: "internaldrive")

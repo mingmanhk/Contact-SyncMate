@@ -71,14 +71,71 @@ fi
 echo
 
 # ── 2. Tests ────────────────────────────────────────────────────────────
+#
+# The test host is the app itself, and the app is a menu bar accessory that
+# does not quit when the last test finishes. xcodebuild then waits on it
+# forever: the log reads "Executed 120 tests, with 0 failures" and the command
+# never returns. Reaping the host afterwards is what makes this script exit.
+#
+# Matched on the Debug product path, never on the process name. `pkill -x
+# "Contact SyncMate"` would also kill the copy the user is running from Xcode,
+# which has happened before.
+reap_test_host() {
+    # Literal path fragment, no regex. `.*` between the DerivedData folder and
+    # the product path did not reliably match under pkill.
+    for pid in $(pgrep -f "Build/Products/Debug/Contact SyncMate" 2>/dev/null); do
+        kill -9 "$pid" 2>/dev/null || true
+    done
+}
+trap reap_test_host EXIT
+
 bold "2. Tests"
-if xcodebuild -project "$PROJECT" -scheme "$SCHEME" \
-     test > "$LOG_DIR/test.log" 2>&1; then
-    RESULT=$(grep -E 'Executed [0-9]+ test' "$LOG_DIR/test.log" | tail -1 | sed 's/^[[:space:]]*//')
-    pass "${RESULT:-tests passed}"
+
+# xcodebuild's exit status is not usable here.
+#
+# The test host is the app, and the app is a menu bar accessory that does not
+# quit when the last test finishes — so xcodebuild sits waiting on it forever,
+# long after the log says "Executed 120 tests, with 0 failures". Reaping the
+# host from a watcher did not settle it either: a fresh host reappears.
+#
+# So the log is the source of truth, and the wait is bounded. This reports what
+# the tests actually did instead of what xcodebuild's teardown is doing.
+rm -f "$LOG_DIR/test.log"; : > "$LOG_DIR/test.log"
+
+xcodebuild -project "$PROJECT" -scheme "$SCHEME" \
+     test > "$LOG_DIR/test.log" 2>&1 &
+XCB=$!
+
+TEST_TIMEOUT=300
+for _ in $(seq 1 "$TEST_TIMEOUT"); do
+    # Only two reasons to stop early: the run reported a result, or xcodebuild
+    # died. An "error:" grep was also here and broke the loop immediately —
+    # `xcodebuild test` compiles first, and ordinary compiler noise in that
+    # phase matched, killing the run before a single test executed.
+    # "Test Suite 'All tests'", not the first "Executed N tests" — that one is
+    # a per-suite line, so breaking on it reported whichever suite happened to
+    # finish first (4 tests) as the whole run.
+    grep -q "Test Suite 'All tests' \(passed\|failed\)" "$LOG_DIR/test.log" 2>/dev/null && break
+    kill -0 "$XCB" 2>/dev/null || break
+    sleep 1
+done
+
+kill -9 "$XCB" 2>/dev/null || true
+wait "$XCB" 2>/dev/null || true
+reap_test_host
+
+RESULT=$(grep -E 'Executed [0-9]+ test' "$LOG_DIR/test.log" | tail -1 | sed 's/^[[:space:]]*//')
+if [ -n "$RESULT" ] && ! grep -q 'with [1-9][0-9]* failure' "$LOG_DIR/test.log"; then
+    pass "$RESULT"
+elif [ -n "$RESULT" ]; then
+    fail "$RESULT"
+    grep -E ' error: | failed \(' "$LOG_DIR/test.log" | head -15 | sed 's/^/    /'
+    info "full log: $LOG_DIR/test.log"
+    FAILED=1
 else
-    fail "tests failed"
-    grep -E 'error:|failed' "$LOG_DIR/test.log" | head -15 | sed 's/^/    /'
+    fail "tests did not report a result within ${TEST_TIMEOUT}s"
+    grep -E 'error:' "$LOG_DIR/test.log" | sed 's|.*/Contact SyncMate/||' \
+        | sort -u | head -15 | sed 's/^/    /'
     info "full log: $LOG_DIR/test.log"
     FAILED=1
 fi
@@ -107,6 +164,12 @@ if files:
     for f in files:
         args += ["--stringsdata", f]
     subprocess.run(args, capture_output=True)
+    # Immediately after the sync, not before it. `sync` re-adds strings from
+    # stale `.stringsdata` sidecars — DerivedData keeps one per source file and
+    # an incremental build only refreshes the ones it recompiled — so pruning
+    # first is undone by the very next line. This step reported the same two
+    # renamed strings as missing translations three runs running because of it.
+    subprocess.run(["python3", "Scripts/prune-stale-keys.py"], capture_output=True)
 data = json.load(open(catalog))["strings"]
 total = len([k for k in data if k.strip()])
 gaps = False

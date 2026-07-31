@@ -432,6 +432,54 @@ class ContactBackupManager: ObservableObject {
         }
     }
 
+    /// Delete every backup: the index, the version history, and the files.
+    ///
+    /// Irreversible, and the one operation here with no undo — a backup *is* the
+    /// undo for everything else. Only reachable from Reset Everything, behind a
+    /// confirmation that says so.
+    ///
+    /// Asynchronous, like every other mutation on this queue.
+    ///
+    /// The first version used `sync(flags: .barrier)` so the deletion would
+    /// finish before the caller reset the rest of the app. That deadlocked: this
+    /// type is main-actor isolated under the project's default isolation, so a
+    /// blocking barrier from here parks the main thread behind whatever the
+    /// concurrent queue is already running — including the prune and orphan
+    /// sweep that `init` fires. The test run hung on it.
+    ///
+    /// Ordering was never the real concern anyway: the rest of the reset touches
+    /// settings, mappings and history, none of which this queue owns.
+    ///
+    /// The published counters are set here, on the main actor, rather than from
+    /// inside the barrier — they drive the UI.
+    func deleteAllBackups() {
+        backupCount = 0
+        totalBackupSize = 0
+        lastBackupDate = nil
+
+        backupQueue.async(flags: .barrier) { [weak self] in
+            guard let self else { return }
+            let removed = self.backupSessions.count
+
+            self.withBackupDirectory { dir in
+                let files = (try? FileManager.default.contentsOfDirectory(
+                    at: dir, includingPropertiesForKeys: nil)) ?? []
+                for file in files where file.pathExtension == "json" {
+                    try? FileManager.default.removeItem(at: file)
+                }
+            }
+
+            // Per-contact version history lives inside each session's
+            // `contactVersions`, so clearing the sessions clears it too — there
+            // is no second store to forget about.
+            self.backupSessions = []
+            try? self.saveBackupIndex()
+
+            SyncHistory.shared.log(source: "BackupManager", action: "backups.deletedAll",
+                                   details: "removed \(removed) session(s)")
+        }
+    }
+
     /// Delete backup files with no entry in the index.
     ///
     /// Earlier builds trimmed the index without removing files, so existing

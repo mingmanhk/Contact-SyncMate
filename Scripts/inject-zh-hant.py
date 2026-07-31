@@ -529,10 +529,10 @@ T = {
         "沒有符合搜尋的聯絡人",
     "Reset Settings Only":
         "僅重設偏好設定",
-    "Reset Everything for Testing":
-        "完整重設以便重新測試",
-    "Reset Settings Only restores preferences. Reset Everything for Testing also clears contact mappings, the sync log and onboarding, so the next sync starts from scratch. Neither touches your contacts, your backups or your Google sign-in.":
-        "「僅重設偏好設定」只還原設定。「完整重設以便重新測試」還會清除聯絡人配對、同步記錄與導覽狀態，讓下次同步從零開始。兩者都不會動到你的聯絡人、備份或 Google 登入。",
+    "Reset Everything":
+        "完整重設",
+    "Reset Settings Only restores preferences. Reset Everything also deletes every backup, the sync log and the contact mappings — deleted backups cannot be recovered, so nothing will be left to undo a past sync with. Neither option touches your contacts or your Google sign-in.":
+        "「僅重設偏好設定」只還原設定。「完整重設」還會刪除所有備份、同步記錄與聯絡人配對 —— 已刪除的備份無法復原，之後將沒有任何東西可用來還原先前的同步。兩者都不會動到你的聯絡人或 Google 登入。",
     "Run a sync, review pending changes and read the activity log in the Dashboard (⌘1).":
         "同步、檢視待處理變更與活動記錄，都在儀表板（⌘1）中進行。",
     "Delete all recorded sync events. Backups and contacts are not affected.":

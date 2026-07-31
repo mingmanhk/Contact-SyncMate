@@ -1575,6 +1575,7 @@
       }
     },
     "Backups will be created automatically during syncs": {
+      "extractionState": "stale",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -4620,6 +4621,7 @@
       }
     },
     "No Backups": {
+      "extractionState": "stale",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -4864,6 +4866,7 @@
       }
     },
     "No results for \"%@\"": {
+      "extractionState": "stale",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -5902,18 +5905,19 @@
         }
       }
     },
-    "Reset Everything for Testing": {
+    "Reset Everything": {
+      "extractionState": "manual",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "完整重设以便重新测试"
+            "value": "完整重设"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "完整重設以便重新測試"
+            "value": "完整重設"
           }
         }
       }
@@ -5951,18 +5955,19 @@
         }
       }
     },
-    "Reset Settings Only restores preferences. Reset Everything for Testing also clears contact mappings, the sync log and onboarding, so the next sync starts from scratch. Neither touches your contacts, your backups or your Google sign-in.": {
+    "Reset Settings Only restores preferences. Reset Everything also deletes every backup, the sync log and the contact mappings — deleted backups cannot be recovered, so nothing will be left to undo a past sync with. Neither option touches your contacts or your Google sign-in.": {
+      "extractionState": "manual",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "「仅重设偏好设置」只还原设置。「完整重设以便重新测试」还会清除联系人配对、同步记录与导览状态，让下次同步从零开始。两者都不会动到你的联系人、备份或 Google 登录。"
+            "value": "「仅重设偏好设置」只还原设置。「完整重设」还会删除所有备份、同步记录与联系人配对 —— 已删除的备份无法复原，之后将没有任何东西可用来还原先前的同步。两者都不会动到你的联系人或 Google 登录。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "「僅重設偏好設定」只還原設定。「完整重設以便重新測試」還會清除聯絡人配對、同步記錄與導覽狀態，讓下次同步從零開始。兩者都不會動到你的聯絡人、備份或 Google 登入。"
+            "value": "「僅重設偏好設定」只還原設定。「完整重設」還會刪除所有備份、同步記錄與聯絡人配對 —— 已刪除的備份無法復原，之後將沒有任何東西可用來還原先前的同步。兩者都不會動到你的聯絡人或 Google 登入。"
           }
         }
       }

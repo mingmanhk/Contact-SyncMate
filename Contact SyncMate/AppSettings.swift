@@ -505,21 +505,26 @@ class AppSettings: ObservableObject {
         menuBarShowNavigationLinks = true
     }
 
-    /// Return the app to a first-launch state for testing.
+    /// Return the app to a first-launch state.
     ///
-    /// `resetToDefaults()` only resets preferences, which is not enough to
-    /// retest: the contact mappings, the sync log, the onboarding flag and the
+    /// `resetToDefaults()` only resets preferences, which is not enough: the
+    /// contact mappings, the sync log, the backups, the onboarding flag and the
     /// last-sync record all survive it, so the next run behaves like an
     /// established install rather than a new one.
     ///
-    /// Deliberately does NOT touch contacts or backups. Backups are the record
-    /// of what previous syncs did — the one thing worth keeping when a test goes
-    /// wrong. Google sign-out is left to the caller, since re-authorising is
-    /// often not what you want between runs.
-    func resetForTesting(signOutGoogle: Bool = false) {
+    /// This deletes the backups too. That is the difference between "reset" and
+    /// "reset except for the bit that remembers everything", and a button called
+    /// Reset Everything should not quietly mean the second. It is irreversible —
+    /// backups are the undo for every other operation in the app — so the
+    /// confirmation that reaches it says so plainly.
+    ///
+    /// Never touches the user's actual contacts, on either side. Google sign-out
+    /// is opt-in, since re-authorising is usually not what you want.
+    func resetEverything(signOutGoogle: Bool = false) {
         resetToDefaults()
 
         ContactMappingStore().deleteAllMappings()
+        ContactBackupManager.shared.deleteAllBackups()
         SyncHistory.shared.clear()
 
         hasCompletedOnboarding = false
@@ -538,9 +543,10 @@ class AppSettings: ObservableObject {
         }
 
         SyncHistory.shared.log(
-            source: "AppSettings", action: "reset.forTesting",
-            details: signOutGoogle ? "settings, mappings, history, Google sign-out"
-                                   : "settings, mappings, history")
+            source: "AppSettings", action: "reset.everything",
+            details: signOutGoogle
+                ? "settings, mappings, backups, history, Google sign-out"
+                : "settings, mappings, backups, history")
     }
 }
 

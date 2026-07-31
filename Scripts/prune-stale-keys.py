@@ -15,8 +15,21 @@ import sys
 CATALOG = pathlib.Path("Contact SyncMate/Localizable.xcstrings")
 
 # Keys removed from source; listed explicitly so pruning is never guesswork.
+#
+# These reappear on their own: DerivedData keeps a `.stringsdata` per source
+# file, an incremental build only regenerates the ones it recompiled, and
+# `xcstringstool sync` reads all of them — so a string deleted from a file that
+# was not rebuilt is re-added to the catalog from the stale sidecar. Deleting it
+# from the catalog by hand does not stick; it has to be listed here.
 STALE = [
     "Clear Log",
+    # Renamed to "Reset Everything" — the qualifier implied it was for testing
+    # only, when it is simply the full reset.
+    "Reset Everything for Testing",
+    "Reset Settings Only restores preferences. Reset Everything for Testing "
+    "also clears contact mappings, the sync log and onboarding, so the next "
+    "sync starts from scratch. Neither touches your contacts, your backups or "
+    "your Google sign-in.",
 ]
 
 
