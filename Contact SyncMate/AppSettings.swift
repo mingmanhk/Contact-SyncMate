@@ -525,7 +525,17 @@ class AppSettings: ObservableObject {
 
         ContactMappingStore().deleteAllMappings()
         ContactBackupManager.shared.deleteAllBackups()
+        DeduplicationDecisionStore.shared.clearAll()
         SyncHistory.shared.clear()
+
+        // Then remove the directory itself.
+        //
+        // Clearing each store through its own API leaves whatever nobody
+        // remembered to list. That is not hypothetical: `dedup_decisions.json`
+        // sat here through every "reset" in this app's life because no reset
+        // path knew about it. Deleting the container is the version that cannot
+        // silently miss a file a future store adds.
+        Self.deleteApplicationSupportDirectory()
 
         hasCompletedOnboarding = false
         hasCompletedInitialSync = false
@@ -545,8 +555,49 @@ class AppSettings: ObservableObject {
         SyncHistory.shared.log(
             source: "AppSettings", action: "reset.everything",
             details: signOutGoogle
-                ? "settings, mappings, backups, history, Google sign-out"
-                : "settings, mappings, backups, history")
+                ? "settings, mappings, backups, dedup decisions, history, Google sign-out"
+                : "settings, mappings, backups, dedup decisions, history")
+    }
+
+    /// Everything the app has written under Application Support.
+    ///
+    /// `contact_mappings.json`, `sync_history.json`, `dedup_decisions.json` —
+    /// and anything added later, which is the point of removing the directory
+    /// rather than a list of filenames.
+    private static func deleteApplicationSupportDirectory() {
+        let fm = FileManager.default
+        guard let appSupport = try? fm.url(for: .applicationSupportDirectory,
+                                           in: .userDomainMask,
+                                           appropriateFor: nil, create: false)
+        else { return }
+
+        let bundleID = Bundle.main.bundleIdentifier ?? "ContactSync"
+        let directory = appSupport.appendingPathComponent(bundleID, isDirectory: true)
+        try? fm.removeItem(at: directory)
+    }
+
+    /// Remove the Keychain items and the saved folder grant as well.
+    ///
+    /// Separate from `resetEverything` because signing out is a different
+    /// decision from starting over — but "erase everything about me" has to
+    /// include the credentials, or it is not that.
+    func eraseCredentialsAndGrants() {
+        GoogleOAuthManager.shared.signOut()
+
+        let keychain = Self.keychain
+        for account in [KeychainStore.Account.anthropicAPIKey,
+                        KeychainStore.Account.googleClientSecret,
+                        "GoogleAccessToken", "GoogleRefreshToken",
+                        "GoogleOAuthClientSecret"] {
+            _ = keychain.delete(account: account)
+        }
+
+        SecurityScopedBookmark.clear(.backupFolder)
+        anthropicAPIKey = ""
+        googleAccountEmail = nil
+
+        SyncHistory.shared.log(source: "AppSettings", action: "reset.credentialsErased",
+                               details: "Keychain items and folder grant removed")
     }
 }
 

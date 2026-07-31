@@ -541,6 +541,17 @@ struct GeneralSettingsView: View {
                     // survive it, so the next run behaves like an established
                     // install. This is the one that actually starts over — and
                     // it is named for what it does, without a qualifier.
+                    // Signing out is a different decision from starting over, so
+                    // it is a separate button rather than a hidden side effect of
+                    // the one above.
+                    Button("Erase All My Data & Sign Out", role: .destructive) {
+                        settings.resetEverything(signOutGoogle: true)
+                        settings.eraseCredentialsAndGrants()
+                        appState.lastSyncDate = nil
+                        appState.lastSyncResult = nil
+                        appState.nextScheduledSync = nil
+                        appState.currentSyncSession = nil
+                    }
                     Button("Reset Everything", role: .destructive) {
                         settings.resetEverything()
                         // AppState holds the session's sync record in memory, not
@@ -554,7 +565,7 @@ struct GeneralSettingsView: View {
                     }
                     Button("Cancel", role: .cancel) {}
                 } message: {
-                    Text("Reset Settings Only restores preferences. Reset Everything also deletes every backup, the sync log and the contact mappings — deleted backups cannot be recovered, so nothing will be left to undo a past sync with. Neither option touches your contacts or your Google sign-in.")
+                    Text("Reset Settings Only restores preferences. Reset Everything also deletes every backup, the sync log, the contact mappings and the duplicate decisions — deleted backups cannot be recovered, so nothing will be left to undo a past sync with. Erase All My Data does that and additionally removes the stored Google and API credentials and signs you out. None of them touch the contacts themselves, on this Mac or in your Google account.")
                 }
             } header: {
                 Label("Data & History", systemImage: "internaldrive")

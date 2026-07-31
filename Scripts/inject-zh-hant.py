@@ -531,6 +531,10 @@ T = {
         "僅重設偏好設定",
     "Reset Everything":
         "完整重設",
+    "Erase All My Data & Sign Out":
+        "清除我的所有資料並登出",
+    "Reset Settings Only restores preferences. Reset Everything also deletes every backup, the sync log, the contact mappings and the duplicate decisions — deleted backups cannot be recovered, so nothing will be left to undo a past sync with. Erase All My Data does that and additionally removes the stored Google and API credentials and signs you out. None of them touch the contacts themselves, on this Mac or in your Google account.":
+        "「僅重設偏好設定」只還原設定。「完整重設」還會刪除所有備份、同步記錄、聯絡人配對與重複判定 —— 已刪除的備份無法復原，之後將沒有任何東西可用來還原先前的同步。「清除我的所有資料並登出」在此之上再移除已儲存的 Google 與 API 憑證並登出。三者都不會動到聯絡人本身，無論在這台 Mac 或你的 Google 帳戶中。",
     "Reset Settings Only restores preferences. Reset Everything also deletes every backup, the sync log and the contact mappings — deleted backups cannot be recovered, so nothing will be left to undo a past sync with. Neither option touches your contacts or your Google sign-in.":
         "「僅重設偏好設定」只還原設定。「完整重設」還會刪除所有備份、同步記錄與聯絡人配對 —— 已刪除的備份無法復原，之後將沒有任何東西可用來還原先前的同步。兩者都不會動到你的聯絡人或 Google 登入。",
     "Run a sync, review pending changes and read the activity log in the Dashboard (⌘1).":
