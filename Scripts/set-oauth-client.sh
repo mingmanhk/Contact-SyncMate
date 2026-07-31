@@ -50,6 +50,18 @@ case "$CLIENT_ID" in
         ;;
 esac
 
+# A real client ID is <digits>-<lowercase alphanumerics>. Checking the suffix
+# alone is not enough: the first version of this script accepted the literal
+# placeholder from its own usage message, wrote it into both files, and the
+# only symptom was a failed sign-in later.
+PREFIX_CHECK="${CLIENT_ID%.apps.googleusercontent.com}"
+if ! printf '%s' "$PREFIX_CHECK" | grep -Eq '^[0-9]+-[a-z0-9]+$'; then
+    echo "ABORT: '$PREFIX_CHECK' is not a client ID." >&2
+    echo "       Expected <digits>-<letters/digits>, e.g. 714060347503-a1b2c3d4e5f6." >&2
+    echo "       Copy the real value from Google Cloud Console → Clients." >&2
+    exit 1
+fi
+
 # "714060347503-abc.apps.googleusercontent.com"
 #   → "com.googleusercontent.apps.714060347503-abc"
 PREFIX="${CLIENT_ID%.apps.googleusercontent.com}"
@@ -75,7 +87,28 @@ cat > "$CONFIG" <<JSON
 JSON
 echo "wrote $CONFIG"
 
-/usr/libexec/PlistBuddy -c "Set :CFBundleURLTypes:0:CFBundleURLSchemes:0 $SCHEME" "$PLIST"
+# Targeted text edit, not PlistBuddy.
+#
+# PlistBuddy rewrites the whole file: it drops every XML comment and reorders
+# the keys alphabetically. Info.plist here carries comments explaining the
+# export-compliance declaration and the Contacts usage string, and losing them
+# to a one-line change is not an acceptable trade.
+python3 - "$PLIST" "$SCHEME" <<'PY'
+import re, sys
+path, scheme = sys.argv[1], sys.argv[2]
+with open(path, encoding="utf-8") as handle:
+    text = handle.read()
+
+# The one <string> inside CFBundleURLSchemes.
+pattern = re.compile(
+    r"(<key>CFBundleURLSchemes</key>\s*<array>\s*<string>)([^<]*)(</string>)")
+if not pattern.search(text):
+    sys.exit("ABORT: could not find CFBundleURLSchemes in " + path)
+
+updated = pattern.sub(lambda m: m.group(1) + scheme + m.group(3), text, count=1)
+with open(path, "w", encoding="utf-8") as handle:
+    handle.write(updated)
+PY
 echo "wrote $PLIST"
 
 echo
