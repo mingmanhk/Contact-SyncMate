@@ -446,13 +446,28 @@ class MacContactsConnector: ObservableObject {
             CNContactPhoneNumbersKey, CNContactEmailAddressesKey,
             CNContactPostalAddressesKey, CNContactUrlAddressesKey,
             CNContactBirthdayKey,
-            CNContactImageDataKey, CNContactImageDataAvailableKey,
             CNContactDatesKey, CNContactSocialProfilesKey,
             CNContactInstantMessageAddressesKey,
             // Deliberately absent: CNContactNoteKey needs the
             // com.apple.developer.contacts.notes entitlement, and requesting it
             // without one makes the fetch itself fail.
         ].map { $0 as CNKeyDescriptor }
+        // Full-resolution photo bytes, only when photo sync is on.
+        //
+        // `CNContactImageDataKey` was fetched unconditionally, so every sync
+        // pulled every contact photo at full size over XPC, carried it through
+        // the diff, and wrote it into both the pre- and post-sync backup — for a
+        // field `applyFieldSettings` then discards when the setting is off.
+        // Photos are the largest thing in a contact by a wide margin; a few
+        // hundred of them is the difference between a backup of a few megabytes
+        // and one of a few hundred.
+        //
+        // `ImageDataAvailable` stays either way: it is a flag, not the bytes,
+        // and the mapper reads it.
+        + (AppSettings.shared.syncPhotos
+           ? [CNContactImageDataKey as CNKeyDescriptor,
+              CNContactImageDataAvailableKey as CNKeyDescriptor]
+           : [CNContactImageDataAvailableKey as CNKeyDescriptor])
         // Callers that format a display name go through CNContactFormatter, which
         // has its own required-key descriptor. Omitting it raises
         // CNContactPropertyNotFetchedException — an ObjC exception, so it kills

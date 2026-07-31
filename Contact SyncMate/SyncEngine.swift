@@ -588,9 +588,18 @@ class SyncEngine: ObservableObject {
         }
 
         // --- Step 2: New on Google, not yet mapped ---
+        //
+        // Index built once, outside the loop. This used to call
+        // `macByIdentifier.filter { … }` per contact — rebuilding the entire
+        // dictionary on every iteration — and then scan it linearly, normalising
+        // each candidate's name again each time. On a first sync between two
+        // populated address books that is every contact against every contact:
+        // ~500,000 dictionary insertions and as many name normalisations for
+        // 650 Google × 770 Mac. Lookups are now O(1).
+        let macIndex = FuzzyIndex(contacts: macByIdentifier)
+
         for (gID, gContact) in googleByResourceName where !processedGoogle.contains(gID) {
-            let fuzzyMatch = findFuzzyMatch(for: gContact,
-                                            in: macByIdentifier.filter { !processedMac.contains($0.key) })
+            let fuzzyMatch = macIndex.match(gContact, excluding: processedMac)
             if let (mID, mContact) = fuzzyMatch {
                 changes.append(ContactChange(
                     contactName: gContact.displayName, action: .merge,
@@ -910,28 +919,53 @@ class SyncEngine: ObservableObject {
     // MARK: - Fuzzy Match
 
     /// Find a probable match for a contact in an unmapped pool using name + email
-    private func findFuzzyMatch(
-        for contact: UnifiedContact,
-        in pool: [String: UnifiedContact]
-    ) -> (String, UnifiedContact)? {
-        let normalizedName = ContactNormalizer.normalizeFullName(
-            given: contact.givenName, middle: nil, family: contact.familyName)
-        let contactEmails = Set(contact.emailAddresses.map { $0.value.lowercased() })
+    /// Email and normalised-name lookup over a set of contacts, built once.
+    ///
+    /// Replaces a linear scan that re-derived every candidate's emails and
+    /// normalised name on each probe. Besides the cost, that scan walked a
+    /// dictionary in arbitrary order and returned the first hit — so when two
+    /// contacts both matched, which one won varied between runs. Ordering the
+    /// candidates makes the result reproducible, which matters when the
+    /// consequence of a wrong match is a merged or duplicated contact.
+    struct FuzzyIndex {
+        private var byEmail: [String: [String]] = [:]
+        private var byName: [String: [String]] = [:]
+        private let contacts: [String: UnifiedContact]
 
-        for (id, candidate) in pool {
-            // Email exact match — high confidence
-            let candidateEmails = Set(candidate.emailAddresses.map { $0.value.lowercased() })
-            if !contactEmails.isEmpty && !contactEmails.isDisjoint(with: candidateEmails) {
-                return (id, candidate)
+        init(contacts: [String: UnifiedContact]) {
+            self.contacts = contacts
+            for (id, contact) in contacts {
+                for email in contact.emailAddresses {
+                    guard let key = email.value.nonBlank?.lowercased() else { continue }
+                    byEmail[key, default: []].append(id)
+                }
+                let name = ContactNormalizer.normalizeFullName(
+                    given: contact.givenName, middle: nil, family: contact.familyName)
+                if !name.isEmpty { byName[name, default: []].append(id) }
             }
-            // Name match — medium confidence (require both given + family)
-            let candidateName = ContactNormalizer.normalizeFullName(
-                given: candidate.givenName, middle: nil, family: candidate.familyName)
-            if !normalizedName.isEmpty && normalizedName == candidateName {
-                return (id, candidate)
-            }
+            // Sorted so a tie resolves the same way every run.
+            for key in byEmail.keys { byEmail[key]?.sort() }
+            for key in byName.keys { byName[key]?.sort() }
         }
-        return nil
+
+        /// Email match first, then name — the same precedence as before.
+        func match(_ contact: UnifiedContact,
+                   excluding used: Set<String>) -> (String, UnifiedContact)? {
+            for email in contact.emailAddresses {
+                guard let key = email.value.nonBlank?.lowercased() else { continue }
+                if let id = byEmail[key]?.first(where: { !used.contains($0) }),
+                   let match = contacts[id] {
+                    return (id, match)
+                }
+            }
+
+            let name = ContactNormalizer.normalizeFullName(
+                given: contact.givenName, middle: nil, family: contact.familyName)
+            guard !name.isEmpty,
+                  let id = byName[name]?.first(where: { !used.contains($0) }),
+                  let match = contacts[id] else { return nil }
+            return (id, match)
+        }
     }
 
     // MARK: - Apply Changes
@@ -1621,9 +1655,17 @@ enum ContactMapper {
             unified.note = macContact.note
         }
         
-        // Photo
-        unified.photoData = macContact.imageData
-        
+        // Photo.
+        //
+        // Guarded like `note` above, and for the same reason: image data is only
+        // fetched when photo sync is on, and reading an unfetched property
+        // raises CNContactPropertyNotFetchedException. That is an ObjC
+        // exception — not catchable as a Swift error, so it takes the process
+        // down rather than surfacing as a failed sync.
+        if macContact.isKeyAvailable(CNContactImageDataKey) {
+            unified.photoData = macContact.imageData
+        }
+
         return unified
     }
     

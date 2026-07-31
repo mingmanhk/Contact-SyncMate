@@ -696,17 +696,29 @@ class ContactBackupManager: ObservableObject {
         return (versions.max { $0.versionNumber < $1.versionNumber }?.versionNumber ?? 0) + 1
     }
 
+    /// Total size of the backup files on disk.
+    ///
+    /// Reads the file sizes. The previous implementation re-encoded every
+    /// session to JSON — every contact of both address books, including the
+    /// full photo bytes — and threw the result away except for its length. With
+    /// 30 retained backups of a normal address book that is hundreds of
+    /// megabytes serialised to produce one number for a Settings label, and it
+    /// ran after every backup, on every prune, and whenever the statistics view
+    /// appeared.
+    ///
+    /// Asking the filesystem is also more accurate: it measures what is
+    /// actually stored rather than what a fresh encode would produce.
     private func calculateEstimatedSize() -> Int64 {
-        let encoder = JSONEncoder()
-        var totalSize: Int64 = 0
-
-        for session in backupSessions {
-            if let data = try? encoder.encode(session) {
-                totalSize += Int64(data.count)
+        withBackupDirectory { dir -> Int64 in
+            let files = (try? FileManager.default.contentsOfDirectory(
+                at: dir,
+                includingPropertiesForKeys: [.fileSizeKey])) ?? []
+            return files.reduce(into: Int64(0)) { total, file in
+                guard file.pathExtension == "json" else { return }
+                let size = (try? file.resourceValues(forKeys: [.fileSizeKey]))?.fileSize
+                total += Int64(size ?? 0)
             }
         }
-
-        return totalSize
     }
 
     // MARK: - Disk Persistence
