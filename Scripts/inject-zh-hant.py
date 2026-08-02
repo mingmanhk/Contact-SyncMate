@@ -549,8 +549,8 @@ T = {
         "拷貝所有近期變更",
     "This Client ID belongs to a Desktop or Web OAuth client, which requires a secret. Create an iOS client in Google Cloud Console — that is the type Google requires for macOS apps, and it needs no secret — then run Scripts/set-oauth-client.sh with its Client ID.":
         "這個 Client ID 屬於 Desktop 或 Web 類型的 OAuth 用戶端，需要 secret。請在 Google Cloud Console 建立 iOS 類型的用戶端 —— 那是 Google 對 macOS app 要求的類型，且不需要 secret —— 然後用它的 Client ID 執行 Scripts/set-oauth-client.sh。",
-    "Erase All My Data & Sign Out":
-        "清除我的所有資料並登出",
+    "Reset Settings Only restores preferences and nothing else. Reset Everything returns the app to how it was on first launch: it deletes every backup, the sync log, the contact mappings and the duplicate decisions, removes the stored credentials, signs you out, and restarts. Deleted backups cannot be recovered, so nothing will be left to undo a past sync with. Neither option touches the contacts themselves, on this Mac or in your Google account.":
+        "「僅重設偏好設定」只還原設定，不動其他。「完整重設」會把 app 還原成首次啟動的狀態：刪除所有備份、同步記錄、聯絡人配對與重複判定，移除已儲存的憑證，登出，然後重新啟動。已刪除的備份無法復原，之後將沒有任何東西可用來還原先前的同步。兩者都不會動到聯絡人本身，無論在這台 Mac 或你的 Google 帳戶中。",
     "Reset Settings Only restores preferences. Reset Everything also deletes every backup, the sync log, the contact mappings and the duplicate decisions — deleted backups cannot be recovered, so nothing will be left to undo a past sync with. Erase All My Data does that and additionally removes the stored Google and API credentials and signs you out. None of them touch the contacts themselves, on this Mac or in your Google account.":
         "「僅重設偏好設定」只還原設定。「完整重設」還會刪除所有備份、同步記錄、聯絡人配對與重複判定 —— 已刪除的備份無法復原，之後將沒有任何東西可用來還原先前的同步。「清除我的所有資料並登出」在此之上再移除已儲存的 Google 與 API 憑證並登出。三者都不會動到聯絡人本身，無論在這台 Mac 或你的 Google 帳戶中。",
     "Reset Settings Only restores preferences. Reset Everything also deletes every backup, the sync log and the contact mappings — deleted backups cannot be recovered, so nothing will be left to undo a past sync with. Neither option touches your contacts or your Google sign-in.":

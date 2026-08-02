@@ -3143,22 +3143,6 @@
         }
       }
     },
-    "Erase All My Data & Sign Out": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "清除我的所有数据并登出"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "清除我的所有資料並登出"
-          }
-        }
-      }
-    },
     "Errors": {
       "extractionState": "manual",
       "localizations": {
@@ -6039,18 +6023,19 @@
         }
       }
     },
-    "Reset Settings Only restores preferences. Reset Everything also deletes every backup, the sync log, the contact mappings and the duplicate decisions — deleted backups cannot be recovered, so nothing will be left to undo a past sync with. Erase All My Data does that and additionally removes the stored Google and API credentials and signs you out. None of them touch the contacts themselves, on this Mac or in your Google account.": {
+    "Reset Settings Only restores preferences and nothing else. Reset Everything returns the app to how it was on first launch: it deletes every backup, the sync log, the contact mappings and the duplicate decisions, removes the stored credentials, signs you out, and restarts. Deleted backups cannot be recovered, so nothing will be left to undo a past sync with. Neither option touches the contacts themselves, on this Mac or in your Google account.": {
+      "extractionState": "manual",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "「仅重设偏好设置」只还原设置。「完整重设」还会删除所有备份、同步记录、联系人配对与重复判定 —— 已删除的备份无法复原，之后将没有任何东西可用来还原先前的同步。「清除我的所有数据并登出」在此之上再移除已保存的 Google 与 API 凭证并登出。三者都不会动到联系人本身，无论在这台 Mac 或你的 Google 帐户中。"
+            "value": "「仅重设偏好设置」只还原设置，不动其他。「完整重设」会把 app 还原成首次启动的状态：删除所有备份、同步记录、联系人配对与重复判定，移除已保存的凭证，登出，然后重新启动。已删除的备份无法复原，之后将没有任何东西可用来还原先前的同步。两者都不会动到联系人本身，无论在这台 Mac 或你的 Google 帐户中。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "「僅重設偏好設定」只還原設定。「完整重設」還會刪除所有備份、同步記錄、聯絡人配對與重複判定 —— 已刪除的備份無法復原，之後將沒有任何東西可用來還原先前的同步。「清除我的所有資料並登出」在此之上再移除已儲存的 Google 與 API 憑證並登出。三者都不會動到聯絡人本身，無論在這台 Mac 或你的 Google 帳戶中。"
+            "value": "「僅重設偏好設定」只還原設定，不動其他。「完整重設」會把 app 還原成首次啟動的狀態：刪除所有備份、同步記錄、聯絡人配對與重複判定，移除已儲存的憑證，登出，然後重新啟動。已刪除的備份無法復原，之後將沒有任何東西可用來還原先前的同步。兩者都不會動到聯絡人本身，無論在這台 Mac 或你的 Google 帳戶中。"
           }
         }
       }

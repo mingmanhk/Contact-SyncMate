@@ -30,6 +30,14 @@ STALE = [
     "also clears contact mappings, the sync log and onboarding, so the next "
     "sync starts from scratch. Neither touches your contacts, your backups or "
     "your Google sign-in.",
+    # The dialog briefly had three destructive buttons; it has two again.
+    "Erase All My Data & Sign Out",
+    "Reset Settings Only restores preferences. Reset Everything also deletes "
+    "every backup, the sync log, the contact mappings and the duplicate "
+    "decisions — deleted backups cannot be recovered, so nothing will be left "
+    "to undo a past sync with. Erase All My Data does that and additionally "
+    "removes the stored Google and API credentials and signs you out. None of "
+    "them touch the contacts themselves, on this Mac or in your Google account.",
     # Superseded when the dialog gained the credentials option.
     "Reset Settings Only restores preferences. Reset Everything also deletes "
     "every backup, the sync log and the contact mappings — deleted backups "
