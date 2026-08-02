@@ -126,7 +126,7 @@ struct DashboardView: View {
             }
         }
         .sheet(isPresented: $showHistoryView) {
-            SyncHistoryAndBackupView()
+            SyncHistoryAndBackupView(isSheet: true)
         }
         .confirmationDialog("Delete all sync events?",
                             isPresented: $showClearHistoryConfirmation,
@@ -153,6 +153,13 @@ struct DashboardView: View {
             sync.appState = appState
         }
         // Drive banners from the coordinator's phase
+        // The engine reports progress per contact, which makes it the natural
+        // clock for streaming the list — no timer to own, and nothing polls
+        // while idle.
+        .onChange(of: sync.progress) { _, _ in
+            guard sync.phase.isActive else { return }
+            recentEvents = Self.interestingEvents(from: SyncHistory.shared.events())
+        }
         .onChange(of: sync.phase) { _, phase in
             switch phase {
             case .completed(let r):
@@ -178,6 +185,10 @@ struct DashboardView: View {
                     syncResultBanner = nil
                     syncErrorMessage = nil
                 }
+                // Show the writes as they land. Refreshing only on completion
+                // meant the most informative moment — a long sync in flight —
+                // was the one showing "No sync history yet".
+                recentEvents = Self.interestingEvents(from: SyncHistory.shared.events())
             case .idle:
                 break
             }
@@ -670,42 +681,15 @@ struct DashboardView: View {
     /// The Apply button used to be a TODO that just closed the sheet, so manual
     /// mode showed the user exactly what it was going to do and then did nothing.
     private func applyReviewedSession(_ session: SyncSession) {
-        appState.isSyncing = true
-
-        Task {
-            do {
-                let engine = SyncEngine(
-                    googleConnector: GoogleContactsConnector(),
-                    macConnector: MacContactsConnector(),
-                    mappingStore: ContactMappingStore()
-                )
-                let result = try await engine.executeSync(session: session)
-
-                await MainActor.run {
-                    appState.isSyncing = false
-                    appState.currentSyncSession = nil
-                    withAnimation {
-                        syncErrorMessage = nil
-                        syncResultBanner = SyncResultBanner(
-                            icon: result.successful
-                                ? "checkmark.circle.fill"
-                                : "exclamationmark.triangle.fill",
-                            color: result.successful ? .green : .orange,
-                            title: result.successful
-                                ? "Sync Completed"
-                                : "Sync Completed with Errors",
-                            detail: result.summary
-                        )
-                    }
-                    recentEvents = Self.interestingEvents(from: SyncHistory.shared.events())
-                }
-            } catch {
-                await MainActor.run {
-                    appState.isSyncing = false
-                    handleSyncError(error)
-                }
-            }
-        }
+        // Through the coordinator, not around it. Building a SyncEngine here
+        // meant nothing was subscribed to its progress, so the header read
+        // "Syncing…" while the progress bar and the live event list — both of
+        // which watch SyncCoordinator.phase — showed nothing at all.
+        //
+        // The result banner still appears: the .onChange(of: sync.phase) handler
+        // above builds it from the completed phase, the same as for every other
+        // sync. This method no longer needs its own copy of that either.
+        Task { await sync.applyReviewed(session) }
     }
 
     /// Manual mode: prepare a preview session, then show the SyncPreviewView sheet.

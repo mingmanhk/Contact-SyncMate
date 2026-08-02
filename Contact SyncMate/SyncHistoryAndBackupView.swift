@@ -12,6 +12,10 @@ import SwiftUI
 // MARK: - Main Sync History & Backup View
 
 struct SyncHistoryAndBackupView: View {
+    /// True when shown as a sheet, which has no title bar of its own.
+    var isSheet: Bool = false
+
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject private var backupManager = ContactBackupManager.shared
     @StateObject private var viewModel = SyncHistoryViewModel()
     @State private var selectedBackup: BackupSession?
@@ -44,6 +48,16 @@ struct SyncHistoryAndBackupView: View {
                         .fontWeight(.bold)
 
                     Spacer()
+
+                    // Presented as a sheet from the Dashboard, and a sheet has no
+                    // title bar — so there was no way out of this screen except
+                    // Escape, which is not discoverable. As a standalone window
+                    // (⌘2) the close button comes from the window frame, hence
+                    // `dismiss` only rendering when there is something to dismiss.
+                    if isSheet {
+                        Button("Done") { dismiss() }
+                            .keyboardShortcut(.defaultAction)
+                    }
 
                     // Clearing lived only in the other history view, which is not
                     // the one this window shows — so from here the log could be

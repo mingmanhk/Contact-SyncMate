@@ -8639,6 +8639,23 @@
           }
         }
       }
+    },
+    "Applying reviewed changes…": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在套用已檢視的變更…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在套用已查看的变更…"
+          }
+        }
+      }
     }
   },
   "version": "1.1"

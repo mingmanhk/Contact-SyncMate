@@ -284,6 +284,86 @@ final class SyncCoordinator: ObservableObject {
         }
     }
 
+    /// Apply a session the user approved in the preview sheet.
+    ///
+    /// Goes through the coordinator rather than around it. The Dashboard used to
+    /// build its own `SyncEngine` for this, which meant the apply ran with
+    /// nothing subscribed to `engine.$progress` — so the header said "Syncing…"
+    /// while the progress bar, the step label and the live event list all sat
+    /// idle, because every one of them reads `SyncCoordinator.phase`.
+    ///
+    /// Everything after the execute call is deliberately identical to `runSync`:
+    /// same completion phase, same AppState updates, same notification, same
+    /// Spotlight entry. Two ways to finish a sync is how they drift apart.
+    func applyReviewed(_ session: SyncSession) async {
+        guard !isRunning else { return }
+
+        setPhase(.syncing(0), step: "Applying reviewed changes…", progress: 0)
+        appState?.isSyncing = true
+
+        let engine = SyncEngine(
+            googleConnector: GoogleContactsConnector(),
+            macConnector: MacContactsConnector(),
+            mappingStore: ContactMappingStore()
+        )
+
+        var progressCancellable: AnyCancellable?
+        progressCancellable = engine.$progress
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] p in
+                guard let self, let p, self.isRunning else { return }
+                let frac = p.totalItems > 0
+                    ? Double(p.completedItems) / Double(p.totalItems)
+                    : 0
+                self.setPhase(.syncing(frac), step: p.currentStep, progress: frac)
+                self.appState?.syncProgress = p
+            }
+
+        do {
+            let result = try await engine.executeSync(session: session)
+            progressCancellable?.cancel()
+
+            let phaseResult = SyncPhaseResult(from: result)
+            setPhase(.completed(phaseResult), step: phaseResult.summary, progress: 1)
+
+            appState?.isSyncing = false
+            appState?.lastSyncDate = Date()
+            appState?.lastSyncResult = result
+            appState?.syncProgress = nil
+            appState?.currentSyncSession = nil
+
+            SyncHistory.shared.log(source: "SyncCoordinator", action: "sync.complete",
+                                   details: result.summary)
+
+            let changedSomething = result.added + result.updated
+                + result.deleted + result.merged > 0
+            if changedSomething || !result.errors.isEmpty {
+                SyncNotifier.notifySyncCompleted(
+                    added: result.added, updated: result.updated,
+                    deleted: result.deleted, errorCount: result.errors.count)
+            }
+
+            SpotlightIndexer.indexSyncResult(
+                added: result.added, updated: result.updated,
+                deleted: result.deleted, errorCount: result.errors.count,
+                date: result.endTime)
+
+            scheduleIdleReset(after: 8)
+
+        } catch {
+            progressCancellable?.cancel()
+            let friendly = friendlyMessage(for: error)
+            setFailed(friendly)
+            appState?.isSyncing = false
+            appState?.syncProgress = nil
+
+            SyncHistory.shared.log(source: "SyncCoordinator", action: "sync.failed",
+                                   details: "\(friendly) — \(error.localizedDescription)")
+            SyncNotifier.notifySyncFailed(message: friendly)
+            scheduleIdleReset(after: 12)
+        }
+    }
+
     // MARK: - Private helpers
 
     private func setPhase(_ p: SyncPhase, step: String = "", progress pg: Double = 0) {

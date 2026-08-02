@@ -541,6 +541,10 @@ T = {
         "Google 拒絕了這個請求。若應用程式的發布狀態為「測試中」，登入的電子郵件必須列在 OAuth 同意畫面的測試使用者名單中。",
     "Copy":
         "拷貝",
+    "Done":
+        "完成",
+    "Applying reviewed changes…":
+        "正在套用已檢視的變更…",
     "Reconnect (re-approve permissions)":
         "重新連接（重新授權權限）",
     "Sign Out":
