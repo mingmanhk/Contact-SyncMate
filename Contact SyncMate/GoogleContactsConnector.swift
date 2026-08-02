@@ -892,6 +892,21 @@ enum GoogleContactsError: LocalizedError {
         case .networkError(let error):
             return "Network error: \(error.localizedDescription)"
         case .apiError(let statusCode, let message):
+            // A 403 from the People API is almost always one of three
+            // configuration mistakes, and the raw JSON names which — but it is
+            // long, so the useful sentence gets truncated out of any list that
+            // shows it. Lead with the diagnosis and keep the payload after it.
+            if statusCode == 403 {
+                let advice: String
+                if message.contains("SERVICE_DISABLED") || message.contains("has not been used in project") {
+                    advice = String(localized: "The People API is not enabled for this Google Cloud project. Open the project's API Library, enable People API, then wait a minute and try again.")
+                } else if message.contains("ACCESS_TOKEN_SCOPE_INSUFFICIENT") || message.contains("insufficient") {
+                    advice = String(localized: "The connected account did not grant the Contacts permission. Sign out in Settings → Accounts, sign in again, and approve the Contacts scope.")
+                } else {
+                    advice = String(localized: "Google refused this request. If the app's publishing status is Testing, the signed-in address must be listed as a test user in the OAuth consent screen.")
+                }
+                return "\(advice)\n\nAPI error (403): \(message)"
+            }
             return "API error (\(statusCode)): \(message)"
         case .rateLimitExceeded:
             return "Rate limit exceeded. Please try again later."

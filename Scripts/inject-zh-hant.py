@@ -531,6 +531,18 @@ T = {
         "僅重設偏好設定",
     "Reset Everything":
         "完整重設",
+    "The People API is not enabled for this Google Cloud project. Open the project's API Library, enable People API, then wait a minute and try again.":
+        "此 Google Cloud 專案尚未啟用 People API。請開啟專案的 API 程式庫，啟用 People API，等候約一分鐘後再試。",
+    "The connected account did not grant the Contacts permission. Sign out in Settings → Accounts, sign in again, and approve the Contacts scope.":
+        "已連接的帳戶未授予聯絡人權限。請到「設定 → 帳戶」登出後重新登入，並允許聯絡人權限。",
+    "Google refused this request. If the app's publishing status is Testing, the signed-in address must be listed as a test user in the OAuth consent screen.":
+        "Google 拒絕了這個請求。若應用程式的發布狀態為「測試中」，登入的電子郵件必須列在 OAuth 同意畫面的測試使用者名單中。",
+    "Copy":
+        "拷貝",
+    "Copy All Recent Changes":
+        "拷貝所有近期變更",
+    "This Client ID belongs to a Desktop or Web OAuth client, which requires a secret. Create an iOS client in Google Cloud Console — that is the type Google requires for macOS apps, and it needs no secret — then run Scripts/set-oauth-client.sh with its Client ID.":
+        "這個 Client ID 屬於 Desktop 或 Web 類型的 OAuth 用戶端，需要 secret。請在 Google Cloud Console 建立 iOS 類型的用戶端 —— 那是 Google 對 macOS app 要求的類型，且不需要 secret —— 然後用它的 Client ID 執行 Scripts/set-oauth-client.sh。",
     "Erase All My Data & Sign Out":
         "清除我的所有資料並登出",
     "Reset Settings Only restores preferences. Reset Everything also deletes every backup, the sync log, the contact mappings and the duplicate decisions — deleted backups cannot be recovered, so nothing will be left to undo a past sync with. Erase All My Data does that and additionally removes the stored Google and API credentials and signs you out. None of them touch the contacts themselves, on this Mac or in your Google account.":

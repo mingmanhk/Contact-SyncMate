@@ -587,7 +587,12 @@ struct DashboardView: View {
                     Text(detail)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        // Failures carry the API payload that says what actually
+                        // went wrong, and one line of it is never the useful
+                        // part — "API error (403): {…" tells you nothing.
+                        .lineLimit(isFailure(event.action) ? 6 : 1)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -600,6 +605,32 @@ struct DashboardView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(.background)
+        // Right-click → Copy. Reading an error off a screenshot and retyping it
+        // is how detail gets lost, and the detail is the whole message here.
+        .contextMenu {
+            Button("Copy") { copyToPasteboard(Self.plainText(event)) }
+            Button("Copy All Recent Changes") {
+                copyToPasteboard(recentEvents.map(Self.plainText).joined(separator: "\n"))
+            }
+        }
+        .help(event.details ?? friendlyLabel(for: event.action))
+    }
+
+    private func isFailure(_ action: String) -> Bool {
+        let lowered = action.lowercased()
+        return lowered.contains("fail") || lowered.contains("error")
+    }
+
+    /// One log line, in the shape you would want pasted into a bug report.
+    private static func plainText(_ event: SyncEvent) -> String {
+        let stamp = event.timestamp.formatted(date: .abbreviated, time: .standard)
+        let detail = event.details.map { " — \($0)" } ?? ""
+        return "[\(stamp)] \(event.source) \(event.action)\(detail)"
+    }
+
+    private func copyToPasteboard(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 
     // MARK: - Sync Action

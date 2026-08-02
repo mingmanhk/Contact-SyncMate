@@ -543,7 +543,22 @@ class GoogleOAuthManager: NSObject, ObservableObject {
             // between those without the payload wastes hours.
             let status = (response as? HTTPURLResponse)?.statusCode ?? -1
             let body = String(data: data, encoding: .utf8) ?? ""
-            let detail = Self.googleErrorSummary(from: body, status: status)
+            var detail = Self.googleErrorSummary(from: body, status: status)
+
+            // "client_secret is missing" is not a missing-value problem — it is
+            // Google saying this client is a *confidential* one. Only Desktop
+            // and Web clients are issued a secret; an iOS client, the type
+            // Google requires for macOS apps, is public and is never asked for
+            // one. So the message means the configured client is the wrong type,
+            // and the fix is a different client ID rather than finding a secret.
+            //
+            // Worth translating, because the literal wording sends you looking
+            // for a value that does not exist for the client you should be using.
+            if body.contains("client_secret is missing") {
+                detail += "\n\n" + String(
+                    localized: "This Client ID belongs to a Desktop or Web OAuth client, which requires a secret. Create an iOS client in Google Cloud Console — that is the type Google requires for macOS apps, and it needs no secret — then run Scripts/set-oauth-client.sh with its Client ID.")
+            }
+
             throw GoogleOAuthError.tokenExchangeFailed(detail)
         }
 

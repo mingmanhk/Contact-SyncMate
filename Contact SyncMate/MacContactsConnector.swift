@@ -423,6 +423,21 @@ class MacContactsConnector: ObservableObject {
         return identifiers
     }
 
+    /// Whether photo sync is on, readable from a nonisolated context.
+    ///
+    /// `AppSettings` is main-actor isolated under the project's default
+    /// isolation, so `AppSettings.shared.syncPhotos` cannot be read here — and
+    /// should not be: this runs on the Contacts fetch queue, and reaching onto
+    /// the main actor from there is the priority inversion this whole file
+    /// exists to avoid.
+    ///
+    /// Reading the backing store directly is the honest way to get one Bool off
+    /// the main actor. The default matches `AppSettings.syncPhotos` — `true`
+    /// when the key has never been written.
+    private nonisolated static func photoSyncEnabled() -> Bool {
+        UserDefaults.standard.object(forKey: "syncPhotos") as? Bool ?? true
+    }
+
     /// Key set for `fetchAllContactsOffMain`.
     ///
     /// Deliberately excludes `CNContactNoteKey`: reading it needs the
@@ -464,7 +479,7 @@ class MacContactsConnector: ObservableObject {
         //
         // `ImageDataAvailable` stays either way: it is a flag, not the bytes,
         // and the mapper reads it.
-        + (AppSettings.shared.syncPhotos
+        + (photoSyncEnabled()
            ? [CNContactImageDataKey as CNKeyDescriptor,
               CNContactImageDataAvailableKey as CNKeyDescriptor]
            : [CNContactImageDataAvailableKey as CNKeyDescriptor])

@@ -2537,6 +2537,40 @@
         }
       }
     },
+    "Copy": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拷贝"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拷貝"
+          }
+        }
+      }
+    },
+    "Copy All Recent Changes": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拷贝所有近期变更"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拷貝所有近期變更"
+          }
+        }
+      }
+    },
     "Couldn't encode the log.": {
       "extractionState": "manual",
       "localizations": {
@@ -3111,16 +3145,16 @@
     },
     "Erase All My Data & Sign Out": {
       "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "清除我的所有資料並登出"
-          }
-        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "清除我的所有数据并登出"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除我的所有資料並登出"
           }
         }
       }
@@ -3637,6 +3671,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "以 Google 聯絡人為準,變更只同步到 Mac"
+          }
+        }
+      }
+    },
+    "Google refused this request. If the app's publishing status is Testing, the signed-in address must be listed as a test user in the OAuth consent screen.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 拒绝了这个请求。若应用程式的发布状态为「测试中」，登录的电子邮件必须列在 OAuth 同意画面的测试使用者名单中。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 拒絕了這個請求。若應用程式的發布狀態為「測試中」，登入的電子郵件必須列在 OAuth 同意畫面的測試使用者名單中。"
           }
         }
       }
@@ -5973,16 +6024,16 @@
     },
     "Reset Settings Only restores preferences. Reset Everything also deletes every backup, the sync log, the contact mappings and the duplicate decisions — deleted backups cannot be recovered, so nothing will be left to undo a past sync with. Erase All My Data does that and additionally removes the stored Google and API credentials and signs you out. None of them touch the contacts themselves, on this Mac or in your Google account.": {
       "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "「僅重設偏好設定」只還原設定。「完整重設」還會刪除所有備份、同步記錄、聯絡人配對與重複判定 —— 已刪除的備份無法復原，之後將沒有任何東西可用來還原先前的同步。「清除我的所有資料並登出」在此之上再移除已儲存的 Google 與 API 憑證並登出。三者都不會動到聯絡人本身，無論在這台 Mac 或你的 Google 帳戶中。"
-          }
-        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "「仅重设偏好设置」只还原设置。「完整重设」还会删除所有备份、同步记录、联系人配对与重复判定 —— 已删除的备份无法复原，之后将没有任何东西可用来还原先前的同步。「清除我的所有数据并登出」在此之上再移除已保存的 Google 与 API 凭证并登出。三者都不会动到联系人本身，无论在这台 Mac 或你的 Google 帐户中。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「僅重設偏好設定」只還原設定。「完整重設」還會刪除所有備份、同步記錄、聯絡人配對與重複判定 —— 已刪除的備份無法復原，之後將沒有任何東西可用來還原先前的同步。「清除我的所有資料並登出」在此之上再移除已儲存的 Google 與 API 憑證並登出。三者都不會動到聯絡人本身，無論在這台 Mac 或你的 Google 帳戶中。"
           }
         }
       }
@@ -7705,6 +7756,23 @@
         }
       }
     },
+    "The People API is not enabled for this Google Cloud project. Open the project's API Library, enable People API, then wait a minute and try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此 Google Cloud 专案尚未启用 People API。请开启专案的 API 程式库，启用 People API，等候约一分钟后再试。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此 Google Cloud 專案尚未啟用 People API。請開啟專案的 API 程式庫，啟用 People API，等候約一分鐘後再試。"
+          }
+        }
+      }
+    },
     "The cloud tier is called only for ambiguous pairs — never for high-confidence matches or when you're offline.": {
       "localizations": {
         "zh-Hans": {
@@ -7717,6 +7785,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "只有在配對難以判定時才會呼叫雲端 — 高信心配對或離線時都不會呼叫。"
+          }
+        }
+      }
+    },
+    "The connected account did not grant the Contacts permission. Sign out in Settings → Accounts, sign in again, and approve the Contacts scope.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已连接的帐户未授予联系人权限。请到「设置 → 帐户」登出后重新登录，并允许联系人权限。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已連接的帳戶未授予聯絡人權限。請到「設定 → 帳戶」登出後重新登入，並允許聯絡人權限。"
           }
         }
       }
@@ -7797,6 +7882,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "建議保留這些防護。關閉可加快同步,但會提高資料遺失的風險。"
+          }
+        }
+      }
+    },
+    "This Client ID belongs to a Desktop or Web OAuth client, which requires a secret. Create an iOS client in Google Cloud Console — that is the type Google requires for macOS apps, and it needs no secret — then run Scripts/set-oauth-client.sh with its Client ID.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个 Client ID 属于 Desktop 或 Web 类型的 OAuth 用户端，需要 secret。请在 Google Cloud Console 建立 iOS 类型的用户端 —— 那是 Google 对 macOS app 要求的类型，且不需要 secret —— 然后用它的 Client ID 执行 Scripts/set-oauth-client.sh。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這個 Client ID 屬於 Desktop 或 Web 類型的 OAuth 用戶端，需要 secret。請在 Google Cloud Console 建立 iOS 類型的用戶端 —— 那是 Google 對 macOS app 要求的類型，且不需要 secret —— 然後用它的 Client ID 執行 Scripts/set-oauth-client.sh。"
           }
         }
       }
