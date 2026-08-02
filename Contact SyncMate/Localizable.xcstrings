@@ -5793,6 +5793,23 @@
         }
       }
     },
+    "Reconnect (re-approve permissions)": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新连接（重新授权权限）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新連接（重新授權權限）"
+          }
+        }
+      }
+    },
     "Refresh": {
       "localizations": {
         "zh-Hans": {
@@ -7012,6 +7029,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "請先登入 Google(帳號頁籤)才能匯出 Google 聯絡人。"
+          }
+        }
+      }
+    },
+    "Sign-in completed, but Google did not grant this permission: %@. On the consent screen, make sure every requested permission is ticked before continuing — an unticked box still lets sign-in succeed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录已完成，但 Google 未授予这项权限：%@。在同意画面上，请确认每一项要求的权限都已勾选再继续 —— 未勾选也一样会登录成功。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登入已完成，但 Google 未授予這項權限：%@。在同意畫面上，請確認每一項要求的權限都已勾選再繼續 —— 未勾選也一樣會登入成功。"
           }
         }
       }

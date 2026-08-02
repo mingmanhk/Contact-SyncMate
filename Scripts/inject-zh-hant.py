@@ -531,6 +531,8 @@ T = {
         "僅重設偏好設定",
     "Reset Everything":
         "完整重設",
+    "Sign-in completed, but Google did not grant this permission: %@. On the consent screen, make sure every requested permission is ticked before continuing — an unticked box still lets sign-in succeed.":
+        "登入已完成，但 Google 未授予這項權限：%@。在同意畫面上，請確認每一項要求的權限都已勾選再繼續 —— 未勾選也一樣會登入成功。",
     "The People API is not enabled for this Google Cloud project. Open the project's API Library, enable People API, then wait a minute and try again.":
         "此 Google Cloud 專案尚未啟用 People API。請開啟專案的 API 程式庫，啟用 People API，等候約一分鐘後再試。",
     "The connected account did not grant the Contacts permission. Sign out in Settings → Accounts, sign in again, and approve the Contacts scope.":
@@ -539,6 +541,10 @@ T = {
         "Google 拒絕了這個請求。若應用程式的發布狀態為「測試中」，登入的電子郵件必須列在 OAuth 同意畫面的測試使用者名單中。",
     "Copy":
         "拷貝",
+    "Reconnect (re-approve permissions)":
+        "重新連接（重新授權權限）",
+    "Sign Out":
+        "登出",
     "Copy All Recent Changes":
         "拷貝所有近期變更",
     "This Client ID belongs to a Desktop or Web OAuth client, which requires a secret. Create an iOS client in Google Cloud Console — that is the type Google requires for macOS apps, and it needs no secret — then run Scripts/set-oauth-client.sh with its Client ID.":

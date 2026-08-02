@@ -302,6 +302,19 @@ struct DashboardView: View {
                     : "Not connected",
                 isConnected: oauth.isAuthenticated
             )
+            // Re-consenting is the fix for a permission that was not granted,
+            // and the only way to do it was a Sign Out button in a Settings
+            // section the user has to know to look in. Put it where the account
+            // is shown and the failure is read.
+            .contextMenu {
+                if oauth.isAuthenticated {
+                    Button("Reconnect (re-approve permissions)") {
+                        oauth.signOut()
+                        GoogleOAuthManager.shared.startSignInFromCurrentWindow()
+                    }
+                    Button("Sign Out", role: .destructive) { oauth.signOut() }
+                }
+            }
 
             accountCard(
                 icon: "desktopcomputer",

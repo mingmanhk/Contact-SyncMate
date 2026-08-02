@@ -563,7 +563,30 @@ class GoogleOAuthManager: NSObject, ObservableObject {
         }
 
         let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
-        
+
+        // Fail the sign-in if Contacts was not granted, rather than succeeding
+        // and failing at the first API call.
+        //
+        // Google returns a token for whatever subset the user approved. Treating
+        // that as success produced the worst possible sequence: "Signin
+        // Succeeded", then a 403 on sync whose text names a scope the user was
+        // never told was missing. Checking here reports the actual problem at the
+        // moment it is caused, while the consent screen is still fresh in mind.
+        let granted = Set((tokenResponse.scope ?? "").split(separator: " ").map(String.init))
+        SyncHistory.shared.log(source: "GoogleOAuth", action: "signIn.scopesGranted",
+                               details: granted.sorted().joined(separator: " "))
+
+        let missing = scopes.filter { !granted.contains($0) }
+        if !missing.isEmpty {
+            clearTokens()
+            let message = String(
+                format: NSLocalizedString(
+                    "Sign-in completed, but Google did not grant this permission: %@. On the consent screen, make sure every requested permission is ticked before continuing — an unticked box still lets sign-in succeed.",
+                    comment: "OAuth consent granted fewer scopes than requested"),
+                missing.joined(separator: ", "))
+            throw GoogleOAuthError.configurationInvalid(message)
+        }
+
         // Store tokens
         try saveAccessToken(tokenResponse.accessToken)
         if let refreshToken = tokenResponse.refreshToken {
@@ -914,12 +937,21 @@ private struct TokenResponse: Codable {
     let refreshToken: String?
     let expiresIn: Int
     let tokenType: String
-    
+    /// What Google actually granted — not what was asked for.
+    ///
+    /// A consent screen can return fewer scopes than requested: the user unticks
+    /// a permission, or an unverified app is limited. Sign-in still succeeds, so
+    /// the shortfall only surfaces later as a 403 from whichever API needed the
+    /// missing scope, with nothing connecting the two. Reading this makes the
+    /// gap visible at the moment it happens.
+    let scope: String?
+
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
         case refreshToken = "refresh_token"
         case expiresIn = "expires_in"
         case tokenType = "token_type"
+        case scope
     }
 }
 
