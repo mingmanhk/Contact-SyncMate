@@ -233,7 +233,19 @@ class GoogleOAuthManager: NSObject, ObservableObject {
               URL(string: redirectURI) != nil else {
             throw GoogleOAuthError.invalidCallback
         }
-        
+
+        // The scheme in the config has to be one this app actually registered.
+        //
+        // ASWebAuthenticationSession will not open a window for a callback
+        // scheme the bundle does not own: `start()` just returns false. The
+        // symptom is a Connect button that does nothing at all — no browser, no
+        // error — which says nothing about the two files being out of step.
+        //
+        // The redirect URI lives in GoogleOAuthConfig.json and the scheme in
+        // Info.plist, and they are edited separately, so drifting apart is the
+        // normal failure. Scripts/set-oauth-client.sh writes both from one ID.
+        try assertCallbackSchemeIsRegistered()
+
         let authURL = buildAuthorizationURL()
         
         return try await withCheckedThrowingContinuation { continuation in
@@ -425,6 +437,26 @@ class GoogleOAuthManager: NSObject, ObservableObject {
         return components.url!
     }
     
+    /// Throw unless `Info.plist` registers the scheme the config asks for.
+    private func assertCallbackSchemeIsRegistered() throws {
+        let scheme = getCallbackScheme()
+        let registered = (Bundle.main.object(forInfoDictionaryKey: "CFBundleURLTypes")
+                          as? [[String: Any]] ?? [])
+            .flatMap { $0["CFBundleURLSchemes"] as? [String] ?? [] }
+
+        guard registered.contains(scheme) else {
+            let message = String(
+                format: NSLocalizedString(
+                    "The sign-in callback is not set up. GoogleOAuthConfig.json expects the URL scheme “%@”, but this build registers “%@”. Run Scripts/set-oauth-client.sh with your Google Client ID to write both from one value.",
+                    comment: "OAuth redirect scheme missing from Info.plist"),
+                scheme, registered.first ?? "none")
+            SyncHistory.shared.log(source: "GoogleOAuth",
+                                   action: "signIn.callbackSchemeMissing",
+                                   details: "config=\(scheme) plist=\(registered)")
+            throw GoogleOAuthError.configurationInvalid(message)
+        }
+    }
+
     private func getCallbackScheme() -> String {
         // Extract scheme from redirect URI like: com.googleusercontent.apps.<CLIENT_ID>:/oauth2redirect
         let trimmed = redirectURI.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
@@ -911,8 +943,12 @@ enum GoogleOAuthError: LocalizedError {
     case tokenRefreshFailed
     case noRefreshToken
     case keychainError(OSStatus)
+    /// The app's own OAuth configuration is wrong — carries the specific
+    /// mismatch, because "sign-in failed" is useless when the fix is editing a
+    /// file the user has to be told the name of.
+    case configurationInvalid(String)
     case unknown
-    
+
     var errorDescription: String? {
         switch self {
         case .notAuthenticated:
@@ -939,6 +975,8 @@ enum GoogleOAuthError: LocalizedError {
             return "No refresh token available. Please sign in again."
         case .keychainError(let status):
             return "Keychain error: \(status)"
+        case .configurationInvalid(let detail):
+            return detail
         case .unknown:
             return "An unknown error occurred."
         }
