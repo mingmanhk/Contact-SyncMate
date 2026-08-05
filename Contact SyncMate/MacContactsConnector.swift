@@ -180,7 +180,17 @@ class MacContactsConnector: ObservableObject {
     nonisolated func fetchAllContactsOffMainActor(
         in container: CNContainer? = nil
     ) async throws -> [CNContact] {
-        try await Task.detached(priority: .userInitiated) {
+        // `.utility`, not `.userInitiated`.
+        //
+        // contactsd serves these calls at background QoS, so a user-initiated
+        // requester waiting on it is an inversion by definition — there is no
+        // way to call this synchronous API from a higher band without one. This
+        // is the mild form: the earlier warnings came from the *main* actor,
+        // user-interactive, and that contention corrupted faulting mid-save
+        // (Cocoa 134092). Asking at utility removes the inversion honestly
+        // rather than silencing the warning, and a full address-book fetch is
+        // exactly the sort of bulk work utility describes.
+        try await Task.detached(priority: .utility) {
             try Self.fetchAllContactsOffMain(in: container)
         }.value
     }

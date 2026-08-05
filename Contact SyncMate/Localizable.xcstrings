@@ -1120,6 +1120,23 @@
         }
       }
     },
+    "Applying reviewed changes…": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在套用已查看的变更…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在套用已檢視的變更…"
+          }
+        }
+      }
+    },
     "Ask before Sync Now": {
       "localizations": {
         "zh-Hans": {
@@ -8636,23 +8653,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "繁體中文"
-          }
-        }
-      }
-    },
-    "Applying reviewed changes…": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在套用已檢視的變更…"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在套用已查看的变更…"
           }
         }
       }

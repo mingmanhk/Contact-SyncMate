@@ -131,6 +131,91 @@ final class SyncEngineDiffTests: XCTestCase {
             "Google → Mac is the direction photos can travel, so it must be diffed")
     }
 
+    // MARK: - Diff convergence
+    //
+    // A sync that reports the same change every run never settles. These cover
+    // the formatting differences the two providers introduce on their own —
+    // which is what made every contact look edited on every sync.
+
+    private func mappedPair(gID: String, mID: String) -> ContactMappingStore {
+        let store = ContactMappingStore()
+        store.saveMapping(ContactMapping(
+            googleResourceName: gID, macContactIdentifier: mID,
+            lastSyncedAt: Date(timeIntervalSince1970: 0)))
+        Thread.sleep(forTimeInterval: 0.05)
+        return store
+    }
+
+    /// Apple Contacts reformats a number when it saves it; Google returns what
+    /// it was sent. Same number, different string.
+    func test_phoneFormattingDifference_isNotAChange() {
+        let store = mappedPair(gID: "people/phone", mID: "mac/phone")
+        var google = UnifiedContact.diffMake(givenName: "Dana", phones: ["+15551234567"],
+                                             googleResourceName: "people/phone")
+        google.lastModified = Date()
+        var mac = UnifiedContact.diffMake(givenName: "Dana", phones: ["+1 (555) 123-4567"],
+                                          macContactIdentifier: "mac/phone")
+        mac.lastModified = Date()
+
+        let changes = SyncEngine(
+            googleConnector: GoogleContactsConnector(),
+            macConnector: MacContactsConnector(),
+            mappingStore: store
+        ).computeChanges(googleContacts: [google], macContacts: [mac], direction: .twoWay)
+
+        XCTAssertFalse(changes.flatMap(\.changes).contains { $0.contains("Phone") },
+                       "Identical numbers formatted differently must not diff")
+    }
+
+    /// A genuinely different number still has to be reported.
+    func test_differentPhone_isAChange() {
+        let store = mappedPair(gID: "people/phone2", mID: "mac/phone2")
+        var google = UnifiedContact.diffMake(givenName: "Dana", phones: ["+15551234567"],
+                                             googleResourceName: "people/phone2")
+        google.lastModified = Date()
+        var mac = UnifiedContact.diffMake(givenName: "Dana", phones: ["+15559999999"],
+                                          macContactIdentifier: "mac/phone2")
+        mac.lastModified = Date(timeIntervalSince1970: 0)
+
+        let changes = SyncEngine(
+            googleConnector: GoogleContactsConnector(),
+            macConnector: MacContactsConnector(),
+            mappingStore: store
+        ).computeChanges(googleContacts: [google], macContacts: [mac], direction: .twoWay)
+
+        XCTAssertTrue(changes.flatMap(\.changes).contains { $0.contains("Phone") })
+    }
+
+    /// Contacts fills in `calendar` and `era`; Google does not.
+    func test_birthday_comparesOnlyTheDateParts() {
+        var withCalendar = DateComponents()
+        withCalendar.year = 1990; withCalendar.month = 5; withCalendar.day = 20
+        withCalendar.calendar = Calendar(identifier: .gregorian)
+        withCalendar.era = 1
+
+        var bare = DateComponents()
+        bare.year = 1990; bare.month = 5; bare.day = 20
+
+        XCTAssertEqual(SyncEngine.birthdayKey(withCalendar), SyncEngine.birthdayKey(bare))
+    }
+
+    /// 1604 (Apple) and 0 (Google) both mean "no year".
+    func test_birthday_placeholderYearsAgree() {
+        var apple = DateComponents(); apple.year = 1604; apple.month = 3; apple.day = 1
+        var google = DateComponents(); google.year = 0; google.month = 3; google.day = 1
+        XCTAssertEqual(SyncEngine.birthdayKey(apple), SyncEngine.birthdayKey(google))
+    }
+
+    func test_url_trailingSlashAndSchemeIgnored() {
+        XCTAssertEqual(SyncEngine.normalizedURL("https://Example.com/"),
+                       SyncEngine.normalizedURL("http://www.example.com"))
+    }
+
+    func test_url_differentPathsStillDiffer() {
+        XCTAssertNotEqual(SyncEngine.normalizedURL("https://example.com/a"),
+                          SyncEngine.normalizedURL("https://example.com/b"))
+    }
+
     // MARK: - Postal country normalisation
 
     func test_countryName_yieldsISOCode() {

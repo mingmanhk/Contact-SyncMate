@@ -793,39 +793,72 @@ class SyncEngine: ObservableObject {
             diffs.append("Forced update")
         }
 
-        func check<T: Equatable>(_ label: String, _ lhs: T?, _ rhs: T?) {
-            if lhs != rhs { diffs.append("\(label) changed") }
+        // Core name / identity fields.
+        //
+        // Trimmed and case-folded, and an empty string treated as absent — the
+        // two providers disagree about how to say "no value" (Google omits the
+        // key, Contacts returns ""), and a name that differs only in whitespace
+        // is not an edit anyone made. Comparing raw optionals reported both as
+        // changes on every single sync.
+        func textual(_ label: String, _ lhs: String?, _ rhs: String?) {
+            let left = lhs?.nonBlank?.lowercased()
+            let right = rhs?.nonBlank?.lowercased()
+            if left != right { diffs.append("\(label) changed") }
         }
-
-        // Core name / identity fields are always diffed
-        check("First name",  a.givenName,       b.givenName)
-        check("Last name",   a.familyName,       b.familyName)
-        check("Middle name", a.middleName,       b.middleName)
-        check("Company",     a.organizationName, b.organizationName)
+        textual("First name",  a.givenName,       b.givenName)
+        textual("Last name",   a.familyName,       b.familyName)
+        textual("Middle name", a.middleName,       b.middleName)
+        textual("Company",     a.organizationName, b.organizationName)
 
         // Per-field toggles from Settings → Common Sync → Fields to Sync
-        if settings.syncJobTitle  { check("Job title", a.jobTitle, b.jobTitle) }
-        if settings.syncNotes     { check("Note",      a.note,     b.note)     }
-        if settings.syncBirthday  { check("Birthday",  a.birthday, b.birthday) }
+        if settings.syncJobTitle { textual("Job title", a.jobTitle, b.jobTitle) }
+        if settings.syncNotes    { textual("Note",      a.note,     b.note)     }
 
-        // Multi-value fields: compare as sets so ordering doesn't cause false positives
-        let aPhones = Set(a.phoneNumbers.map(\.value))
-        let bPhones = Set(b.phoneNumbers.map(\.value))
+        // Birthday compared field by field, not as a whole DateComponents.
+        //
+        // The two sides populate different members of the struct — Contacts
+        // fills in `calendar` and `era`, Google does not — so two identical
+        // birthdays were never equal, and every contact with one reported a
+        // change on every sync. Only the three parts that mean "a birthday" are
+        // compared, and a year of 0 or 1604 (the placeholder for "no year")
+        // counts as absent.
+        if settings.syncBirthday {
+            if Self.birthdayKey(a.birthday) != Self.birthdayKey(b.birthday) {
+                diffs.append("Birthday changed")
+            }
+        }
+
+        // Multi-value fields: compared as *normalised* sets.
+        //
+        // This is why a sync never converged. Apple Contacts reformats a phone
+        // number when it saves it — "+15551234567" comes back as
+        // "+1 (555) 123-4567" — while Google returns exactly what it was sent.
+        // Comparing the raw strings therefore reported "Phone numbers changed"
+        // for a contact that had just been synced, on every run, forever. The
+        // same held for addresses, where the two sides differ in spacing and
+        // capitalisation, and for URLs with or without a trailing slash.
+        //
+        // The matching code has always normalised — `identityKeys` and
+        // `FuzzyIndex` both do. Only the diff compared raw values, so the app
+        // could recognise two records as the same contact and then insist
+        // forever that they differed.
+        let aPhones = ContactNormalizer.normalizePhones(a.phoneNumbers.map(\.value))
+        let bPhones = ContactNormalizer.normalizePhones(b.phoneNumbers.map(\.value))
         if aPhones != bPhones { diffs.append("Phone numbers changed") }
 
-        let aEmails = Set(a.emailAddresses.map { $0.value.lowercased() })
-        let bEmails = Set(b.emailAddresses.map { $0.value.lowercased() })
+        let aEmails = ContactNormalizer.normalizeEmails(a.emailAddresses.map(\.value))
+        let bEmails = ContactNormalizer.normalizeEmails(b.emailAddresses.map(\.value))
         if aEmails != bEmails { diffs.append("Email addresses changed") }
 
         if settings.syncAddresses {
-            let aAddr = Set(a.postalAddresses.map { $0.formattedAddress })
-            let bAddr = Set(b.postalAddresses.map { $0.formattedAddress })
+            let aAddr = Set(a.postalAddresses.map(Self.normalizedAddress))
+            let bAddr = Set(b.postalAddresses.map(Self.normalizedAddress))
             if aAddr != bAddr { diffs.append("Addresses changed") }
         }
 
         if settings.syncWebsites {
-            let aUrls = Set(a.urls.map(\.value))
-            let bUrls = Set(b.urls.map(\.value))
+            let aUrls = Set(a.urls.map { Self.normalizedURL($0.value) })
+            let bUrls = Set(b.urls.map { Self.normalizedURL($0.value) })
             if aUrls != bUrls { diffs.append("Websites changed") }
         }
 
@@ -883,6 +916,41 @@ class SyncEngine: ObservableObject {
             NameFormattingEngine.applyToContact(&c, convention: settings.nameCasingConvention)
         }
         return c
+    }
+
+    /// A birthday reduced to the three numbers that mean one.
+    ///
+    /// `nil` when there is no birthday. 1604 is Apple's "year unknown"
+    /// placeholder and 0 is Google's, so both are treated as no year — a
+    /// birthday with a year on one side and none on the other still differs,
+    /// which is a real difference, but two absent years now agree.
+    nonisolated static func birthdayKey(_ components: DateComponents?) -> String? {
+        guard let components,
+              let month = components.month,
+              let day = components.day else { return nil }
+        let year = components.year.flatMap { ($0 == 0 || $0 == 1604) ? nil : $0 }
+        return "\(year.map(String.init) ?? "-")-\(month)-\(day)"
+    }
+
+    /// An address reduced to what the two sides actually agree on.
+    nonisolated static func normalizedAddress(_ address: UnifiedContact.PostalAddress) -> String {
+        ContactNormalizer.normalizeAddress(
+            street: address.street, city: address.city, state: address.state,
+            postalCode: address.postalCode, country: address.country)
+    }
+
+    /// A URL reduced to what the two sides agree on.
+    ///
+    /// Case and a trailing slash are not a change anyone made — but Google and
+    /// Contacts disagree about both, so comparing raw strings reported one.
+    nonisolated static func normalizedURL(_ url: String) -> String {
+        var value = url.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        while value.hasSuffix("/") { value.removeLast() }
+        for prefix in ["https://", "http://"] where value.hasPrefix(prefix) {
+            value.removeFirst(prefix.count)
+        }
+        if value.hasPrefix("www.") { value.removeFirst(4) }
+        return value
     }
 
     /// Fill in a missing ISO country code, and align the country name with it.
