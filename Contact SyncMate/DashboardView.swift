@@ -741,83 +741,11 @@ struct DashboardView: View {
         recentEvents = Array(SyncHistory.shared.events().suffix(5).reversed())
     }
 
-    private func friendlyErrorMessage(for error: Error) -> String {
-        // SyncEngine errors
-        if let syncError = error as? SyncEngineError {
-            switch syncError {
-            case .syncAlreadyInProgress:
-                return "A sync is already running. Please wait for it to finish."
-            case .autoSyncDisabled:
-                return "Auto-sync is disabled in settings."
-            case .conditionsNotMet:
-                return "Sync conditions not met — check power, network, and idle settings."
-            case .missingContactData(let detail):
-                return "Missing contact data: \(detail)"
-            case .backupNotFound:
-                return "Backup not found."
-            case .batchItemRejected(let name):
-                return "Google rejected \(name). Other contacts in the same batch were unaffected."
-            }
-        }
+    // friendlyErrorMessage lived here — 62 lines that had drifted from
+    // SyncCoordinator.friendlyMessage(for:), which is what handleSyncError
+    // actually calls.
 
-        // Network errors
-        let nsError = error as NSError
-        if nsError.domain == NSURLErrorDomain {
-            switch nsError.code {
-            case NSURLErrorNotConnectedToInternet:
-                return "No internet connection. Check your network and try again."
-            case NSURLErrorTimedOut:
-                return "The request timed out. Google's servers may be slow — try again later."
-            case NSURLErrorNetworkConnectionLost:
-                return "Network connection was lost during sync. Try again."
-            case NSURLErrorCannotFindHost, NSURLErrorCannotConnectToHost:
-                return "Cannot reach Google servers. Check your internet connection."
-            default:
-                return "Network error: \(nsError.localizedDescription)"
-            }
-        }
-
-        // Contacts framework errors
-        if nsError.domain == "CNErrorDomain" {
-            switch nsError.code {
-            case 100: // CNErrorCodeAuthorizationDenied
-                return "Contacts access was denied. Open System Settings → Privacy → Contacts to re-enable."
-            case 200: // CNErrorCodeCommunicationError
-                return "Could not communicate with the Contacts database. Try restarting the app."
-            default:
-                return "Contacts error: \(nsError.localizedDescription)"
-            }
-        }
-
-        // Google API / OAuth errors
-        let desc = error.localizedDescription.lowercased()
-        if desc.contains("401") || desc.contains("unauthorized") || desc.contains("token") {
-            return "Google authentication expired. Please sign out and sign back in from Settings → Accounts."
-        }
-        if desc.contains("403") || desc.contains("forbidden") {
-            return "Google API access forbidden. Check that the Contacts API is enabled for your account."
-        }
-        if desc.contains("429") || desc.contains("rate limit") {
-            return "Google API rate limit reached. Wait a few minutes and try again."
-        }
-
-        return error.localizedDescription
-    }
-
-    private func formatResultSummary(_ result: SyncResult) -> String {
-        var parts: [String] = []
-        if result.added > 0   { parts.append("\(result.added) added") }
-        if result.updated > 0 { parts.append("\(result.updated) updated") }
-        if result.deleted > 0 { parts.append("\(result.deleted) deleted") }
-        if result.merged > 0  { parts.append("\(result.merged) merged") }
-        if result.skipped > 0 { parts.append("\(result.skipped) skipped") }
-        if !result.errors.isEmpty {
-            parts.append("\(result.errors.count) error\(result.errors.count == 1 ? "" : "s")")
-        }
-        if parts.isEmpty { return "Everything is already in sync." }
-        let duration = String(format: "%.1fs", result.duration)
-        return parts.joined(separator: ", ") + " in \(duration)"
-    }
+    // formatResultSummary went with it; SyncResult.summary is used instead.
 
     // MARK: - Event Helpers
 

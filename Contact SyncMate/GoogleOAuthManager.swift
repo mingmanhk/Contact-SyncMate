@@ -197,10 +197,7 @@ class GoogleOAuthManager: NSObject, ObservableObject {
         return code
     }
 
-    /// Manually store a client secret in the Keychain (e.g. from Settings UI).
-    func setClientSecret(_ secret: String) throws {
-        try saveToKeychain(key: Self.clientSecretKeychainKey, value: secret)
-    }
+    // setClientSecret had no callers; the comment claimed Settings used it.
 
     // MARK: - PKCE Helpers (RFC 7636)
 

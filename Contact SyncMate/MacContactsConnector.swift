@@ -392,10 +392,31 @@ class MacContactsConnector: ObservableObject {
         in container: CNContainer? = nil
     ) throws -> [CNContact] {
         let request = CNContactFetchRequest(keysToFetch: nonisolatedKeysToFetch())
-        if let container {
+
+        // Never fall through to "all accounts".
+        //
+        // This is the duplicate factory. macOS Contacts can hold the user's
+        // Google account as a CardDAV account, which mirrors the very contacts
+        // this app is syncing. Fetching with no predicate returns that mirror
+        // too, so every Google contact appeared a second time as a "Mac
+        // contact" — with a different local identifier, so no mapping matched —
+        // and the sync dutifully pushed it back to Google as new.
+        //
+        // The main-actor twin `fetchAllContacts(in:)` has always resolved a
+        // container before fetching and says why. This path, the one every sync
+        // actually uses, did not.
+        let scope = container ?? recommendedContainerOffMain()
+        if let scope {
             request.predicate = CNContact.predicateForContactsInContainer(
-                withIdentifier: container.identifier
+                withIdentifier: scope.identifier
             )
+        } else {
+            // No writable container resolved. Fetching everything here is what
+            // caused the duplicates, so refuse instead of guessing.
+            SyncHistory.shared.log(
+                source: "MacContacts", action: "fetch.noContainerResolved",
+                details: "refusing an unscoped fetch — see Settings → Accounts → Mac Contacts")
+            throw MacContactsError.noWritableContainer
         }
 
         var contacts: [CNContact] = []
@@ -403,6 +424,27 @@ class MacContactsConnector: ObservableObject {
             contacts.append(contact)
         }
         return contacts
+    }
+
+    /// The container a sync should read and write, resolved off the main actor.
+    ///
+    /// Mirrors the main-actor `getRecommendedContainer()`: iCloud when present,
+    /// otherwise the local one, and never a Google/Exchange CardDAV account —
+    /// those mirror the remote side and syncing against them creates duplicates.
+    nonisolated static func recommendedContainerOffMain() -> CNContainer? {
+        guard let containers = try? shared.containers(matching: nil) else { return nil }
+
+        let candidates = containers.filter { !isLikelyRemoteMirror($0) }
+        return candidates.first { $0.type == .cardDAV && $0.name.localizedCaseInsensitiveContains("icloud") }
+            ?? candidates.first { $0.type == .local }
+            ?? candidates.first
+    }
+
+    /// Whether a container is a mirror of a remote account we also sync directly.
+    nonisolated static func isLikelyRemoteMirror(_ container: CNContainer) -> Bool {
+        if container.type == .exchange { return true }
+        let name = container.name.lowercased()
+        return ["google", "gmail", "exchange", "outlook"].contains { name.contains($0) }
     }
 
     /// Identifiers of every contact belonging to any of `groupIDs`.
@@ -710,11 +752,7 @@ class MacContactsConnector: ObservableObject {
     
     // MARK: - Deduplication Support
     
-    /// Fetch all contacts for deduplication analysis
-    func fetchAllContactsForDeduplication(in container: CNContainer? = nil) throws -> [CNContact] {
-        // Same as fetchAllContacts but explicitly for deduplication context
-        return try fetchAllContacts(in: container)
-    }
+    // fetchAllContactsForDeduplication had no callers.
     
     deinit {
         NotificationCenter.default.removeObserver(self)
@@ -726,16 +764,19 @@ class MacContactsConnector: ObservableObject {
 enum MacContactsError: LocalizedError {
     case notAuthorized
     case contactNotFound(String)
-    case saveFailed(Error)
-    
+    /// `saveFailed` used to sit here and was never constructed — every save path
+    /// rethrows the Contacts error, which carries far more than a wrapped
+    /// description (see `diagnose`).
+    case noWritableContainer
+
     var errorDescription: String? {
         switch self {
         case .notAuthorized:
             return "Access to Contacts is not authorized. Please grant permission in System Settings."
         case .contactNotFound(let id):
             return "Contact with identifier \(id) not found."
-        case .saveFailed(let error):
-            return "Failed to save contact: \(error.localizedDescription)"
+        case .noWritableContainer:
+            return String(localized: "No Mac Contacts account could be used for syncing. Open Settings → Accounts → Mac Contacts and choose one.")
         }
     }
 }

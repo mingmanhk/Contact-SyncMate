@@ -190,67 +190,11 @@ extension UnifiedContact {
 // MARK: - Matching & Duplicate Detection
 
 extension UnifiedContact {
-    /// Calculate a similarity score between two contacts (0.0 to 1.0)
-    func similarityScore(to other: UnifiedContact) -> Double {
-        var score = 0.0
-        var totalWeight = 0.0
-        
-        // Name matching (highest weight)
-        let nameWeight = 3.0
-        if let myName = givenName?.lowercased(), let otherName = other.givenName?.lowercased() {
-            if myName == otherName {
-                score += nameWeight
-            } else if myName.contains(otherName) || otherName.contains(myName) {
-                score += nameWeight * 0.5
-            }
-        }
-        totalWeight += nameWeight
-        
-        if let myFamily = familyName?.lowercased(), let otherFamily = other.familyName?.lowercased() {
-            if myFamily == otherFamily {
-                score += nameWeight
-            } else if myFamily.contains(otherFamily) || otherFamily.contains(myFamily) {
-                score += nameWeight * 0.5
-            }
-        }
-        totalWeight += nameWeight
-        
-        // Email matching (high weight)
-        let emailWeight = 2.5
-        let myEmails = Set(emailAddresses.map { $0.normalizedValue })
-        let otherEmails = Set(other.emailAddresses.map { $0.normalizedValue })
-        let emailIntersection = myEmails.intersection(otherEmails)
-        if !emailIntersection.isEmpty {
-            score += emailWeight
-        }
-        totalWeight += emailWeight
-        
-        // Phone matching (high weight)
-        let phoneWeight = 2.0
-        let myPhones = Set(phoneNumbers.map { $0.normalizedValue })
-        let otherPhones = Set(other.phoneNumbers.map { $0.normalizedValue })
-        let phoneIntersection = myPhones.intersection(otherPhones)
-        if !phoneIntersection.isEmpty {
-            score += phoneWeight
-        }
-        totalWeight += phoneWeight
-        
-        // Organization matching (medium weight)
-        let orgWeight = 1.0
-        if let myOrg = organizationName?.lowercased(), let otherOrg = other.organizationName?.lowercased() {
-            if myOrg == otherOrg {
-                score += orgWeight
-            }
-        }
-        totalWeight += orgWeight
-        
-        return score / totalWeight
-    }
+
     
-    /// Check if this contact is likely a duplicate of another
-    func isDuplicateOf(_ other: UnifiedContact, threshold: Double = 0.7) -> Bool {
-        return similarityScore(to: other) >= threshold
-    }
+    // isDuplicateOf and similarityScore lived here. Matching goes through
+    // ContactDeduplicator and AIContactMatcher; these were a third,
+    // unreferenced scoring implementation.
 }
 
 // MARK: - Merging

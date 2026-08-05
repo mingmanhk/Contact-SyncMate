@@ -202,14 +202,20 @@ class DeduplicationCoordinator: ObservableObject {
                 }
             }
 
-            // Delete the duplicate contacts (not the primary)
+            // Delete the duplicate contacts (not the primary).
+            //
+            // `try?` here was the worst possible combination: the merged payload
+            // has already been written into the primary above, so a swallowed
+            // deletion leaves N copies each holding the merged data — and the
+            // success log below still claimed the merge worked. A failure has to
+            // reach the catch, because a half-done merge is worse than none.
             for other in others {
                 if other.source == .google, let gID = other.contact.googleResourceName {
-                    try? await googleConnector.deleteContact(resourceName: gID)
+                    try await googleConnector.deleteContact(resourceName: gID)
                 }
                 if other.source == .mac, let mID = other.contact.macContactIdentifier {
                     let c = macConnector
-                    try? await MacContactsConnector.performWriteOffMain {
+                    try await MacContactsConnector.performWriteOffMain {
                         try c.deleteContactSync(withIdentifier: mID)
                     }
                 }

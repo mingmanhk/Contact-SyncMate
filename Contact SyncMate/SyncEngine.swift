@@ -394,49 +394,8 @@ class SyncEngine: ObservableObject {
         return result
     }
     
-    /// Run automatic sync (called by background agent)
-    func runAutoSync() async throws -> SyncResult {
-        guard settings.autoSyncEnabled else {
-            throw SyncEngineError.autoSyncDisabled
-        }
-
-        // Check conditions
-        if !checkAutoSyncConditions() {
-            throw SyncEngineError.conditionsNotMet
-        }
-
-        // Use incremental sync with sync tokens.
-        let direction = settings.autoSyncDirection
-        var session = try await prepareManualSync(direction: direction)
-        session.mode = .automatic
-
-        // Run deduplication scan if enabled
-        if settings.detectGoogleDuplicates {
-            let dedupCoordinator = DeduplicationCoordinator()
-            let googleContacts = session.contactChanges.compactMap { $0.sourceContact }.filter { $0.googleResourceName != nil }
-            let macContacts = session.contactChanges.compactMap { $0.targetContact }.filter { $0.macContactIdentifier != nil }
-            if !googleContacts.isEmpty || !macContacts.isEmpty {
-                let result = await dedupCoordinator.scanForDuplicates(
-                    googleContacts: googleContacts,
-                    macContacts: macContacts,
-                    existingMappings: mappingStore.getAllMappings(),
-                    // Silent auto-merge is opt-in (Settings → General →
-                    // Confirmations). When off, every merge goes to review.
-                    autoApplyIfSafe: settings.allowSilentAutoMerge
-                )
-                if result.needsUserConfirmation {
-                    SyncHistory.shared.log(
-                        source: "SyncEngine",
-                        action: "autoSync.dedupDeferred",
-                        details: "\(result.groupsNeedingConfirmation.count) duplicate groups need user review"
-                    )
-                }
-            }
-        }
-
-        // Auto-execute without user preview
-        return try await executeSync(session: session)
-    }
+    // runAutoSync lived here, with no callers. Auto-sync runs through
+    // AutoSyncScheduler → AutoSyncConditions.blocker() → SyncCoordinator.
     
     // MARK: - Private Helpers
     
@@ -591,6 +550,44 @@ class SyncEngine: ObservableObject {
                         contactName: m.displayName, action: .update,
                         direction: .macToGoogle, changes: fieldDiffs,
                         sourceContact: m, targetContact: g))
+                } else {
+                    // The fields differ but no timestamp says who moved.
+                    //
+                    // This branch did not exist, and the change was dropped —
+                    // silently, for the most common case there is. `CNContact`
+                    // exposes no modification date, so a Mac contact's
+                    // `lastModified` is always nil and `mChanged` is always
+                    // false. An edit made only on the Mac therefore satisfied
+                    // neither branch above, and a mapped pair could differ
+                    // forever while every sync reported nothing to do.
+                    //
+                    // Unknown-vs-unknown is exactly the ambiguity the conflict
+                    // preference exists to settle, so it is settled the same way
+                    // rather than by picking a side here.
+                    switch settings.defaultConflictResolution {
+                    case .alwaysAsk:
+                        changes.append(ContactChange(
+                            contactName: g.displayName, action: .merge,
+                            direction: .twoWay,
+                            changes: fieldDiffs + ["Differs, but neither side reports when it changed"],
+                            sourceContact: g, targetContact: m))
+                    case .preferGoogle:
+                        changes.append(ContactChange(
+                            contactName: g.displayName, action: .update,
+                            direction: .googleToMac, changes: fieldDiffs,
+                            sourceContact: g, targetContact: m))
+                    case .preferMac:
+                        changes.append(ContactChange(
+                            contactName: m.displayName, action: .update,
+                            direction: .macToGoogle, changes: fieldDiffs,
+                            sourceContact: m, targetContact: g))
+                    case .mergeBoth:
+                        changes.append(ContactChange(
+                            contactName: g.displayName, action: .merge,
+                            direction: .twoWay, changes: fieldDiffs,
+                            userOverride: .merge,
+                            sourceContact: g, targetContact: m))
+                    }
                 }
             }
         }
@@ -1619,20 +1616,7 @@ class SyncEngine: ObservableObject {
         }
     }
 
-    private func checkAutoSyncConditions() -> Bool {
-        let settings = AppSettings.shared
-
-        // Check power condition
-        if settings.autoSyncOnlyOnPower {
-            let info = ProcessInfo.processInfo
-            if info.isLowPowerModeEnabled { return false }
-        }
-
-        // Check that both accounts are connected
-        if !GoogleOAuthManager.shared.isAuthenticated { return false }
-
-        return true
-    }
+    // checkAutoSyncConditions went with runAutoSync, its only caller.
 
     private func saveToHistory(result: SyncResult) async throws {
         SyncHistory.shared.log(

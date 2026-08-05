@@ -141,7 +141,15 @@ extension SyncEngine {
         let liveGoogleUnified = liveGoogle.map { ContactMapper.toUnified(from: $0) }
         let liveMacUnified = liveMac.map { ContactMapper.toUnified(from: $0) }
 
-        _ = try? await ContactBackupManager.shared.createManualBackup(
+        // `try`, not `try?`.
+        //
+        // The doc comment above promises the rollback can itself be rolled back.
+        // Discarding this failure broke that promise in the one case it exists
+        // for: the snapshot fails, nothing is logged, and the restore proceeds
+        // to overwrite — and with `.remove`, delete — live contacts that now
+        // have no snapshot to come back from. Failing here costs the user a
+        // retry; succeeding falsely costs them their contacts.
+        _ = try await ContactBackupManager.shared.createManualBackup(
             googleContacts: liveGoogleUnified,
             macContacts: liveMacUnified,
             customNotes: "Safety snapshot taken before restoring backup \(backupId)"
@@ -294,56 +302,6 @@ extension SyncEngine {
 
 // MARK: - Backup Recovery View Support
 
-/// View model for backup management UI
-class BackupManagementViewModel: ObservableObject {
-    @Published var backupSessions: [BackupSession] = []
-    @Published var isLoading = false
-    @Published var error: Error?
-
-    private let backupManager = ContactBackupManager.shared
-
-    func loadBackups() {
-        backupSessions = backupManager.getAllBackupSessions()
-    }
-
-    func deleteBackup(id: String) {
-        // Filter out the backup
-        backupSessions.removeAll { $0.id == id }
-    }
-
-    func exportBackup(id: String) -> Data? {
-        return backupManager.exportBackupSession(id: id)
-    }
-
-    func getStats() -> ContactBackupManager.BackupStats {
-        return backupManager.getBackupStats()
-    }
-
-    func restoreBackup(id: String) async -> SyncEngine.RollbackResult? {
-        isLoading = true
-        defer { isLoading = false }
-
-        let engine = SyncEngine(
-            googleConnector: GoogleContactsConnector(),
-            macConnector: MacContactsConnector(),
-            mappingStore: ContactMappingStore()
-        )
-        do {
-            let result = try await engine.rollbackToBackup(backupId: id)
-            SyncHistory.shared.log(
-                source: "BackupManagement",
-                action: result.successful ? "restore.success" : "restore.partial",
-                details: "Backup \(id): \(result.restored) restored, \(result.failed.count) failed"
-            )
-            return result
-        } catch {
-            self.error = error
-            SyncHistory.shared.log(
-                source: "BackupManagement",
-                action: "restore.failed",
-                details: error.localizedDescription
-            )
-            return nil
-        }
-    }
-}
+// BackupManagementViewModel lived here: never instantiated, and its
+// deleteBackup only removed an item from an in-memory array without
+// deleting anything.

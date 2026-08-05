@@ -546,16 +546,7 @@ class GoogleContactsConnector: ObservableObject {
     
     // MARK: - Duplicate Detection
     
-    func searchDuplicates() async throws -> [GoogleDuplicateSet] {
-        guard isAuthenticated else {
-            throw GoogleContactsError.notAuthenticated
-        }
-        
-        // Note: Google doesn't have a direct duplicate detection API
-        // We'll fetch all contacts and detect duplicates locally
-        let contacts = try await fetchAllContacts()
-        return detectDuplicatesLocally(contacts)
-    }
+    // searchDuplicates had no callers.
     
     private func detectDuplicatesLocally(_ contacts: [GoogleContact]) -> [GoogleDuplicateSet] {
         var duplicateSets: [GoogleDuplicateSet] = []

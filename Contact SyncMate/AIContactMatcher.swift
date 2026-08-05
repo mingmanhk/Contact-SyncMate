@@ -283,11 +283,22 @@ class AIContactMatcher {
         return stripped(String(p1[0])) == stripped(String(p2[0]))
     }
 
+    /// Bonus when two names are the same once spacing is ignored.
+    ///
+    /// e.g. "liwei zhang" ↔ "li wei zhang" — the usual CJK romanisation split.
+    ///
+    /// The guard used to read `c1 != c2 && c1 == c2`, which nothing can satisfy,
+    /// so this always returned 0 and the signal never existed. The intent was
+    /// "the spaced forms differ, but the unspaced forms match" — otherwise this
+    /// would just be re-scoring an exact name match that the caller has already
+    /// counted.
     private func compoundNameBonus(n1: NormalizedContact, n2: NormalizedContact) -> Double {
-        // e.g. "liwei zhang" ↔ "li wei zhang"
         let c1 = n1.fullName.replacingOccurrences(of: " ", with: "")
         let c2 = n2.fullName.replacingOccurrences(of: " ", with: "")
-        guard !c1.isEmpty && !c2.isEmpty && c1 != c2 && c1 == c2 else { return 0 }
+        guard !c1.isEmpty, !c2.isEmpty,
+              n1.fullName != n2.fullName,   // not already an exact match
+              c1 == c2                       // identical once spacing is removed
+        else { return 0 }
         return 25
     }
 

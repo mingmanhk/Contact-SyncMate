@@ -944,15 +944,24 @@ class ContactBackupManager: ObservableObject {
     }
 
     private func saveBackupSession(_ session: BackupSession) throws {
-        // Perform file I/O synchronously
-        backupSessions.append(session)
-
-        // Save individual session file and index inside one scoped access, so a
-        // custom folder is written to with its sandbox grant actually held.
+        // Appending on the caller's thread was a data race.
+        //
+        // Every other access to `backupSessions` is serialised on `backupQueue`
+        // — reads under `sync`, writes under `async(flags: .barrier)`. This one
+        // appended from the main actor while `pruneOldBackups` (which this
+        // method itself schedules, below) barrier-assigns the whole array.
+        // Concurrent append and whole-array assignment on a Swift Array is
+        // undefined behaviour, in the component whose entire job is to be the
+        // undo for everything else.
+        let indexData: Data
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(session)
-        let indexData = try encoder.encode(backupSessions)
+
+        indexData = try backupQueue.sync(flags: .barrier) { () throws -> Data in
+            backupSessions.append(session)
+            return try encoder.encode(backupSessions)
+        }
 
         try withBackupDirectory { dir in
             try data.write(to: dir.appendingPathComponent("\(session.id).json"),
@@ -962,7 +971,7 @@ class ContactBackupManager: ObservableObject {
         }
 
         // Update published properties on main thread
-        let count = backupSessions.count
+        let count = backupQueue.sync { backupSessions.count }
         let size = calculateEstimatedSize()
         let timestamp = session.timestamp
         DispatchQueue.main.async { [weak self] in
