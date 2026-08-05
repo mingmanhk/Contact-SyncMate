@@ -8,7 +8,17 @@
 import Foundation
 
 /// Utility for normalizing contact fields for comparison
-enum ContactNormalizer {
+///
+/// `nonisolated` on the type, not on individual members.
+///
+/// The project builds with default MainActor isolation, so an unannotated enum
+/// is main-actor isolated — and every caller here is off the main actor by
+/// design: the diff, the fuzzy index, and the Contacts write queue. Annotating
+/// one function at a time meant the same compiler error resurfaced each time a
+/// new call site appeared, three times in a row. Nothing in here touches shared
+/// state; these are pure functions of their arguments, which is what
+/// `nonisolated` says.
+nonisolated enum ContactNormalizer {
     
     // MARK: - Name Normalization
     

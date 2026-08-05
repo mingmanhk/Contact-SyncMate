@@ -30,8 +30,35 @@ FAILED=0
 bold "Contact SyncMate — verify"
 echo
 
-# ── 1. Release build ────────────────────────────────────────────────────
-bold "1. Build (Release)"
+# ── 1. Debug build ──────────────────────────────────────────────────────
+#
+# Not redundant with the Release build above. Actor-isolation diagnostics
+# differ between the two configurations, and Debug is what Xcode runs — so a
+# Release-only check reported "all clear" on code that failed to compile the
+# moment the project was opened. That happened with `String.nonBlank` being
+# main-actor isolated under default MainActor isolation.
+#
+# `clean build`, not `build`. Incremental builds only recompile the files that
+# changed, and a cross-file actor-isolation error — calling a main-actor member
+# from a nonisolated context in another file — surfaces when the *caller* is
+# recompiled. So an incremental run could pass on code that failed the moment
+# Xcode did ⇧⌘K + ⌘B. That happened three times in a row, each time reported by
+# the user rather than by this script, which is the opposite of the point.
+bold "1. Build (Debug, clean)"
+if xcodebuild -project "$PROJECT" -scheme "$SCHEME" \
+     -configuration Debug clean build > "$LOG_DIR/build-debug.log" 2>&1; then
+    pass "BUILD SUCCEEDED"
+else
+    fail "debug build failed"
+    grep -E ' error: ' "$LOG_DIR/build-debug.log" | sed 's|.*/Contact SyncMate/||' \
+        | sort -u | head -15 | sed 's/^/    /'
+    info "full log: $LOG_DIR/build-debug.log"
+    exit 1
+fi
+echo
+
+# ── 1b. Release build ───────────────────────────────────────────────────
+bold "1b. Build (Release)"
 if xcodebuild -project "$PROJECT" -scheme "$SCHEME" \
      -configuration Release build > "$LOG_DIR/build.log" 2>&1; then
     pass "BUILD SUCCEEDED"
@@ -48,26 +75,6 @@ OUR_WARNINGS=$(grep -E ' warning: ' "$LOG_DIR/build.log" \
     | grep -F "/Contact SyncMate/Contact SyncMate/" \
     | sed 's|.*/Contact SyncMate/||' | sort -u | wc -l | tr -d ' ')
 [ "$OUR_WARNINGS" != "0" ] && info "$OUR_WARNINGS warning(s) in app sources — see build.log"
-echo
-
-# ── 1b. Debug build ─────────────────────────────────────────────────────
-#
-# Not redundant with the Release build above. Actor-isolation diagnostics
-# differ between the two configurations, and Debug is what Xcode runs — so a
-# Release-only check reported "all clear" on code that failed to compile the
-# moment the project was opened. That happened with `String.nonBlank` being
-# main-actor isolated under default MainActor isolation.
-bold "1b. Build (Debug)"
-if xcodebuild -project "$PROJECT" -scheme "$SCHEME" \
-     -configuration Debug build > "$LOG_DIR/build-debug.log" 2>&1; then
-    pass "BUILD SUCCEEDED"
-else
-    fail "debug build failed"
-    grep -E ' error: ' "$LOG_DIR/build-debug.log" | sed 's|.*/Contact SyncMate/||' \
-        | sort -u | head -15 | sed 's/^/    /'
-    info "full log: $LOG_DIR/build-debug.log"
-    exit 1
-fi
 echo
 
 # ── 2. Tests ────────────────────────────────────────────────────────────
