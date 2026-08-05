@@ -212,6 +212,7 @@ class SyncEngine: ObservableObject {
         var merged = 0
         var skipped = 0
         var deferredDeletions = 0
+        var setAside = 0
         var errors: [SyncError] = []
 
         // Google-bound writes go out in bulk first; the loop below then walks the
@@ -232,6 +233,25 @@ class SyncEngine: ObservableObject {
             
             // Use override if set, otherwise use planned action
             let action = change.userOverride ?? change.action
+
+            // Set aside after repeated failures.
+            //
+            // A contact that cannot be written was retried on every sync
+            // forever: the same failures scrolled past each run and nothing
+            // accumulated into something the user could act on. After three
+            // attempts it is skipped and listed in Settings → Sync Failures.
+            let failureKey = Self.failureKey(for: change)
+            if let failureKey, SyncFailureStore.shared.shouldSkip(key: failureKey) {
+                skipped += 1
+                setAside += 1
+                SyncHistory.shared.log(
+                    source: "SyncEngine", action: "change.setAside",
+                    details: "\(change.contactName) — failed "
+                           + "\(SyncFailureStore.attemptsBeforeSkipping)+ times; "
+                           + "review in Settings → Sync Failures"
+                )
+                continue
+            }
 
             // "Ask before deleting contacts": record it, do not do it. The user
             // applies held-back deletions from the sync preview.
@@ -293,6 +313,10 @@ class SyncEngine: ObservableObject {
                     skipped += 1
                 }
 
+                // It worked — forget any past failures, so a contact that
+                // recovers is not held against its history.
+                if let failureKey { SyncFailureStore.shared.clearFailure(key: failureKey) }
+
                 // Per-change audit trail: every applied change is recorded
                 // with contact, action, direction, field summary, and the
                 // sync-session ID that links it to its pre/post backups —
@@ -314,10 +338,20 @@ class SyncEngine: ObservableObject {
                     message: error.localizedDescription,
                     timestamp: Date()
                 ))
+                // Count it against this contact. On the third strike the next
+                // sync will set it aside instead of failing it again.
+                var attempts = 0
+                if let failureKey {
+                    attempts = SyncFailureStore.shared.recordFailure(
+                        key: failureKey,
+                        name: change.contactName,
+                        reason: error.localizedDescription)
+                }
                 SyncHistory.shared.log(
                     source: "SyncEngine",
                     action: "change.failed",
                     details: "\(change.contactName) [\(action.rawValue)]: \(error.localizedDescription)"
+                           + (attempts > 0 ? " (attempt \(attempts) of \(SyncFailureStore.attemptsBeforeSkipping))" : "")
                 )
 
                 // Stop on a failure that every remaining change will hit too.
@@ -352,7 +386,8 @@ class SyncEngine: ObservableObject {
             merged: merged,
             skipped: skipped,
             errors: errors,
-            deferredDeletions: deferredDeletions
+            deferredDeletions: deferredDeletions,
+            setAside: setAside
         )
 
         // Create post-sync backup with actual final state.
@@ -605,11 +640,23 @@ class SyncEngine: ObservableObject {
 
         for (gID, gContact) in googleByResourceName where !processedGoogle.contains(gID) {
             let fuzzyMatch = macIndex.match(gContact, excluding: processedMac)
-            if let (mID, mContact) = fuzzyMatch {
+            if let (mID, mContact, confidence) = fuzzyMatch {
+                // Only the uncertain matches ask.
+                //
+                // Every fuzzy match used to be queued for review, so a first
+                // sync between two populated address books produced hundreds of
+                // identical prompts — and a shared email address is not a guess.
+                // Confirmation fatigue is its own failure mode: a dialog shown
+                // two hundred times stops being read, which is worse than not
+                // showing it for the cases that never needed it.
+                let autoApply = confidence == .exactEmail
                 changes.append(ContactChange(
                     contactName: gContact.displayName, action: .merge,
                     direction: .twoWay,
-                    changes: ["Potential match: \(mContact.displayName) (fuzzy — review before merging)"],
+                    changes: [autoApply
+                        ? "Matched \(mContact.displayName) on a shared email address"
+                        : "Possible match: \(mContact.displayName) (same name only — review before merging)"],
+                    userOverride: autoApply ? .merge : nil,
                     sourceContact: gContact, targetContact: mContact))
                 processedMac.insert(mID)
             } else {
@@ -1058,14 +1105,28 @@ class SyncEngine: ObservableObject {
             for key in byName.keys { byName[key]?.sort() }
         }
 
+        /// How a candidate was found. The caller needs this: an email match and
+        /// a name match are not equally trustworthy, and treating them as one
+        /// thing meant every merge — including the obvious ones — went through
+        /// a confirmation dialog. Two hundred prompts is not review; it is a
+        /// button people learn to click without reading.
+        enum Confidence {
+            /// A shared email address. Two contacts with the same address are
+            /// the same person in every practical case.
+            case exactEmail
+            /// Same normalised name and nothing else. "David Chen" is a real
+            /// person twice over; this always needs a human.
+            case nameOnly
+        }
+
         /// Email match first, then name — the same precedence as before.
         func match(_ contact: UnifiedContact,
-                   excluding used: Set<String>) -> (String, UnifiedContact)? {
+                   excluding used: Set<String>) -> (String, UnifiedContact, Confidence)? {
             for email in contact.emailAddresses {
                 guard let key = email.value.nonBlank?.lowercased() else { continue }
                 if let id = byEmail[key]?.first(where: { !used.contains($0) }),
                    let match = contacts[id] {
-                    return (id, match)
+                    return (id, match, .exactEmail)
                 }
             }
 
@@ -1074,7 +1135,7 @@ class SyncEngine: ObservableObject {
             guard !name.isEmpty,
                   let id = byName[name]?.first(where: { !used.contains($0) }),
                   let match = contacts[id] else { return nil }
-            return (id, match)
+            return (id, match, .nameOnly)
         }
     }
 
@@ -1148,6 +1209,24 @@ class SyncEngine: ObservableObject {
     /// Below this, batching costs the same number of requests as the per-contact
     /// path but loses its per-contact error messages and stale-etag retry.
     private static let minimumBatchSize = 2
+
+    /// Stable identity for failure tracking.
+    ///
+    /// Prefers the Mac identifier because that is what the failing writes are
+    /// about — 134092 comes from `CNSaveRequest`, and the Google resource name
+    /// of the same pair can change when a contact is recreated. Falls back to
+    /// the Google side for Google-only changes. A change with neither (a pure
+    /// add, where nothing exists yet) returns nil and is never set aside: there
+    /// is no record to blame, and retrying an add is harmless.
+    static func failureKey(for change: ContactChange) -> String? {
+        for contact in [change.targetContact, change.sourceContact] {
+            if let id = contact?.macContactIdentifier, !id.isEmpty { return "mac:" + id }
+        }
+        for contact in [change.targetContact, change.sourceContact] {
+            if let id = contact?.googleResourceName, !id.isEmpty { return "google:" + id }
+        }
+        return nil
+    }
 
     /// Whether "Ask before deleting contacts" should hold this deletion back.
     ///
@@ -2032,6 +2111,21 @@ class ContactMappingStore {
     func deleteMapping(googleResourceName: String) {
         queue.async(flags: .barrier) {
             self.mappings.removeValue(forKey: googleResourceName)
+            self.saveToDisk()
+        }
+    }
+
+    /// Forget one pairing, addressed from the Mac side.
+    ///
+    /// The dictionary is keyed by Google resource name, so removing a mapping
+    /// when all you hold is a Mac identifier means a scan. That is the shape
+    /// the Sync Failures list needs: a failed `CNSaveRequest` names the Mac
+    /// record, not the Google one.
+    func deleteMapping(macContactIdentifier: String) {
+        queue.sync(flags: .barrier) {
+            let stale = self.mappings.filter { $0.value.macContactIdentifier == macContactIdentifier }
+            guard !stale.isEmpty else { return }
+            for key in stale.keys { self.mappings.removeValue(forKey: key) }
             self.saveToDisk()
         }
     }

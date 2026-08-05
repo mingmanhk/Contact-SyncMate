@@ -41,14 +41,33 @@ struct SyncPreviewView: View {
     private var filteredChanges: [ContactChange] {
         let base = session.contactChanges.filter { !skipped.contains($0.id) }
         guard let action = activeFilter.action else { return base }
+        // Wrapped in a closure rather than passed as `filter(Self.needsReview)`.
+        // A bare method reference becomes a function *value*, which has no
+        // enclosing context to inherit isolation from — under default MainActor
+        // isolation that is a compile error, and `ContactChange` has `var`
+        // properties so the method cannot simply be marked `nonisolated`. A
+        // non-escaping closure inherits this View's isolation and is free.
+        if action == .merge { return base.filter { Self.needsReview($0) } }
         return base.filter { $0.action == action }
+    }
+
+    /// A merge the app has not already decided.
+    ///
+    /// The conflicts chip used to count every merge, so a first sync between
+    /// two populated address books reported ~200 "conflicts" — almost all of
+    /// them contacts matched on a shared email address, where there is nothing
+    /// to decide. A number that large reads as a wall, and a wall gets clicked
+    /// through. Counting only the matches that genuinely need a person makes
+    /// the number small enough to be worth reading.
+    static func needsReview(_ change: ContactChange) -> Bool {
+        change.action == .merge && change.userOverride == nil
     }
 
     private var pendingCount:  Int { session.contactChanges.filter { !skipped.contains($0.id) }.count }
     private var addedCount:    Int { session.contactChanges.filter { $0.action == .add    }.count }
     private var updatedCount:  Int { session.contactChanges.filter { $0.action == .update }.count }
     private var deletedCount:  Int { session.contactChanges.filter { $0.action == .delete }.count }
-    private var conflictCount: Int { session.contactChanges.filter { $0.action == .merge  }.count }
+    private var conflictCount: Int { session.contactChanges.filter { Self.needsReview($0) }.count }
 
     /// The session as the user left it: rows they unchecked become explicit
     /// skips, and the whole session is marked reviewed.
@@ -74,7 +93,7 @@ struct SyncPreviewView: View {
         case .add:      return base.filter { $0.action == .add    }.count
         case .update:   return base.filter { $0.action == .update }.count
         case .delete:   return base.filter { $0.action == .delete }.count
-        case .conflict: return base.filter { $0.action == .merge  }.count
+        case .conflict: return base.filter { Self.needsReview($0) }.count
         }
     }
 

@@ -103,6 +103,11 @@ struct SyncResult {
     /// this names *why* they were skipped so the UI can offer a review.
     var deferredDeletions: Int = 0
 
+    /// Contacts skipped because they have failed repeatedly. Counted inside
+    /// `skipped`; named separately so the UI can point at the list rather than
+    /// letting them vanish into an anonymous skip count.
+    var setAside: Int = 0
+
     var successful: Bool {
         errors.isEmpty
     }
@@ -120,6 +125,9 @@ struct SyncResult {
         // that went wrong.
         if !errors.isEmpty {
             text += "\nFailed: \(errors.count)"
+        }
+        if setAside > 0 {
+            text += "\nSet aside after repeated failures: \(setAside)"
         }
         if deferredDeletions > 0 {
             text += "\nHeld back for review: \(deferredDeletions) deletion"

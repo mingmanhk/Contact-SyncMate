@@ -646,7 +646,14 @@ struct DashboardView: View {
     }
 
     /// One log line, in the shape you would want pasted into a bug report.
-    private static func plainText(_ event: SyncEvent) -> String {
+    ///
+    /// `nonisolated` because it is passed by reference, not just called.
+    /// `recentEvents.map(Self.plainText)` makes a function *value* out of this,
+    /// and a value of function type has no enclosing context to inherit
+    /// isolation from — so under default MainActor isolation the method has to
+    /// say it needs none. It reads only `let` properties of a `Sendable`
+    /// struct, which is exactly the case where that is true.
+    private nonisolated static func plainText(_ event: SyncEvent) -> String {
         let stamp = event.timestamp.formatted(date: .abbreviated, time: .standard)
         let detail = event.details.map { " — \($0)" } ?? ""
         return "[\(stamp)] \(event.source) \(event.action)\(detail)"

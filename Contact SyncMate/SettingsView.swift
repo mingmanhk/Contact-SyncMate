@@ -290,6 +290,12 @@ struct GeneralSettingsView: View {
     @StateObject private var sync = SyncCoordinator.shared
     @EnvironmentObject private var appState: AppState
     @State private var showingResetConfirmation = false
+    @State private var showingSyncFailures = false
+    /// Read once per appearance rather than observed. The store is written from
+    /// the sync engine on a background queue and this is a badge, not a live
+    /// readout — publishing every failure into SwiftUI to keep a number fresh
+    /// while Settings is open would be more machinery than the number is worth.
+    @State private var syncFailureCount = 0
     @State private var pendingLanguageRelaunch = false
     // The inline change log used to live here: a cached recentChanges array,
     // an expandable list, failure counts, and icon/tint helpers for each action
@@ -522,6 +528,27 @@ struct GeneralSettingsView: View {
                 }
                 .help("Events older than this are removed automatically")
 
+                // Failures need a destination.
+                //
+                // A contact that cannot be written used to fail on every sync
+                // and say so only in the log, where it scrolled away and came
+                // back next run. Nothing accumulated into a thing you could
+                // look at and decide about. This is that thing.
+                Button {
+                    showingSyncFailures = true
+                } label: {
+                    HStack {
+                        Label("Sync Failures…", systemImage: "exclamationmark.triangle")
+                        Spacer()
+                        if syncFailureCount > 0 {
+                            Text("\(syncFailureCount)")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .help("Contacts that failed to save repeatedly and are no longer retried")
+
                 Button(role: .destructive) {
                     showingResetConfirmation = true
                 } label: {
@@ -579,6 +606,12 @@ struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear { syncFailureCount = SyncFailureStore.shared.allFailures().count }
+        .sheet(isPresented: $showingSyncFailures, onDismiss: {
+            syncFailureCount = SyncFailureStore.shared.allFailures().count
+        }) {
+            SyncFailuresView()
+        }
         // The log-streaming observers that used to hang here went with the log.
         // They polled SyncHistory on every progress tick — which takes a lock and
         // copies the whole event array — to feed a list that duplicated the

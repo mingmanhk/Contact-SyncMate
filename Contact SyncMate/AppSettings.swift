@@ -526,6 +526,7 @@ class AppSettings: ObservableObject {
         ContactMappingStore().deleteAllMappings()
         ContactBackupManager.shared.deleteAllBackups()
         DeduplicationDecisionStore.shared.clearAll()
+        SyncFailureStore.shared.clearAll()
         SyncHistory.shared.clear()
 
         // Then remove the directory itself.
