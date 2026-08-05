@@ -111,6 +111,16 @@ struct SyncResult {
         var text = """
         Added: \(added), Updated: \(updated), Deleted: \(deleted), Merged: \(merged), Skipped: \(skipped)
         """
+        // Failures were missing from this line entirely.
+        //
+        // A run where every merge failed read "Added: 0, Updated: 0, Deleted: 0,
+        // Merged: 0, Skipped: 0" — indistinguishable from a clean no-op, while
+        // six contacts had just failed to write. The counters only count
+        // successes, so silence about `errors` is silence about the only thing
+        // that went wrong.
+        if !errors.isEmpty {
+            text += "\nFailed: \(errors.count)"
+        }
         if deferredDeletions > 0 {
             text += "\nHeld back for review: \(deferredDeletions) deletion"
                  + (deferredDeletions == 1 ? "" : "s")
