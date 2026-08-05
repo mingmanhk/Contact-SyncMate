@@ -12,7 +12,25 @@ import Contacts
 /// Central app state observable object
 class AppState: ObservableObject {
     @Published var isSyncing = false
-    @Published var lastSyncDate: Date?
+
+    /// When the last sync finished — persisted, not just remembered.
+    ///
+    /// This drives the "Never synced" / "Last synced …" line everywhere. It used
+    /// to live only in memory, so it reset on every launch: the app would report
+    /// Never synced while the history window listed hundreds of events from that
+    /// same afternoon. The sync log is on disk; the one fact summarising it was
+    /// not.
+    /// `Self` is not usable in a stored-property initialiser on a non-final
+    /// class, so the key is spelled out here and named once below.
+    @Published var lastSyncDate: Date? = UserDefaults.standard
+        .object(forKey: "lastSyncDate") as? Date {
+        didSet { UserDefaults.standard.set(lastSyncDate, forKey: Self.lastSyncDateKey) }
+    }
+    static let lastSyncDateKey = "lastSyncDate"
+
+    /// Not persisted, on purpose. A `SyncResult` describes one run in detail and
+    /// is only meaningful next to the progress UI that produced it; the history
+    /// window is where past runs are read. Only the date outlives the session.
     @Published var lastSyncResult: SyncResult?
     @Published var syncProgress: SyncProgress?
 

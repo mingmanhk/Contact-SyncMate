@@ -541,12 +541,13 @@ class AppSettings: ObservableObject {
         hasCompletedInitialSync = false
         if signOutGoogle { googleAccountEmail = nil }
 
-        // `lastSyncDate`, `lastSyncResult` and `nextScheduledSync` are not
-        // cleared here: they live on AppState as in-memory @Published values,
-        // not in UserDefaults. Removing those keys would be a no-op on keys that
-        // never existed. The caller owns AppState and clears them — see
-        // GeneralSettingsView, which resets them alongside this call so the
-        // status line does not keep saying "Last synced 5 minutes ago".
+        // `lastSyncDate` is persisted (AppState writes it to UserDefaults), so
+        // it has to be removed here or a "reset" leaves the status line
+        // reporting a sync whose every other trace has just been deleted.
+        //
+        // `lastSyncResult` and `nextScheduledSync` are in-memory only; the
+        // caller clears those, since AppSettings has no access to AppState.
+        UserDefaults.standard.removeObject(forKey: AppState.lastSyncDateKey)
 
         if signOutGoogle {
             GoogleOAuthManager.shared.signOut()
