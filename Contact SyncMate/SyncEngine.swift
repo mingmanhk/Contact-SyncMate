@@ -1908,7 +1908,18 @@ enum ContactMapper {
         if let v = unified.organizationName   { mac.organizationName   = v }
         if let v = unified.department         { mac.departmentName     = v }
         if let v = unified.jobTitle           { mac.jobTitle           = v }
-        if let v = unified.note               { mac.note               = v }
+
+        // Guarded, exactly as `toMac` guards it.
+        //
+        // Writing `note` without the com.apple.developer.contacts.notes
+        // entitlement makes Contacts reject the *entire* save — every field, not
+        // just the note — as Cocoa 134092. `toMac` had this guard; this function
+        // did not, and it is the one the merge path uses. That is why merges
+        // failed with 134092 while adds and updates succeeded.
+        if MacContactsConnector.notesFieldAvailable, let v = unified.note {
+            mac.note = v
+        }
+
         if let v = unified.photoData          { mac.imageData          = v }
         if let v = unified.birthday           { mac.birthday           = v }
 

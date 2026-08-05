@@ -304,16 +304,37 @@ class MacContactsConnector: ObservableObject {
     /// the fetch sits on the same hot path as the write. Leaving it main-actor
     /// isolated kept the priority inversion alive for exactly the operation the
     /// off-main write queue was built to protect.
+    /// The individual record, not the unified one.
+    ///
+    /// `unifiedContact(withIdentifier:)` returns Contacts' *linked* view — one
+    /// merged object standing for the same person across several accounts. That
+    /// view is fine to read and cannot be saved: `CNSaveRequest.update` on it
+    /// fails with Cocoa 134092, because there is no single underlying record to
+    /// write it back to.
+    ///
+    /// It failed precisely on the contacts this app calls merges — those are
+    /// duplicates, which is exactly what a user links, so they are the ones with
+    /// a unified view. Adds and updates of unlinked contacts went through fine,
+    /// which is why the failures looked specific to merging.
+    ///
+    /// A fetch request with an identifier predicate returns the real records.
     nonisolated func fetchContactSync(withIdentifier identifier: String) throws -> CNContact? {
+        let request = CNContactFetchRequest(keysToFetch: Self.nonisolatedKeysToFetch())
+        request.predicate = CNContact.predicateForContacts(withIdentifiers: [identifier])
+
+        var found: CNContact?
         do {
-            return try Self.shared.unifiedContact(withIdentifier: identifier,
-                                                  keysToFetch: Self.nonisolatedKeysToFetch())
+            try Self.shared.enumerateContacts(with: request) { contact, stop in
+                found = contact
+                stop.pointee = true
+            }
         } catch let error as NSError {
             if error.domain == CNErrorDomain && error.code == CNError.recordDoesNotExist.rawValue {
                 return nil
             }
             throw error
         }
+        return found
     }
 
     nonisolated func updateContactSync(_ contact: CNMutableContact) throws {
