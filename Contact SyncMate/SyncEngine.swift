@@ -118,6 +118,14 @@ class SyncEngine: ObservableObject {
                 direction: direction
             )
 
+            // Which fields are driving the changes, counted.
+            //
+            // A second sync should have close to nothing to do. When it does not,
+            // the question is always "which field never settles" — and answering
+            // that from a list of per-contact entries means reading hundreds of
+            // rows and tallying by eye. One line does it instead.
+            Self.logFieldDiffHistogram(changes)
+
             if changes.isEmpty {
                 SyncHistory.shared.log(
                     source: "SyncEngine",
@@ -916,6 +924,43 @@ class SyncEngine: ObservableObject {
             NameFormattingEngine.applyToContact(&c, convention: settings.nameCasingConvention)
         }
         return c
+    }
+
+    /// Tally the diff reasons across a change set and log the top ones.
+    ///
+    /// Contact names are not included — this counts reasons, not people, so it
+    /// is safe to paste into a bug report.
+    nonisolated static func logFieldDiffHistogram(_ changes: [ContactChange]) {
+        guard !changes.isEmpty else { return }
+
+        var counts: [String: Int] = [:]
+        for change in changes {
+            for reason in change.changes {
+                // Collapse the per-contact detail ("Potential match: Dana …")
+                // down to the reason itself.
+                let key = reason.contains(":")
+                    ? String(reason.prefix(upTo: reason.firstIndex(of: ":")!))
+                    : reason
+                counts[key, default: 0] += 1
+            }
+        }
+
+        let ranked = counts.sorted { ($0.value, $1.key) > ($1.value, $0.key) }
+            .prefix(8)
+            .map { "\($0.key)=\($0.value)" }
+            .joined(separator: ", ")
+
+        var actions: [String: Int] = [:]
+        for change in changes {
+            actions[(change.userOverride ?? change.action).rawValue, default: 0] += 1
+        }
+        let byAction = actions.sorted { $0.key < $1.key }
+            .map { "\($0.key)=\($0.value)" }
+            .joined(separator: ", ")
+
+        SyncHistory.shared.log(
+            source: "SyncEngine", action: "diff.reasons",
+            details: "\(changes.count) changes — by action: \(byAction) — top fields: \(ranked)")
     }
 
     /// A birthday reduced to the three numbers that mean one.
