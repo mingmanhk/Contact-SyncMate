@@ -634,7 +634,11 @@ struct DashboardView: View {
         .contextMenu {
             Button("Copy") { copyToPasteboard(Self.plainText(event)) }
             Button("Copy All Recent Changes") {
-                copyToPasteboard(recentEvents.map(Self.plainText).joined(separator: "\n"))
+                // `map { Self.plainText($0) }`, not `map(Self.plainText)`. The
+                // second form makes a function *value*, which has no enclosing
+                // context to inherit isolation from — a compile error under
+                // default MainActor isolation. The closure inherits this one.
+                copyToPasteboard(recentEvents.map { Self.plainText($0) }.joined(separator: "\n"))
             }
         }
         .help(event.details ?? friendlyLabel(for: event.action))
@@ -647,12 +651,10 @@ struct DashboardView: View {
 
     /// One log line, in the shape you would want pasted into a bug report.
     ///
-    /// `nonisolated` because it is passed by reference, not just called.
-    /// `recentEvents.map(Self.plainText)` makes a function *value* out of this,
-    /// and a value of function type has no enclosing context to inherit
-    /// isolation from — so under default MainActor isolation the method has to
-    /// say it needs none. It reads only `let` properties of a `Sendable`
-    /// struct, which is exactly the case where that is true.
+    /// `nonisolated` so it can be called from the context menu's escaping
+    /// closure without the enclosing view's isolation. It reads only `let`
+    /// properties of a `Sendable` struct, which is the case where that is
+    /// actually true rather than merely convenient.
     private nonisolated static func plainText(_ event: SyncEvent) -> String {
         let stamp = event.timestamp.formatted(date: .abbreviated, time: .standard)
         let detail = event.details.map { " — \($0)" } ?? ""

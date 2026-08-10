@@ -275,7 +275,7 @@ final class SyncCoordinator: ObservableObject {
             SyncHistory.shared.log(
                 source: "SyncCoordinator",
                 action: "sync.failed",
-                details: "\(friendly) — \(error.localizedDescription)"
+                details: Self.failureDetails(friendly: friendly, error: error)
             )
 
             SyncNotifier.notifySyncFailed(message: friendly)
@@ -358,7 +358,7 @@ final class SyncCoordinator: ObservableObject {
             appState?.syncProgress = nil
 
             SyncHistory.shared.log(source: "SyncCoordinator", action: "sync.failed",
-                                   details: "\(friendly) — \(error.localizedDescription)")
+                                   details: Self.failureDetails(friendly: friendly, error: error))
             SyncNotifier.notifySyncFailed(message: friendly)
             scheduleIdleReset(after: 12)
         }
@@ -450,6 +450,20 @@ final class SyncCoordinator: ObservableObject {
             }
         }
 
+        // `invalid_client` is not a session problem, and telling the user to
+        // sign in again — which is what the generic auth wording does — sends
+        // them into a loop that cannot succeed. Google is saying the client ID
+        // itself is unknown to it: deleted in the Cloud Console, or belonging to
+        // a project that no longer exists. Signing in again uses the same ID and
+        // fails the same way.
+        let text = error.localizedDescription
+        if text.contains("invalid_client") {
+            return "Google no longer recognises this app's OAuth client. "
+                 + "It was most likely deleted in Google Cloud Console. Create a "
+                 + "new iOS client and run Scripts/set-oauth-client.sh with its ID "
+                 + "— signing in again will not help until then."
+        }
+
         let nsError = error as NSError
         if nsError.domain == NSURLErrorDomain {
             switch nsError.code {
@@ -480,5 +494,19 @@ final class SyncCoordinator: ObservableObject {
         }
 
         return error.localizedDescription
+    }
+
+    /// The log line for a failed sync: the friendly reading, plus the raw error
+    /// only when it adds something.
+    ///
+    /// This was unconditionally `"\(friendly) — \(error.localizedDescription)"`,
+    /// and `friendlyMessage` falls back to returning `localizedDescription`
+    /// verbatim when it has no better wording. So every unrecognised error was
+    /// logged twice in one line, joined by a dash — "The OAuth client was not
+    /// found. — The OAuth client was not found." Reading that, you look for the
+    /// difference between the two halves, and there isn't one.
+    nonisolated static func failureDetails(friendly: String, error: Error) -> String {
+        let raw = error.localizedDescription
+        return friendly == raw ? friendly : "\(friendly) — \(raw)"
     }
 }

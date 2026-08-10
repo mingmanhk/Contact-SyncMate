@@ -442,3 +442,352 @@ final class SyncEngineDiffTests: XCTestCase {
         }
     }
 }
+
+// MARK: - Conflict auto-resolution (AUDIT §3, Critical row 2)
+
+/// One test per `defaultConflictResolution` mode, for both conflict branches:
+/// "both timestamps moved" and "neither timestamp moved" (unknown-vs-unknown,
+/// the CNContact-has-no-modification-date case).
+final class ConflictAutoResolutionTests: XCTestCase {
+
+    private var savedConflict: ConflictResolutionDefault!
+    private var savedForceUpdate: Bool!
+    private var savedPostalCodes: Bool!
+    private var savedFilterByGroups: Bool!
+    private var savedSyncDeleted: Bool!
+
+    override func setUp() {
+        super.setUp()
+        let s = AppSettings.shared
+        savedConflict       = s.defaultConflictResolution
+        savedForceUpdate    = s.forceUpdateAll
+        savedPostalCodes    = s.syncPostalCountryCodes
+        savedFilterByGroups = s.filterByGroups
+        savedSyncDeleted    = s.syncDeletedContacts
+        s.defaultConflictResolution = .alwaysAsk
+        s.forceUpdateAll = false
+        s.syncPostalCountryCodes = true
+        s.filterByGroups = false
+        s.syncDeletedContacts = false
+    }
+
+    override func tearDown() {
+        let s = AppSettings.shared
+        s.defaultConflictResolution = savedConflict
+        s.forceUpdateAll = savedForceUpdate
+        s.syncPostalCountryCodes = savedPostalCodes
+        s.filterByGroups = savedFilterByGroups
+        s.syncDeletedContacts = savedSyncDeleted
+        super.tearDown()
+    }
+
+    /// A mapped pair whose given names differ, with the given modification
+    /// timestamps, diffed under the given resolution mode.
+    private func changes(resolution: ConflictResolutionDefault,
+                         googleModified: Date?,
+                         macModified: Date?,
+                         lastSynced: Date) -> [ContactChange] {
+        AppSettings.shared.defaultConflictResolution = resolution
+        let gID = "people/conf-\(UUID().uuidString)"
+        let mID = "mac/conf-\(UUID().uuidString)"
+        let store = ContactMappingStore()
+        store.saveMapping(ContactMapping(
+            googleResourceName: gID, macContactIdentifier: mID, lastSyncedAt: lastSynced))
+        Thread.sleep(forTimeInterval: 0.05)
+
+        var g = UnifiedContact.diffMake(givenName: "GoogleName", googleResourceName: gID)
+        g.lastModified = googleModified
+        var m = UnifiedContact.diffMake(givenName: "MacName", macContactIdentifier: mID)
+        m.lastModified = macModified
+
+        let engine = SyncEngine(
+            googleConnector: GoogleContactsConnector(),
+            macConnector: MacContactsConnector(),
+            mappingStore: store)
+        return engine.computeChanges(googleContacts: [g], macContacts: [m], direction: .twoWay)
+    }
+
+    // Both sides changed since the last sync.
+
+    func test_bothChanged_preferGoogle_updatesTowardMac() {
+        let out = changes(resolution: .preferGoogle,
+                          googleModified: Date(), macModified: Date(),
+                          lastSynced: Date(timeIntervalSince1970: 0))
+        XCTAssertEqual(out.count, 1)
+        XCTAssertEqual(out.first?.action, .update)
+        XCTAssertEqual(out.first?.direction, .googleToMac)
+        XCTAssertNil(out.first?.userOverride)
+        XCTAssertTrue(out.first?.changes.contains { $0.contains("Google preferred") } ?? false)
+        XCTAssertEqual(out.first?.sourceContact?.givenName, "GoogleName",
+                       "Google is the side being read from")
+    }
+
+    func test_bothChanged_preferMac_updatesTowardGoogle() {
+        let out = changes(resolution: .preferMac,
+                          googleModified: Date(), macModified: Date(),
+                          lastSynced: Date(timeIntervalSince1970: 0))
+        XCTAssertEqual(out.count, 1)
+        XCTAssertEqual(out.first?.action, .update)
+        XCTAssertEqual(out.first?.direction, .macToGoogle)
+        XCTAssertTrue(out.first?.changes.contains { $0.contains("Mac preferred") } ?? false)
+        XCTAssertEqual(out.first?.sourceContact?.givenName, "MacName")
+    }
+
+    func test_bothChanged_mergeBoth_emitsPreResolvedMerge() {
+        let out = changes(resolution: .mergeBoth,
+                          googleModified: Date(), macModified: Date(),
+                          lastSynced: Date(timeIntervalSince1970: 0))
+        XCTAssertEqual(out.count, 1)
+        XCTAssertEqual(out.first?.action, .merge)
+        XCTAssertEqual(out.first?.direction, .twoWay)
+        XCTAssertEqual(out.first?.userOverride, .merge,
+                       "mergeBoth pre-resolves the merge so it applies without asking")
+    }
+
+    // Neither timestamp moved (CNContact never reports one), fields differ.
+
+    func test_unknownVsUnknown_alwaysAsk_emitsUnresolvedMerge() {
+        let out = changes(resolution: .alwaysAsk,
+                          googleModified: nil, macModified: nil,
+                          lastSynced: Date())
+        XCTAssertEqual(out.count, 1)
+        XCTAssertEqual(out.first?.action, .merge)
+        XCTAssertEqual(out.first?.direction, .twoWay)
+        XCTAssertNil(out.first?.userOverride,
+                     "alwaysAsk must leave the merge for the user to resolve")
+        XCTAssertTrue(out.first?.changes.contains { $0.contains("neither side reports") } ?? false)
+    }
+
+    func test_unknownVsUnknown_preferGoogle_updatesTowardMac() {
+        let out = changes(resolution: .preferGoogle,
+                          googleModified: nil, macModified: nil,
+                          lastSynced: Date())
+        XCTAssertEqual(out.count, 1)
+        XCTAssertEqual(out.first?.action, .update)
+        XCTAssertEqual(out.first?.direction, .googleToMac)
+    }
+
+    func test_unknownVsUnknown_preferMac_updatesTowardGoogle() {
+        let out = changes(resolution: .preferMac,
+                          googleModified: nil, macModified: nil,
+                          lastSynced: Date())
+        XCTAssertEqual(out.count, 1)
+        XCTAssertEqual(out.first?.action, .update)
+        XCTAssertEqual(out.first?.direction, .macToGoogle)
+    }
+
+    func test_unknownVsUnknown_mergeBoth_emitsPreResolvedMerge() {
+        let out = changes(resolution: .mergeBoth,
+                          googleModified: nil, macModified: nil,
+                          lastSynced: Date())
+        XCTAssertEqual(out.count, 1)
+        XCTAssertEqual(out.first?.action, .merge)
+        XCTAssertEqual(out.first?.userOverride, .merge)
+    }
+}
+
+// MARK: - SyncEngine merge helpers (AUDIT §3, Critical row 3; covers D-05)
+
+final class SyncEngineMergeHelperTests: XCTestCase {
+
+    private func makeEngine() -> SyncEngine {
+        SyncEngine(
+            googleConnector: GoogleContactsConnector(),
+            macConnector: MacContactsConnector(),
+            mappingStore: ContactMappingStore())
+    }
+
+    func test_mergeContacts_primaryWins_secondaryFillsGaps() {
+        var primary = UnifiedContact.diffMake(
+            givenName: "Alice", phones: ["+1 (555) 111-2222"],
+            googleResourceName: "people/prim")
+        primary.familyName = ""          // empty string counts as a gap
+        primary.note = "P"
+
+        var secondary = UnifiedContact.diffMake(
+            givenName: "Alicia", phones: ["15551112222", "+1 555 333 4444"],
+            macContactIdentifier: "mac/sec")
+        secondary.familyName = "Ng"
+        secondary.jobTitle = "Engineer"
+        secondary.note = "S"
+
+        let merged = makeEngine().mergeContacts(primary: primary, secondary: secondary)
+
+        XCTAssertEqual(merged.givenName, "Alice", "primary wins when both have a value")
+        XCTAssertEqual(merged.familyName, "Ng", "an empty primary field is filled from secondary")
+        XCTAssertEqual(merged.jobTitle, "Engineer", "a nil primary field is filled from secondary")
+        XCTAssertEqual(merged.googleResourceName, "people/prim")
+        XCTAssertEqual(merged.macContactIdentifier, "mac/sec",
+                       "identifiers union so the merged record targets both sides")
+        XCTAssertEqual(merged.phoneNumbers.count, 2,
+                       "the digit-identical number dedups, the new one is kept")
+        XCTAssertEqual(merged.note, "P\n---\nS")
+    }
+
+    func test_mergePhoneNumbers_dedupsOnDigitsOnly() {
+        let a = [UnifiedContact.PhoneNumber(value: "+1 (555) 123-4567", label: "mobile")]
+        let b = [UnifiedContact.PhoneNumber(value: "1-555-123-4567", label: "home"),
+                 UnifiedContact.PhoneNumber(value: "+1 555 999 0000", label: "work")]
+        let merged = makeEngine().mergePhoneNumbers(a, b)
+        XCTAssertEqual(merged.count, 2)
+        XCTAssertEqual(merged.first?.value, "+1 (555) 123-4567",
+                       "primary's formatting is the one kept")
+        XCTAssertTrue(merged.contains { $0.value == "+1 555 999 0000" })
+    }
+
+    func test_mergeEmails_dedupsCaseInsensitively() {
+        let a = [UnifiedContact.EmailAddress(value: "Alice@Test.com", label: "work")]
+        let b = [UnifiedContact.EmailAddress(value: "alice@test.com", label: "home"),
+                 UnifiedContact.EmailAddress(value: "b@test.com", label: "home")]
+        let merged = makeEngine().mergeEmails(a, b)
+        XCTAssertEqual(merged.count, 2)
+        XCTAssertEqual(merged.first?.value, "Alice@Test.com")
+        XCTAssertTrue(merged.contains { $0.value == "b@test.com" })
+    }
+
+    func test_mergeURLs_dedupsCaseInsensitively() {
+        let a = [UnifiedContact.Url(value: "https://Example.com", label: "homepage")]
+        let b = [UnifiedContact.Url(value: "https://example.com", label: "other"),
+                 UnifiedContact.Url(value: "https://other.com", label: "blog")]
+        let merged = makeEngine().mergeURLs(a, b)
+        XCTAssertEqual(merged.count, 2)
+        XCTAssertTrue(merged.contains { $0.value == "https://other.com" })
+    }
+
+    func test_mergeNotes_allBranches() {
+        let engine = makeEngine()
+        XCTAssertNil(engine.mergeNotes(nil, nil))
+        XCTAssertEqual(engine.mergeNotes("only A", nil), "only A")
+        XCTAssertEqual(engine.mergeNotes(nil, "only B"), "only B")
+        XCTAssertEqual(engine.mergeNotes("same", "same"), "same",
+                       "identical notes must not be concatenated")
+        XCTAssertEqual(engine.mergeNotes("A", "B"), "A\n---\nB")
+    }
+
+    func test_mergeAddresses_differentStreets_union() {
+        let a = [UnifiedContact.PostalAddress(street: "1 Main St", city: "Springfield")]
+        let b = [UnifiedContact.PostalAddress(street: "2 Oak Ave", city: "Shelbyville")]
+        let merged = makeEngine().mergeAddresses(a, b)
+        XCTAssertEqual(merged.count, 2)
+    }
+
+    func test_mergeAddresses_keepsSecondaryAddressWithoutStreet() {
+        // D-05: an address whose street is nil (city/PO-box-only) is silently
+        // dropped from the secondary side because the dedup key is the street.
+        let a = [UnifiedContact.PostalAddress(street: "1 Main St", city: "Springfield")]
+        let b = [UnifiedContact.PostalAddress(city: "Shelbyville", postalCode: "62565")]
+        let merged = makeEngine().mergeAddresses(a, b)
+        XCTExpectFailure("Known bug — github issue #5") {
+            XCTAssertEqual(merged.count, 2,
+                           "a street-less secondary address carries real data and must survive the merge")
+        }
+    }
+
+    func test_mergeAddresses_keepsSameStreetDifferentCity() {
+        // D-05: "1 Main St, Springfield" and "1 Main St, Shelbyville" are
+        // different places, but the street-only dedup key collapses them.
+        let a = [UnifiedContact.PostalAddress(street: "1 Main St", city: "Springfield")]
+        let b = [UnifiedContact.PostalAddress(street: "1 Main St", city: "Shelbyville")]
+        let merged = makeEngine().mergeAddresses(a, b)
+        XCTExpectFailure("Known bug — github issue #5") {
+            XCTAssertEqual(merged.count, 2,
+                           "same street in a different city is a different address")
+        }
+    }
+}
+
+// MARK: - Failure key + deletion hold-back (AUDIT §3 rows 6-7; D-01)
+
+final class SyncFailureKeyTests: XCTestCase {
+
+    private var savedConfirmDeletions: Bool!
+
+    override func setUp() {
+        super.setUp()
+        savedConfirmDeletions = AppSettings.shared.confirmPendingDeletions
+        AppSettings.shared.confirmPendingDeletions = true
+    }
+
+    override func tearDown() {
+        AppSettings.shared.confirmPendingDeletions = savedConfirmDeletions
+        super.tearDown()
+    }
+
+    private func change(action: SyncAction = .update,
+                        source: UnifiedContact?,
+                        target: UnifiedContact?) -> ContactChange {
+        ContactChange(contactName: "Test", action: action, direction: .twoWay,
+                      changes: [], sourceContact: source, targetContact: target)
+    }
+
+    // MARK: failureKey(for:)
+
+    func test_failureKey_prefersMacIdentifier() {
+        let c = change(source: .diffMake(googleResourceName: "people/g1"),
+                       target: .diffMake(macContactIdentifier: "mac-1"))
+        XCTAssertEqual(SyncEngine.failureKey(for: c), "mac:mac-1")
+    }
+
+    func test_failureKey_findsMacIdentifierOnSource() {
+        let c = change(source: .diffMake(googleResourceName: "people/g1",
+                                         macContactIdentifier: "mac-src"),
+                       target: .diffMake(googleResourceName: "people/g1"))
+        XCTAssertEqual(SyncEngine.failureKey(for: c), "mac:mac-src",
+                       "the Mac identifier wins wherever it lives")
+    }
+
+    func test_failureKey_fallsBackToGoogleResourceName() {
+        let c = change(source: .diffMake(googleResourceName: "people/only"),
+                       target: nil)
+        XCTAssertEqual(SyncEngine.failureKey(for: c), "google:people/only")
+    }
+
+    func test_failureKey_emptyMacIdentifierIsIgnored() {
+        let c = change(source: .diffMake(googleResourceName: "people/g2",
+                                         macContactIdentifier: ""),
+                       target: nil)
+        XCTAssertEqual(SyncEngine.failureKey(for: c), "google:people/g2")
+    }
+
+    func test_failureKey_pureAdd_hasNoKey() {
+        let c = change(action: .add, source: .diffMake(givenName: "Brand New"), target: nil)
+        XCTAssertNil(SyncEngine.failureKey(for: c),
+                     "an add has no record to blame, so it is never set aside")
+    }
+
+    // MARK: deletionIsHeldBack
+
+    private func session(reviewed: Bool) -> SyncSession {
+        var s = SyncSession(mode: .manual, direction: .twoWay,
+                            startTime: Date(), contactChanges: [])
+        s.userReviewed = reviewed
+        return s
+    }
+
+    func test_delete_unreviewedSession_isHeldBack() {
+        XCTAssertTrue(SyncEngine.deletionIsHeldBack(
+            action: .delete, session: session(reviewed: false), settings: AppSettings.shared))
+    }
+
+    func test_delete_reviewedSession_isNotHeldBack() {
+        XCTAssertFalse(SyncEngine.deletionIsHeldBack(
+            action: .delete, session: session(reviewed: true), settings: AppSettings.shared))
+    }
+
+    func test_delete_settingOff_isNotHeldBack() {
+        AppSettings.shared.confirmPendingDeletions = false
+        XCTAssertFalse(SyncEngine.deletionIsHeldBack(
+            action: .delete, session: session(reviewed: false), settings: AppSettings.shared))
+    }
+
+    func test_unreviewedMerge_isDeferred() {
+        // D-01: a scheduled (unreviewed) sync applies a `.merge` nobody
+        // confirmed. Desired behavior: like deletions, an unconfirmed merge is
+        // recorded and deferred to the sync preview.
+        XCTExpectFailure("Known bug — github issue #1") {
+            XCTAssertTrue(SyncEngine.deletionIsHeldBack(
+                action: .merge, session: session(reviewed: false), settings: AppSettings.shared),
+                "an unreviewed merge rewrites both sides and must wait for review")
+        }
+    }
+}

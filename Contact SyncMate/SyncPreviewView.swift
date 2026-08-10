@@ -41,12 +41,6 @@ struct SyncPreviewView: View {
     private var filteredChanges: [ContactChange] {
         let base = session.contactChanges.filter { !skipped.contains($0.id) }
         guard let action = activeFilter.action else { return base }
-        // Wrapped in a closure rather than passed as `filter(Self.needsReview)`.
-        // A bare method reference becomes a function *value*, which has no
-        // enclosing context to inherit isolation from — under default MainActor
-        // isolation that is a compile error, and `ContactChange` has `var`
-        // properties so the method cannot simply be marked `nonisolated`. A
-        // non-escaping closure inherits this View's isolation and is free.
         if action == .merge { return base.filter { Self.needsReview($0) } }
         return base.filter { $0.action == action }
     }
@@ -59,6 +53,12 @@ struct SyncPreviewView: View {
     /// to decide. A number that large reads as a wall, and a wall gets clicked
     /// through. Counting only the matches that genuinely need a person makes
     /// the number small enough to be worth reading.
+    ///
+    /// Always called as `filter { Self.needsReview($0) }`, never
+    /// `filter(Self.needsReview)`. The second form makes a function *value*,
+    /// which has no enclosing context to inherit isolation from and so fails to
+    /// compile under this project's default MainActor isolation. A non-escaping
+    /// closure inherits the view's isolation and costs nothing.
     static func needsReview(_ change: ContactChange) -> Bool {
         change.action == .merge && change.userOverride == nil
     }
@@ -110,8 +110,11 @@ struct SyncPreviewView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Cancel") { isPresented = false }
-                    .keyboardShortcut(.escape)
+                // No Cancel here. The footer already has one, next to Apply,
+                // which is where a sheet's decision belongs — two identical
+                // buttons on one screen make you stop and work out whether they
+                // differ. Escape still closes the sheet; that shortcut moved to
+                // the footer button rather than being dropped.
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 16)

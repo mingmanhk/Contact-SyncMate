@@ -670,3 +670,438 @@ final class PerformanceTests: XCTestCase {
         XCTAssertLessThanOrEqual(count, 1000, "History should respect max events limit")
     }
 }
+
+// MARK: ─────────────────────────────────────────────────────────
+// 10. ContactDeduplicator.calculateMatchScore (AUDIT §3, Critical row 1)
+// ─────────────────────────────────────────────────────────────
+
+final class ContactDeduplicatorScoreTests: XCTestCase {
+
+    private var deduplicator: ContactDeduplicator!
+
+    override func setUp() {
+        super.setUp()
+        deduplicator = ContactDeduplicator(config: ContactDeduplicator.Configuration(),
+                                           decisionStore: DeduplicationDecisionStore.shared)
+    }
+
+    /// The signed sum of every rule contribution — what `totalScore` clamps.
+    private func componentSum(_ b: MatchScoreBreakdown) -> Int {
+        b.emailMatch + b.phoneMatch + b.exactNameMatch + b.similarNameMatch +
+        b.organizationMatch + b.addressMatch + b.emailDomainMismatch + b.differentContactInfo
+    }
+
+    func test_sameEmail_scores60() {
+        let a = UnifiedContact.make(emails: ["pat@example.com"])
+        let b = UnifiedContact.make(emails: ["pat@example.com"])
+        let score = deduplicator.calculateMatchScore(a, b)
+        XCTAssertEqual(score.emailMatch, 60)
+        XCTAssertEqual(score.totalScore, 60)
+    }
+
+    func test_samePhone_scores60() {
+        let a = UnifiedContact.make(phones: ["+15551234567"])
+        let b = UnifiedContact.make(phones: ["+1 (555) 123-4567"])
+        let score = deduplicator.calculateMatchScore(a, b)
+        XCTAssertEqual(score.phoneMatch, 60, "formatting differences normalize away")
+        XCTAssertEqual(score.totalScore, 60)
+    }
+
+    func test_exactName_scores30() {
+        let a = UnifiedContact.make(givenName: "Pat", familyName: "Lee")
+        let b = UnifiedContact.make(givenName: "Pat", familyName: "Lee")
+        let score = deduplicator.calculateMatchScore(a, b)
+        XCTAssertEqual(score.exactNameMatch, 30)
+        XCTAssertEqual(score.similarNameMatch, 0, "rules 3 and 4 are exclusive")
+        XCTAssertEqual(score.totalScore, 30)
+    }
+
+    func test_similarName_scores20_notBoth() {
+        let a = UnifiedContact.make(givenName: "Jon", familyName: "Smith")
+        let b = UnifiedContact.make(givenName: "John", familyName: "Smith")
+        let score = deduplicator.calculateMatchScore(a, b)
+        XCTAssertEqual(score.exactNameMatch, 0)
+        XCTAssertEqual(score.similarNameMatch, 20, "Levenshtein distance 1 is 'very similar'")
+        XCTAssertEqual(score.totalScore, 20,
+                       "no contact info on either side, so the similar-name score stands alone")
+    }
+
+    func test_sameOrganization_scores10() {
+        let a = UnifiedContact.make(organizationName: "Acme Corp")
+        let b = UnifiedContact.make(organizationName: "Acme Corp")
+        let score = deduplicator.calculateMatchScore(a, b)
+        XCTAssertEqual(score.organizationMatch, 10)
+        XCTAssertEqual(score.totalScore, 10)
+    }
+
+    func test_sameAddress_scores10() {
+        var a = UnifiedContact.make()
+        var b = UnifiedContact.make()
+        a.postalAddresses = [UnifiedContact.PostalAddress(street: "1 Infinite Loop", city: "Cupertino")]
+        b.postalAddresses = [UnifiedContact.PostalAddress(street: "1 Infinite Loop", city: "Cupertino")]
+        let score = deduplicator.calculateMatchScore(a, b)
+        XCTAssertEqual(score.addressMatch, 10)
+        XCTAssertEqual(score.totalScore, 10)
+    }
+
+    func test_sameName_conflictingEmailDomains_minus10() {
+        let a = UnifiedContact.make(givenName: "Pat", familyName: "Lee", emails: ["pat@gmail.com"])
+        let b = UnifiedContact.make(givenName: "Pat", familyName: "Lee", emails: ["pat@yahoo.com"])
+        let score = deduplicator.calculateMatchScore(a, b)
+        XCTAssertEqual(score.emailDomainMismatch, -10)
+    }
+
+    func test_sameName_differentContactInfo_minus20() {
+        let a = UnifiedContact.make(givenName: "Pat", familyName: "Lee", phones: ["+15551111111"])
+        let b = UnifiedContact.make(givenName: "Pat", familyName: "Lee", phones: ["+15552222222"])
+        let score = deduplicator.calculateMatchScore(a, b)
+        XCTAssertEqual(score.differentContactInfo, -20)
+        XCTAssertEqual(score.emailDomainMismatch, 0, "no emails on either side")
+        XCTAssertEqual(score.totalScore, 10, "30 (name) - 20 (different numbers)")
+    }
+
+    func test_sameName_bothLackContactInfo_noPenalty() {
+        let a = UnifiedContact.make(givenName: "Pat", familyName: "Lee")
+        let b = UnifiedContact.make(givenName: "Pat", familyName: "Lee")
+        let score = deduplicator.calculateMatchScore(a, b)
+        XCTAssertEqual(score.differentContactInfo, 0,
+                       "two bare name-only cards are not evidence of different people")
+        XCTAssertEqual(score.totalScore, 30)
+    }
+
+    func test_sameName_oneSidedContactInfo_noPenalty() {
+        let a = UnifiedContact.make(givenName: "Pat", familyName: "Lee", phones: ["+15551111111"])
+        let b = UnifiedContact.make(givenName: "Pat", familyName: "Lee")
+        let score = deduplicator.calculateMatchScore(a, b)
+        XCTAssertEqual(score.differentContactInfo, 0,
+                       "the penalty needs contact info on both sides to disagree")
+    }
+
+    func test_breakdown_sumsToTotal() {
+        // Positive case: every additive rule fires.
+        var a = UnifiedContact.make(givenName: "Pat", familyName: "Lee",
+                                    organizationName: "Acme Corp",
+                                    phones: ["+15551234567"], emails: ["pat@example.com"])
+        var b = UnifiedContact.make(givenName: "Pat", familyName: "Lee",
+                                    organizationName: "Acme Corp",
+                                    phones: ["+15551234567"], emails: ["pat@example.com"])
+        a.postalAddresses = [UnifiedContact.PostalAddress(street: "1 Main St", city: "Springfield")]
+        b.postalAddresses = [UnifiedContact.PostalAddress(street: "1 Main St", city: "Springfield")]
+        let rich = deduplicator.calculateMatchScore(a, b)
+        XCTAssertEqual(rich.totalScore, componentSum(rich))
+        XCTAssertEqual(componentSum(rich), 60 + 60 + 30 + 10 + 10)
+
+        // Negative sum clamps to zero rather than going below.
+        let p = UnifiedContact.make(givenName: "Pat", familyName: "Lee", emails: ["pat@gmail.com"])
+        let q = UnifiedContact.make(givenName: "Pat", familyName: "Lee", emails: ["pat@yahoo.com"])
+        let clamped = deduplicator.calculateMatchScore(p, q)
+        XCTAssertEqual(clamped.totalScore, max(0, componentSum(clamped)))
+    }
+}
+
+// MARK: ─────────────────────────────────────────────────────────
+// 11. DeduplicationCoordinator write-back merge (AUDIT §3, Critical row 4)
+// ─────────────────────────────────────────────────────────────
+
+@MainActor
+final class DeduplicationMergeIntoTests: XCTestCase {
+
+    private var coordinator: DeduplicationCoordinator!
+
+    override func setUp() {
+        super.setUp()
+        coordinator = DeduplicationCoordinator()
+    }
+
+    func test_mergeInto_primaryWinsOnConflicts() {
+        let primary = UnifiedContact.make(givenName: "Amy", familyName: "Wu",
+                                          organizationName: "Acme",
+                                          googleResourceName: "people/prim")
+        let secondary = UnifiedContact.make(givenName: "Amelia", familyName: "Woo",
+                                            organizationName: "Other Inc",
+                                            macContactIdentifier: "mac/sec")
+        let merged = coordinator.mergeInto(primary: primary, secondary: secondary)
+        XCTAssertEqual(merged.givenName, "Amy")
+        XCTAssertEqual(merged.familyName, "Wu")
+        XCTAssertEqual(merged.organizationName, "Acme")
+        XCTAssertEqual(merged.id, primary.id)
+        XCTAssertEqual(merged.googleResourceName, "people/prim")
+        XCTAssertEqual(merged.macContactIdentifier, "mac/sec",
+                       "identifiers union so both records stay addressable")
+    }
+
+    func test_mergeInto_secondaryFillsGaps() {
+        var primary = UnifiedContact.make(givenName: "")   // empty string is a gap
+        primary.jobTitle = nil
+        var secondary = UnifiedContact.make(givenName: "Bea", organizationName: "Acme")
+        secondary.jobTitle = "Designer"
+        secondary.nickname = "B"
+        let merged = coordinator.mergeInto(primary: primary, secondary: secondary)
+        XCTAssertEqual(merged.givenName, "Bea")
+        XCTAssertEqual(merged.organizationName, "Acme")
+        XCTAssertEqual(merged.jobTitle, "Designer")
+        XCTAssertEqual(merged.nickname, "B")
+    }
+
+    func test_mergeUniquePhones_digitOnlyDedup() {
+        let a = [UnifiedContact.PhoneNumber(value: "(555) 123-4567", label: "mobile")]
+        let b = [UnifiedContact.PhoneNumber(value: "555.123.4567", label: "home"),
+                 UnifiedContact.PhoneNumber(value: "555-999-0000", label: "work")]
+        let merged = coordinator.mergeUniquePhones(a, b)
+        XCTAssertEqual(merged.count, 2)
+        XCTAssertEqual(merged.first?.value, "(555) 123-4567", "primary's formatting survives")
+        XCTAssertTrue(merged.contains { $0.value == "555-999-0000" })
+    }
+
+    func test_mergeUniqueEmails_caseInsensitiveDedup() {
+        let a = [UnifiedContact.EmailAddress(value: "Pat@Example.com", label: "work")]
+        let b = [UnifiedContact.EmailAddress(value: "pat@example.com", label: "home"),
+                 UnifiedContact.EmailAddress(value: "pat.other@example.com", label: "other")]
+        let merged = coordinator.mergeUniqueEmails(a, b)
+        XCTAssertEqual(merged.count, 2)
+        XCTAssertTrue(merged.contains { $0.value == "pat.other@example.com" })
+    }
+
+    func test_mergeInto_concatenatesDistinctNotes() {
+        var primary = UnifiedContact.make(givenName: "Amy")
+        primary.note = "Primary note"
+        var secondary = UnifiedContact.make(givenName: "Amy")
+        secondary.note = "Secondary note"
+        let merged = coordinator.mergeInto(primary: primary, secondary: secondary)
+        XCTAssertEqual(merged.note, "Primary note\n---\nSecondary note")
+
+        primary.note = nil
+        let filled = coordinator.mergeInto(primary: primary, secondary: secondary)
+        XCTAssertEqual(filled.note, "Secondary note", "a nil primary note takes secondary's")
+
+        secondary.note = nil
+        let empty = coordinator.mergeInto(primary: primary, secondary: secondary)
+        XCTAssertNil(empty.note)
+    }
+
+    func test_mergeInto_urlsUnionByValue() {
+        var primary = UnifiedContact.make(givenName: "Amy")
+        primary.urls = [UnifiedContact.Url(value: "https://a.com", label: "homepage")]
+        var secondary = UnifiedContact.make(givenName: "Amy")
+        secondary.urls = [UnifiedContact.Url(value: "https://a.com", label: "other"),
+                          UnifiedContact.Url(value: "https://b.com", label: "blog")]
+        let merged = coordinator.mergeInto(primary: primary, secondary: secondary)
+        XCTAssertEqual(merged.urls.count, 2)
+        XCTAssertTrue(merged.urls.contains { $0.value == "https://b.com" })
+    }
+
+    func test_mergeInto_keepsSecondaryAddresses() {
+        // D-05: when the primary has any postal address, every secondary
+        // address is dropped wholesale — data loss on the merge write-back.
+        var primary = UnifiedContact.make(givenName: "Amy")
+        primary.postalAddresses = [UnifiedContact.PostalAddress(street: "1 Main St", city: "Springfield")]
+        var secondary = UnifiedContact.make(givenName: "Amy")
+        secondary.postalAddresses = [UnifiedContact.PostalAddress(street: "2 Oak Ave", city: "Shelbyville")]
+        let merged = coordinator.mergeInto(primary: primary, secondary: secondary)
+        XCTExpectFailure("Known bug — github issue #5") {
+            XCTAssertEqual(merged.postalAddresses.count, 2,
+                           "a distinct secondary address must survive the merge")
+        }
+    }
+}
+
+// MARK: ─────────────────────────────────────────────────────────
+// 12. Backup snapshot round-trip (AUDIT §3, Critical row 5)
+// ─────────────────────────────────────────────────────────────
+
+final class BackupSnapshotRoundTripTests: XCTestCase {
+
+    private let manager = ContactBackupManager.shared
+
+    func test_roundTrip_preservesFieldsAndIdentifiers() throws {
+        var original = UnifiedContact.make(
+            givenName: "Round", familyName: "Trip", organizationName: "Acme Corp",
+            phones: ["+1 555 000 1111"], emails: ["round@trip.com"],
+            googleResourceName: "people/rt-1", macContactIdentifier: "mac/rt-1")
+        original.middleName = "Mid"
+        original.namePrefix = "Dr."
+        original.nameSuffix = "Jr."
+        original.nickname = "Trippy"
+        original.phoneticGivenName = "Rownd"
+        original.department = "QA"
+        original.jobTitle = "Tester"
+        original.note = "A round-trip note"
+        original.photoData = Data([0xAB, 0xCD])
+        original.urls = [UnifiedContact.Url(value: "https://round.trip", label: "homepage")]
+        original.postalAddresses = [UnifiedContact.PostalAddress(
+            street: "1 Loop Rd", city: "Cupertino", state: "CA",
+            postalCode: "95014", country: "United States", countryCode: nil, label: "work")]
+        var birthday = DateComponents()
+        birthday.year = 1990; birthday.month = 5; birthday.day = 20
+        original.birthday = birthday
+
+        let snapshot = try XCTUnwrap(manager.createSnapshot(from: original))
+        // `identifier` is deliberately wrong: the snapshot's own captured
+        // identifiers must win over the fallback.
+        let restored = try XCTUnwrap(manager.snapshotToUnifiedContact(
+            snapshot, identifier: "people/should-not-be-used", source: .google))
+
+        XCTAssertEqual(restored.givenName, original.givenName)
+        XCTAssertEqual(restored.middleName, original.middleName)
+        XCTAssertEqual(restored.familyName, original.familyName)
+        XCTAssertEqual(restored.namePrefix, original.namePrefix)
+        XCTAssertEqual(restored.nameSuffix, original.nameSuffix)
+        XCTAssertEqual(restored.nickname, original.nickname)
+        XCTAssertEqual(restored.phoneticGivenName, original.phoneticGivenName)
+        XCTAssertEqual(restored.organizationName, original.organizationName)
+        XCTAssertEqual(restored.department, original.department)
+        XCTAssertEqual(restored.jobTitle, original.jobTitle)
+        XCTAssertEqual(restored.phoneNumbers, original.phoneNumbers)
+        XCTAssertEqual(restored.emailAddresses, original.emailAddresses)
+        XCTAssertEqual(restored.postalAddresses, original.postalAddresses)
+        XCTAssertEqual(restored.urls, original.urls)
+        XCTAssertEqual(restored.birthday, original.birthday)
+        XCTAssertEqual(restored.note, original.note)
+        XCTAssertEqual(restored.photoData, original.photoData)
+        XCTAssertEqual(restored.googleResourceName, "people/rt-1")
+        XCTAssertEqual(restored.macContactIdentifier, "mac/rt-1",
+                       "both identifiers must survive so a restore targets the exact records")
+    }
+
+    /// Backups written before the identifier fields existed fall back to
+    /// `identifier` + `source` — and must land on the correct side.
+    func test_legacySnapshot_reconstructsIdentifierBySource() throws {
+        let legacy = ContactSnapshot(
+            displayName: "Legacy", givenName: "Leg", familyName: "Acy", middleName: nil,
+            phoneNumbers: [], emailAddresses: [], postalAddresses: [],
+            organization: nil, jobTitle: nil, notes: nil, imageData: nil, customFields: [:],
+            namePrefix: nil, nameSuffix: nil, nickname: nil,
+            phoneticGivenName: nil, phoneticMiddleName: nil, phoneticFamilyName: nil,
+            department: nil, urls: nil, birthday: nil,
+            googleResourceName: nil, macContactIdentifier: nil)
+
+        let mac = try XCTUnwrap(manager.snapshotToUnifiedContact(
+            legacy, identifier: "mac-legacy-1", source: .mac))
+        XCTAssertEqual(mac.macContactIdentifier, "mac-legacy-1")
+        XCTAssertNil(mac.googleResourceName,
+                     "a Mac-sourced restore must not invent a Google identity")
+
+        let google = try XCTUnwrap(manager.snapshotToUnifiedContact(
+            legacy, identifier: "people/legacy-1", source: .google))
+        XCTAssertEqual(google.googleResourceName, "people/legacy-1")
+        XCTAssertNil(google.macContactIdentifier)
+    }
+
+    /// A backup written by the first release is missing every v2 field; it must
+    /// still decode (optionals absorb the missing keys) and restore.
+    func test_oldBackupJSON_missingV2Fields_stillDecodes() throws {
+        let oldJSON = """
+        {
+          "displayName": "Old Backup",
+          "givenName": "Old",
+          "phoneNumbers": [{"value": "+1 555 777 8888", "label": "mobile"}],
+          "emailAddresses": [],
+          "postalAddresses": [],
+          "customFields": {}
+        }
+        """.data(using: .utf8)!
+
+        let snapshot = try JSONDecoder().decode(ContactSnapshot.self, from: oldJSON)
+        XCTAssertNil(snapshot.urls)
+        XCTAssertNil(snapshot.googleResourceName)
+        XCTAssertNil(snapshot.macContactIdentifier)
+
+        let restored = try XCTUnwrap(manager.snapshotToUnifiedContact(
+            snapshot, identifier: "mac-old-1", source: .mac))
+        XCTAssertEqual(restored.givenName, "Old")
+        XCTAssertEqual(restored.phoneNumbers.first?.value, "+1 555 777 8888")
+        XCTAssertEqual(restored.macContactIdentifier, "mac-old-1")
+        XCTAssertTrue(restored.urls.isEmpty, "missing v2 lists restore as empty, not as a crash")
+    }
+}
+
+// MARK: ─────────────────────────────────────────────────────────
+// 13. SyncFailureStore (AUDIT §3, row 6)
+// ─────────────────────────────────────────────────────────────
+
+final class SyncFailureStoreTests: XCTestCase {
+
+    /// The store is a singleton persisting to the app container, so every test
+    /// uses unique keys and removes them again — pre-existing entries (and the
+    /// user's real data) are left untouched.
+    private var usedKeys: [String] = []
+
+    private func uniqueKey() -> String {
+        let key = "test:" + UUID().uuidString
+        usedKeys.append(key)
+        return key
+    }
+
+    override func tearDown() {
+        for key in usedKeys {
+            SyncFailureStore.shared.clearFailure(key: key)
+        }
+        usedKeys = []
+        super.tearDown()
+    }
+
+    func test_threeStrikes_skipStartsOnFourthAttempt() {
+        let store = SyncFailureStore.shared
+        let key = uniqueKey()
+
+        XCTAssertFalse(store.shouldSkip(key: key), "an unknown contact is never skipped")
+
+        XCTAssertEqual(store.recordFailure(key: key, name: "Strikes", reason: "134092"), 1)
+        XCTAssertFalse(store.shouldSkip(key: key), "attempt 2 still runs after 1 failure")
+
+        XCTAssertEqual(store.recordFailure(key: key, name: "Strikes", reason: "134092"), 2)
+        XCTAssertFalse(store.shouldSkip(key: key), "attempt 3 still runs after 2 failures")
+
+        XCTAssertEqual(store.recordFailure(key: key, name: "Strikes", reason: "134092"), 3)
+        XCTAssertTrue(store.shouldSkip(key: key),
+                      "after the third strike the contact is set aside")
+    }
+
+    func test_clearFailure_forgetsHistory() {
+        let store = SyncFailureStore.shared
+        let key = uniqueKey()
+        for _ in 0..<3 { store.recordFailure(key: key, name: "Recovers", reason: "x") }
+        XCTAssertTrue(store.shouldSkip(key: key))
+
+        store.clearFailure(key: key)
+        XCTAssertFalse(store.shouldSkip(key: key),
+                       "a contact that recovers is not held against its past")
+        XCTAssertEqual(store.recordFailure(key: key, name: "Recovers", reason: "x"), 1,
+                       "the count restarts from scratch")
+    }
+
+    func test_ignore_skipsRegardlessOfCount() {
+        let store = SyncFailureStore.shared
+        let key = uniqueKey()
+        store.recordFailure(key: key, name: "Ignored", reason: "x")
+        XCTAssertFalse(store.shouldSkip(key: key))
+
+        store.ignore(key: key)
+        XCTAssertTrue(store.shouldSkip(key: key),
+                      "ignore short-circuits the 3-strike threshold")
+    }
+
+    func test_retry_isClear() {
+        let store = SyncFailureStore.shared
+        let key = uniqueKey()
+        for _ in 0..<3 { store.recordFailure(key: key, name: "Retry", reason: "x") }
+        store.retry(key: key)
+        XCTAssertFalse(store.shouldSkip(key: key))
+    }
+
+    func test_syncFailure_codableRoundTrip() throws {
+        let failure = SyncFailure(id: "mac:ABC-123", contactName: "Codable Person",
+                                  reason: "Cocoa 134092", failureCount: 2,
+                                  lastFailedAt: Date(), ignored: true)
+        let decoded = try JSONDecoder().decode(SyncFailure.self,
+                                               from: JSONEncoder().encode(failure))
+        XCTAssertEqual(decoded.id, failure.id)
+        XCTAssertEqual(decoded.contactName, failure.contactName)
+        XCTAssertEqual(decoded.reason, failure.reason)
+        XCTAssertEqual(decoded.failureCount, failure.failureCount)
+        XCTAssertTrue(decoded.ignored)
+        XCTAssertEqual(decoded.lastFailedAt.timeIntervalSinceReferenceDate,
+                       failure.lastFailedAt.timeIntervalSinceReferenceDate,
+                       accuracy: 0.001)
+    }
+}

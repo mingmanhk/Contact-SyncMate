@@ -593,7 +593,7 @@ class ContactBackupManager: ObservableObject {
         return versions
     }
 
-    private func createSnapshot(from contact: UnifiedContact) -> ContactSnapshot? {
+    func createSnapshot(from contact: UnifiedContact) -> ContactSnapshot? { // internal for testing
         return ContactSnapshot(
             displayName: contact.displayName,
             givenName: contact.givenName,
@@ -646,7 +646,7 @@ class ContactBackupManager: ObservableObject {
     ///
     /// Prefers the identifiers captured in the snapshot and falls back to
     /// `identifier` + `source` for backups written before those were stored.
-    private func snapshotToUnifiedContact(
+    func snapshotToUnifiedContact( // internal for testing
         _ snapshot: ContactSnapshot,
         identifier: String,
         source: ContactVersion.ContactSource

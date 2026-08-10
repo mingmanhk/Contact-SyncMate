@@ -251,7 +251,7 @@ class DeduplicationCoordinator: ObservableObject {
     }
 
     /// Merge secondary's data into primary (primary wins for conflicts, secondary fills gaps)
-    private func mergeInto(primary: UnifiedContact, secondary: UnifiedContact) -> UnifiedContact {
+    func mergeInto(primary: UnifiedContact, secondary: UnifiedContact) -> UnifiedContact { // internal for testing
         UnifiedContact(
             id: primary.id,
             googleResourceName: primary.googleResourceName ?? secondary.googleResourceName,
@@ -282,14 +282,14 @@ class DeduplicationCoordinator: ObservableObject {
         )
     }
 
-    private func mergeUniquePhones(_ a: [UnifiedContact.PhoneNumber], _ b: [UnifiedContact.PhoneNumber]) -> [UnifiedContact.PhoneNumber] {
+    func mergeUniquePhones(_ a: [UnifiedContact.PhoneNumber], _ b: [UnifiedContact.PhoneNumber]) -> [UnifiedContact.PhoneNumber] { // internal for testing
         var result = a
         let existing = Set(a.map { $0.value.filter(\.isNumber) })
         for p in b where !existing.contains(p.value.filter(\.isNumber)) { result.append(p) }
         return result
     }
 
-    private func mergeUniqueEmails(_ a: [UnifiedContact.EmailAddress], _ b: [UnifiedContact.EmailAddress]) -> [UnifiedContact.EmailAddress] {
+    func mergeUniqueEmails(_ a: [UnifiedContact.EmailAddress], _ b: [UnifiedContact.EmailAddress]) -> [UnifiedContact.EmailAddress] { // internal for testing
         var result = a
         let existing = Set(a.map { $0.value.lowercased() })
         for e in b where !existing.contains(e.value.lowercased()) { result.append(e) }

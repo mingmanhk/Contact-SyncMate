@@ -333,9 +333,13 @@ class SyncEngine: ObservableObject {
                     )
                 }
             } catch {
+                // The explained form, not the raw one. "Cocoa error 134092" is
+                // what the user sees on a failed merge, and on its own it says
+                // nothing about what failed or whether they can do anything.
+                let explained = SyncErrorExplanation.describe(error)
                 errors.append(SyncError(
                     contactName: change.contactName,
-                    message: error.localizedDescription,
+                    message: explained,
                     timestamp: Date()
                 ))
                 // Count it against this contact. On the third strike the next
@@ -345,12 +349,12 @@ class SyncEngine: ObservableObject {
                     attempts = SyncFailureStore.shared.recordFailure(
                         key: failureKey,
                         name: change.contactName,
-                        reason: error.localizedDescription)
+                        reason: explained)
                 }
                 SyncHistory.shared.log(
                     source: "SyncEngine",
                     action: "change.failed",
-                    details: "\(change.contactName) [\(action.rawValue)]: \(error.localizedDescription)"
+                    details: "\(change.contactName) [\(action.rawValue)]: \(explained)"
                            + (attempts > 0 ? " (attempt \(attempts) of \(SyncFailureStore.attemptsBeforeSkipping))" : "")
                 )
 
@@ -1616,7 +1620,7 @@ class SyncEngine: ObservableObject {
     }
 
     /// Merge two contacts: primary wins for non-empty fields, secondary fills gaps
-    private func mergeContacts(primary: UnifiedContact, secondary: UnifiedContact) -> UnifiedContact {
+    func mergeContacts(primary: UnifiedContact, secondary: UnifiedContact) -> UnifiedContact { // internal for testing
         UnifiedContact(
             id: primary.id,
             googleResourceName: primary.googleResourceName ?? secondary.googleResourceName,
@@ -1645,7 +1649,7 @@ class SyncEngine: ObservableObject {
         )
     }
 
-    private func mergePhoneNumbers(_ a: [UnifiedContact.PhoneNumber], _ b: [UnifiedContact.PhoneNumber]) -> [UnifiedContact.PhoneNumber] {
+    func mergePhoneNumbers(_ a: [UnifiedContact.PhoneNumber], _ b: [UnifiedContact.PhoneNumber]) -> [UnifiedContact.PhoneNumber] { // internal for testing
         var result = a
         let existingValues = Set(a.map { $0.value.filter(\.isNumber) })
         for phone in b where !existingValues.contains(phone.value.filter(\.isNumber)) {
@@ -1654,7 +1658,7 @@ class SyncEngine: ObservableObject {
         return result
     }
 
-    private func mergeEmails(_ a: [UnifiedContact.EmailAddress], _ b: [UnifiedContact.EmailAddress]) -> [UnifiedContact.EmailAddress] {
+    func mergeEmails(_ a: [UnifiedContact.EmailAddress], _ b: [UnifiedContact.EmailAddress]) -> [UnifiedContact.EmailAddress] { // internal for testing
         var result = a
         let existing = Set(a.map { $0.value.lowercased() })
         for email in b where !existing.contains(email.value.lowercased()) {
@@ -1663,7 +1667,7 @@ class SyncEngine: ObservableObject {
         return result
     }
 
-    private func mergeAddresses(_ a: [UnifiedContact.PostalAddress], _ b: [UnifiedContact.PostalAddress]) -> [UnifiedContact.PostalAddress] {
+    func mergeAddresses(_ a: [UnifiedContact.PostalAddress], _ b: [UnifiedContact.PostalAddress]) -> [UnifiedContact.PostalAddress] { // internal for testing
         // Keep all from primary; add from secondary only if street differs
         var result = a
         let existingStreets = Set(a.compactMap { $0.street?.lowercased() })
@@ -1675,7 +1679,7 @@ class SyncEngine: ObservableObject {
         return result
     }
 
-    private func mergeURLs(_ a: [UnifiedContact.Url], _ b: [UnifiedContact.Url]) -> [UnifiedContact.Url] {
+    func mergeURLs(_ a: [UnifiedContact.Url], _ b: [UnifiedContact.Url]) -> [UnifiedContact.Url] { // internal for testing
         var result = a
         let existing = Set(a.map { $0.value.lowercased() })
         for url in b where !existing.contains(url.value.lowercased()) {
@@ -1684,7 +1688,7 @@ class SyncEngine: ObservableObject {
         return result
     }
 
-    private func mergeNotes(_ a: String?, _ b: String?) -> String? {
+    func mergeNotes(_ a: String?, _ b: String?) -> String? { // internal for testing
         switch (a, b) {
         case (nil, nil): return nil
         case (let v?, nil): return v
