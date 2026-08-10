@@ -10,7 +10,9 @@
 
 > **Update (2026-08-09, second pass):** An independent verification cycle re-checked every defect below against the current working tree, ran fresh audit sweeps over the recent commits and the previously-unaudited accessibility/localization/UX dimension, filed **all 41 findings as GitHub issues (#1–#41)**, and expanded the test suite from 126 to **176 tests (all passing)**. Results: **all 23 original defects are still OPEN** (the "audit fix" commits predate this report), and **18 new findings** were added (N-01..N-05 code, A-01..A-06 accessibility, L-01..L-05 localization, U-01..U-02 UX). See §6 for the new findings and §7 for the issue index.
 
-## 1. Verdict: **NO-GO** (re-confirmed on verification pass)
+> **Remediation complete (2026-08-09, evening):** All 41 issues (#1–#41) have been fixed, committed with `Fixes #N` references, and verified — test suite at **190 passing, 0 failures**, zero app-file compiler warnings. Every launch blocker below is resolved; the previously `XCTExpectFailure`-pinned regression tests now assert the fixed behavior directly. With the blockers closed and their regression tests green, the §1 condition is met: the verdict flips to **GO** (recommended pre-release step: one manual smoke pass of sign-in → preview → sync → cancel → restore on real accounts, since the automated suite does not exercise the live connectors).
+
+## 1. Verdict at audit time: **NO-GO** (superseded — see remediation note above)
 
 Do not ship to production until **D-01 (#1), D-02 (#2), D-06 (#6), D-07 (#7), and N-01 (#24)** are fixed. The original four blockers all remain open, and the fresh sweep added a fifth: the Google batch pre-pass bypasses the three-strike set-aside, so failed writes retry forever *and* their failures are silently swallowed (N-01). N-02/N-03 (#25/#26) share root causes with D-01/D-06 and should land in the same fixes. Once the blockers are resolved and their staged regression tests (see §3) flip from `XCTExpectFailure` to plain passes, this flips to **GO**.
 
