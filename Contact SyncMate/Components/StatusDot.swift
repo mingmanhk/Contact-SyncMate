@@ -32,13 +32,15 @@ public enum SyncStatus: String {
     }
 
     /// Human-readable status used as the accessibility label and visible
-    /// label (e.g. in `MenuBarView.statusRow`).
+    /// label (e.g. in `MenuBarView.statusRow`). Localized here because the
+    /// call sites render it with `Text(String)`, which never consults the
+    /// string catalog on its own.
     public var label: String {
         switch self {
-        case .idle:    return "Up to date"
-        case .syncing: return "Syncing"
-        case .success: return "Sync complete"
-        case .error:   return "Sync error"
+        case .idle:    return String(localized: "Up to date")
+        case .syncing: return String(localized: "Syncing")
+        case .success: return String(localized: "Sync complete")
+        case .error:   return String(localized: "Sync error")
         }
     }
 

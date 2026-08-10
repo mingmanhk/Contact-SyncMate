@@ -30,30 +30,37 @@ struct MenuBarView: View {
         }
     }
 
-    // Inline feedback derived from the coordinator — no extra @State needed
-    private var syncFeedback: String? {
+    // Inline feedback derived from the coordinator — no extra @State needed.
+    // `String(localized:)` throughout: these used to be plain literals, which
+    // `Text(String)` renders verbatim, so the banner never localized.
+    private var syncFeedback: (message: String, isFailure: Bool)? {
         switch sync.phase {
-        case .completed(let r): return r.successful ? "Done: \(r.summary)" : "Completed with errors"
-        case .failed(let msg):  return "Failed: \(msg)"
-        default:                return nil
+        case .completed(let r):
+            return r.successful
+                ? (String.localized("Done: %@", r.summary), false)
+                : (String(localized: "Completed with errors"), true)
+        case .failed(let msg):
+            return (String.localized("Failed: %@", msg), true)
+        default:
+            return nil
         }
     }
 
     private var statusLabel: String {
-        if appState.isSyncing { return "Sync in progress…" }
-        guard let date = appState.lastSyncDate else { return "Never synced" }
+        if appState.isSyncing { return String(localized: "Sync in progress…") }
+        guard let date = appState.lastSyncDate else { return String(localized: "Never synced") }
         let f = RelativeDateTimeFormatter()
         f.unitsStyle = .full
-        return "Synced \(f.localizedString(for: date, relativeTo: Date()))"
+        return String.localized("Synced %@", f.localizedString(for: date, relativeTo: Date()))
     }
 
     private var autoSyncIntervalLabel: String {
         let interval = settings.autoSyncInterval
-        if interval < 60 { return "every \(Int(interval))s" }
+        if interval < 60 { return String.localized("every %llds", Int(interval)) }
         let minutes = Int(interval / 60)
-        if minutes < 60 { return "every \(minutes) min" }
+        if minutes < 60 { return String.localized("every %lld min", minutes) }
         let hours = minutes / 60
-        return "every \(hours)h"
+        return String.localized("every %lldh", hours)
     }
 
     private var canSync: Bool {
@@ -75,11 +82,11 @@ struct MenuBarView: View {
             // Sync feedback banner (driven by SyncCoordinator.phase)
             if settings.menuBarShowFeedbackBanner, let feedback = syncFeedback {
                 HStack(spacing: 6) {
-                    Image(systemName: feedback.hasPrefix("Failed") ? AppIcon.statusError : AppIcon.statusSuccess)
+                    Image(systemName: feedback.isFailure ? AppIcon.statusError : AppIcon.statusSuccess)
                         .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(feedback.hasPrefix("Failed") ? Color.appError : Color.appSuccess)
+                        .foregroundStyle(feedback.isFailure ? Color.appError : Color.appSuccess)
                         .font(.caption)
-                    Text(feedback)
+                    Text(feedback.message)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
@@ -140,9 +147,9 @@ struct MenuBarView: View {
                     icon: AppIcon.sourceGoogle,
                     iconColor: .appSourceGoogle,
                     label: oauth.isAuthenticated
-                        ? (oauth.userEmail ?? "Google")
-                        : "Not connected",
-                    caption: "Google Account",
+                        ? (oauth.userEmail ?? String(localized: "Google"))
+                        : String(localized: "Not connected"),
+                    caption: String(localized: "Google Account"),
                     isConnected: oauth.isAuthenticated
                 )
 
@@ -151,8 +158,8 @@ struct MenuBarView: View {
                 accountRow(
                     icon: AppIcon.sourceApple,
                     iconColor: .appSourceApple,
-                    label: settings.macAccountMode.rawValue,
-                    caption: "Mac Contacts",
+                    label: settings.macAccountMode.localizedDisplayName,
+                    caption: String(localized: "Mac Contacts"),
                     isConnected: appState.isMacContactsAuthorized
                 )
             }
@@ -186,7 +193,9 @@ struct MenuBarView: View {
                     }
                 }
                 Spacer()
-                Toggle("", isOn: $settings.autoSyncEnabled)
+                // Real title (hidden visually) so VoiceOver announces
+                // "Auto-sync" rather than an unnamed switch.
+                Toggle("Auto-sync", isOn: $settings.autoSyncEnabled)
                     .toggleStyle(.switch)
                     .labelsHidden()
             }
@@ -271,7 +280,11 @@ struct MenuBarView: View {
                 } else {
                     Image(systemName: "arrow.triangle.2.circlepath")
                 }
-                Text(sync.phase.isActive ? sync.phase.label : "Sync Now")
+                if sync.phase.isActive {
+                    Text(verbatim: sync.phase.label)
+                } else {
+                    Text("Sync Now")
+                }
             }
             .frame(maxWidth: .infinity)
         }
@@ -321,7 +334,9 @@ struct MenuBarView: View {
         .accessibilityValue(isConnected ? "Connected" : "Not connected")
     }
 
-    private func menuLink(icon: String, title: String, action: @escaping () -> Void) -> some View {
+    // `LocalizedStringKey`, not `String`: `Text(String)` renders verbatim, so
+    // these titles ignored their existing catalog translations.
+    private func menuLink(icon: String, title: LocalizedStringKey, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label {
                 Text(title)
@@ -333,9 +348,22 @@ struct MenuBarView: View {
         }
         .buttonStyle(.appRow)
         .padding(.horizontal, 8)
-        .accessibilityHint("Opens \(title.lowercased()).")
     }
 
+}
+
+// MARK: - Localized display names
+
+extension MacAccountMode {
+    /// User-facing name. The rawValue is a persistence token and must not be
+    /// shown: `Text(rawValue)` renders the English text verbatim in every locale.
+    var localizedDisplayName: String {
+        switch self {
+        case .auto:     return String(localized: "Auto (Recommended)")
+        case .all:      return String(localized: "All Accounts")
+        case .specific: return String(localized: "Specific Account")
+        }
+    }
 }
 // MenuBarView sync action delegated entirely to SyncCoordinator.shared — see syncNowButton.
 

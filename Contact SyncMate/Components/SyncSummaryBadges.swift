@@ -14,11 +14,13 @@ struct SyncSummaryBadges: View {
     let conflicts: Int
 
     var body: some View {
+        // `String(localized:)` because the labels travel through a `String`
+        // parameter — `Text(String)` renders verbatim and skips the catalog.
         HStack(spacing: 12) {
-            badge(icon: AppIcon.added,    count: added,     color: .appSuccess, label: "Added")
-            badge(icon: AppIcon.updated,  count: updated,   color: .appInfo,    label: "Updated")
-            badge(icon: AppIcon.deleted,  count: deleted,   color: .appError,   label: "Deleted")
-            badge(icon: AppIcon.conflict, count: conflicts, color: .appWarning, label: "Conflicts")
+            badge(icon: AppIcon.added,    count: added,     color: .appSuccess, label: String(localized: "Added"))
+            badge(icon: AppIcon.updated,  count: updated,   color: .appInfo,    label: String(localized: "Updated"))
+            badge(icon: AppIcon.deleted,  count: deleted,   color: .appError,   label: String(localized: "Deleted"))
+            badge(icon: AppIcon.conflict, count: conflicts, color: .appWarning, label: String(localized: "Conflicts"))
         }
     }
 

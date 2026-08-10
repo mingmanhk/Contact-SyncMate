@@ -47,21 +47,15 @@ nonisolated enum SyncErrorExplanation {
                 // (unified) contact, or a contact living in an account macOS
                 // exposes read-only — commonly the Google CardDAV mirror, which
                 // is why it clusters on contacts that exist on both sides.
-                return "macOS refused to save this contact. It usually means the "
-                     + "record is read-only or linked to another account — check "
-                     + "whether it lives in a Google or Exchange account inside "
-                     + "the Contacts app rather than On My Mac."
+                return NSLocalizedString("macOS refused to save this contact. It usually means the record is read-only or linked to another account — check whether it lives in a Google or Exchange account inside the Contacts app rather than On My Mac.", comment: "")
             case 134030:
-                return "The save was rolled back. Another app may have changed "
-                     + "this contact at the same time."
+                return NSLocalizedString("The save was rolled back. Another app may have changed this contact at the same time.", comment: "")
             case 134060:
-                let base = "The contact failed validation — a field is longer or "
-                         + "differently shaped than Contacts allows."
+                let base = NSLocalizedString("The contact failed validation — a field is longer or differently shaped than Contacts allows.", comment: "")
                 guard let fields = offendingFields(in: ns) else { return base }
-                return base + " Failing field: \(fields)."
+                return base + " " + String(format: NSLocalizedString("Failing field: %@.", comment: ""), fields)
             case 4, 260:
-                return "The contact no longer exists. It was probably deleted "
-                     + "after this sync was planned."
+                return NSLocalizedString("The contact no longer exists. It was probably deleted after this sync was planned.", comment: "")
             default:
                 return nil
             }
@@ -70,14 +64,13 @@ nonisolated enum SyncErrorExplanation {
         if ns.domain == CNErrorDomain {
             switch CNError.Code(rawValue: ns.code) {
             case .authorizationDenied:
-                return "Contacts access is turned off. Grant it in System "
-                     + "Settings → Privacy & Security → Contacts."
+                return NSLocalizedString("Contacts access is turned off. Grant it in System Settings → Privacy & Security → Contacts.", comment: "")
             case .recordDoesNotExist:
-                return "The contact no longer exists on this Mac."
+                return NSLocalizedString("The contact no longer exists on this Mac.", comment: "")
             case .insertedRecordAlreadyExists:
-                return "A contact with this identifier already exists."
+                return NSLocalizedString("A contact with this identifier already exists.", comment: "")
             case .containmentCycle, .containmentScope:
-                return "The contact cannot be saved into that account."
+                return NSLocalizedString("The contact cannot be saved into that account.", comment: "")
             // `validationConfigurationError`, not `validationConfiguration` —
             // and there is no `validationUnsupportedField` case at all.
             case .validationConfigurationError, .validationMultipleErrors,
@@ -85,9 +78,9 @@ nonisolated enum SyncErrorExplanation {
                 // Three distinct codes share one sentence because the code
                 // alone never says which field failed — but the userInfo often
                 // does, and that is the part the user can actually act on.
-                let base = "Contacts rejected one of the fields on this contact."
+                let base = NSLocalizedString("Contacts rejected one of the fields on this contact.", comment: "")
                 guard let fields = offendingFields(in: ns) else { return base }
-                return base + " Failing field: \(fields)."
+                return base + " " + String(format: NSLocalizedString("Failing field: %@.", comment: ""), fields)
             default:
                 return nil
             }

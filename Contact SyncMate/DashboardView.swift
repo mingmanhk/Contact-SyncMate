@@ -169,7 +169,7 @@ struct DashboardView: View {
                         icon: r.successful
                             ? "checkmark.circle.fill"
                             : "exclamationmark.triangle.fill",
-                        color: r.successful ? .green : .orange,
+                        color: r.successful ? .appSuccess : .appWarning,
                         title: r.successful ? "Sync Completed" : "Sync Completed with Errors",
                         detail: r.summary
                     )
@@ -224,6 +224,7 @@ struct DashboardView: View {
                     .font(.body)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Open Preferences")
             .help("Open Preferences")
         }
         .padding(.horizontal, 24)
@@ -306,11 +307,11 @@ struct DashboardView: View {
         HStack(spacing: 16) {
             accountCard(
                 icon: "person.crop.circle.fill",
-                iconColor: .red,
-                title: "Google Account",
+                iconColor: .appSourceGoogle,
+                title: String(localized: "Google Account"),
                 detail: oauth.isAuthenticated
-                    ? (oauth.userEmail ?? "Connected")
-                    : "Not connected",
+                    ? (oauth.userEmail ?? String(localized: "Connected"))
+                    : String(localized: "Not connected"),
                 isConnected: oauth.isAuthenticated
             )
             // Re-consenting is the fix for a permission that was not granted,
@@ -329,11 +330,11 @@ struct DashboardView: View {
 
             accountCard(
                 icon: "desktopcomputer",
-                iconColor: .blue,
-                title: "Mac Contacts",
+                iconColor: .appSourceApple,
+                title: String(localized: "Mac Contacts"),
                 detail: CNContactStore.authorizationStatus(for: .contacts) == .authorized
-                    ? settings.macAccountMode.rawValue
-                    : "No access",
+                    ? settings.macAccountMode.localizedDisplayName
+                    : String(localized: "No access"),
                 isConnected: CNContactStore.authorizationStatus(for: .contacts) == .authorized
             )
         }
@@ -455,7 +456,7 @@ struct DashboardView: View {
             if case .completed(let r) = sync.phase {
                 Label(r.summary, systemImage: r.successful ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                     .font(.caption)
-                    .foregroundStyle(r.successful ? .green : .orange)
+                    .foregroundStyle(r.successful ? Color.appSuccess : Color.appWarning)
                     .transition(.opacity)
             }
         }
@@ -464,8 +465,8 @@ struct DashboardView: View {
 
     private var buttonTint: Color {
         switch sync.phase {
-        case .failed:       return .red
-        case .completed(let r): return r.successful ? .green : .orange
+        case .failed:       return .appError
+        case .completed(let r): return r.successful ? .appSuccess : .appWarning
         default:            return .accentColor
         }
     }
@@ -497,6 +498,7 @@ struct DashboardView: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Close")
         }
         .padding(12)
         .background(banner.color.opacity(0.06))
@@ -530,6 +532,7 @@ struct DashboardView: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Close")
         }
         .padding(12)
         .background(Color.appError.opacity(0.10))
@@ -796,7 +799,7 @@ struct DashboardView: View {
 
     private func eventIcon(for action: String) -> (name: String, color: Color) {
         if action.contains("error") || action.contains("Error") {
-            return ("xmark.circle.fill", .red)
+            return ("xmark.circle.fill", .appError)
         }
         switch action {
         case "sync.complete":         return (AppIcon.statusSuccess, .appSuccess)

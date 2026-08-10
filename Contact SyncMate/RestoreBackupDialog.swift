@@ -113,19 +113,19 @@ struct RestoreBackupConfirmationView: View {
                                 .fontWeight(.semibold)
 
                             VStack(alignment: .leading, spacing: 10) {
-                                InfoRow(label: "Type", value: backup.type.rawValue)
+                                InfoRow(label: String(localized: "Type"), value: backup.type.localizedDisplayName)
 
                                 InfoRow(
-                                    label: "Created",
+                                    label: String(localized: "Created"),
                                     value: backup.timestamp.formatted(date: .abbreviated, time: .standard)
                                 )
 
-                                InfoRow(label: "Google Contacts", value: "\(backup.googleContactsCount)")
+                                InfoRow(label: String(localized: "Google Contacts"), value: "\(backup.googleContactsCount)")
 
-                                InfoRow(label: "Mac Contacts", value: "\(backup.macContactsCount)")
+                                InfoRow(label: String(localized: "Mac Contacts"), value: "\(backup.macContactsCount)")
 
                                 InfoRow(
-                                    label: "Total Contacts",
+                                    label: String(localized: "Total Contacts"),
                                     value: "\(backup.contactVersions.count)"
                                 )
 
@@ -171,13 +171,13 @@ struct RestoreBackupConfirmationView: View {
                                 .fontWeight(.semibold)
 
                             VStack(alignment: .leading, spacing: 8) {
-                                StepRow(number: 1, text: "A new backup of current contacts will be created")
+                                StepRow(number: 1, text: String(localized: "A new backup of current contacts will be created"))
 
-                                StepRow(number: 2, text: "All contacts will be updated to match this backup")
+                                StepRow(number: 2, text: String(localized: "All contacts will be updated to match this backup"))
 
-                                StepRow(number: 3, text: "Sync history will record this restoration")
+                                StepRow(number: 3, text: String(localized: "Sync history will record this restoration"))
 
-                                StepRow(number: 4, text: "You can undo by restoring to another backup")
+                                StepRow(number: 4, text: String(localized: "You can undo by restoring to another backup"))
                             }
                         }
                     }
@@ -298,11 +298,11 @@ struct BackupDetailsView: View {
                             .font(.headline)
 
                         VStack(spacing: 8) {
-                            DetailRow(label: "ID", value: backup.id)
-                            DetailRow(label: "Type", value: backup.type.rawValue)
-                            DetailRow(label: "Created", value: backup.timestamp.formatted(date: .abbreviated, time: .standard))
-                            DetailRow(label: "Google Contacts", value: "\(backup.googleContactsCount)")
-                            DetailRow(label: "Mac Contacts", value: "\(backup.macContactsCount)")
+                            DetailRow(label: String(localized: "ID"), value: backup.id)
+                            DetailRow(label: String(localized: "Type"), value: backup.type.localizedDisplayName)
+                            DetailRow(label: String(localized: "Created"), value: backup.timestamp.formatted(date: .abbreviated, time: .standard))
+                            DetailRow(label: String(localized: "Google Contacts"), value: "\(backup.googleContactsCount)")
+                            DetailRow(label: String(localized: "Mac Contacts"), value: "\(backup.macContactsCount)")
                         }
                     }
 
@@ -334,7 +334,7 @@ struct BackupDetailsView: View {
                                             .fontWeight(.semibold)
                                             .lineLimit(1)
 
-                                        Text(version.source.rawValue)
+                                        Text(version.source.localizedDisplayName)
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
                                     }
@@ -369,9 +369,9 @@ struct BackupDetailsView: View {
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
 
-                            DetailRow(label: "Direction", value: syncDirection)
+                            DetailRow(label: String(localized: "Direction"), value: syncDirection)
                             if let mode = backup.metadata.syncMode {
-                                DetailRow(label: "Mode", value: mode)
+                                DetailRow(label: String(localized: "Mode"), value: mode)
                             }
                         }
                     }
@@ -410,6 +410,31 @@ struct DetailRow: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(label): \(value)")
+    }
+}
+
+// MARK: - Localized display names
+
+extension BackupSession.BackupType {
+    /// User-facing name. The rawValue is a persistence token ("preSyncBackup")
+    /// and must never be shown.
+    var localizedDisplayName: String {
+        switch self {
+        case .preSyncBackup:  return String(localized: "Pre-sync backup")
+        case .postSyncBackup: return String(localized: "Post-sync backup")
+        case .manualBackup:   return String(localized: "Manual backup")
+        case .autoBackup:     return String(localized: "Automatic backup")
+        }
+    }
+}
+
+extension ContactVersion.ContactSource {
+    var localizedDisplayName: String {
+        switch self {
+        case .google: return String(localized: "Google")
+        case .mac:    return String(localized: "Mac")
+        case .merged: return String(localized: "Merged")
+        }
     }
 }
 

@@ -23,6 +23,30 @@ private enum ChangeFilter: String, CaseIterable {
         case .conflict: return .merge
         }
     }
+
+    /// Chip title. The rawValue stays an identifier; `Text(rawValue)` would
+    /// ship the English word in every locale.
+    var localizedTitle: String {
+        switch self {
+        case .all:      return String(localized: "All")
+        case .add:      return String(localized: "Add")
+        case .update:   return String(localized: "Edit")
+        case .delete:   return String(localized: "Delete")
+        case .conflict: return String(localized: "Conflict")
+        }
+    }
+
+    /// Empty-list message per filter. Written out per case instead of
+    /// interpolating a lowercased rawValue, which no translator can reorder.
+    var emptyStateText: String {
+        switch self {
+        case .all:      return String(localized: "All changes skipped")
+        case .add:      return String(localized: "No additions pending")
+        case .update:   return String(localized: "No edits pending")
+        case .delete:   return String(localized: "No deletions pending")
+        case .conflict: return String(localized: "No conflicts pending")
+        }
+    }
 }
 
 // MARK: - Sync Preview View
@@ -105,7 +129,9 @@ struct SyncPreviewView: View {
                     Text("Sync Preview")
                         .font(.title2)
                         .fontWeight(.semibold)
-                    Text("\(pendingCount) change\(pendingCount == 1 ? "" : "s") pending")
+                    // Catalog plural rule ("%lld changes pending"), not a
+                    // hand-rolled English "s".
+                    Text("\(pendingCount) changes pending")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -137,7 +163,7 @@ struct SyncPreviewView: View {
                     ForEach(ChangeFilter.allCases, id: \.self) { filter in
                         let n = count(for: filter)
                         FilterChip(
-                            title: filter.rawValue,
+                            title: filter.localizedTitle,
                             count: filter == .all ? nil : n,
                             isSelected: activeFilter == filter,
                             isDisabled: n == 0 && filter != .all
@@ -159,7 +185,7 @@ struct SyncPreviewView: View {
                     Image(systemName: activeFilter == .all ? "checkmark.circle" : "line.3.horizontal.decrease.circle")
                         .font(.largeTitle)
                         .foregroundStyle(.tertiary)
-                    Text(activeFilter == .all ? "All changes skipped" : "No \(activeFilter.rawValue.lowercased()) changes")
+                    Text(activeFilter.emptyStateText)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     if activeFilter != .all {
@@ -191,7 +217,7 @@ struct SyncPreviewView: View {
                         Image(systemName: AppIcon.statusWarning)
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(Color.appWarning)
-                        Text("\(conflictCount) conflict\(conflictCount == 1 ? "" : "s") need review — tap Details on each highlighted row.")
+                        Text("\(conflictCount) conflicts need review — tap Details on each highlighted row.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
@@ -217,10 +243,11 @@ struct SyncPreviewView: View {
                         onApply?(reviewedSession())
                         isPresented = false
                     } label: {
-                        Label(
-                            pendingCount == 0 ? "Nothing to Apply" : "Apply \(pendingCount) Change\(pendingCount == 1 ? "" : "s")",
-                            systemImage: "checkmark"
-                        )
+                        if pendingCount == 0 {
+                            Label("Nothing to Apply", systemImage: "checkmark")
+                        } else {
+                            Label("Apply \(pendingCount) Changes", systemImage: "checkmark")
+                        }
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Color.accentColor)

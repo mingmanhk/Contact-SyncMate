@@ -127,27 +127,27 @@ struct SyncHistoryView: View {
         return events.reversed()
     }
 
+    /// Grouped by calendar day and sorted by *date*, formatted only for
+    /// display. The old version keyed groups on the formatted string and
+    /// sorted those strings, which scrambles across month boundaries ("Feb"
+    /// before "Jan") and completely in locales like zh ("2026年8月9日").
     private var groupedEvents: [(String, [SyncEvent])] {
         let cal = Calendar.current
-        let grouped = Dictionary(grouping: filteredEvents) { event -> String in
-            if cal.isDateInToday(event.timestamp)     { return "Today" }
-            if cal.isDateInYesterday(event.timestamp) { return "Yesterday" }
-            let f = DateFormatter()
-            f.dateStyle = .medium
-            return f.string(from: event.timestamp)
+        let grouped = Dictionary(grouping: filteredEvents) { event in
+            cal.startOfDay(for: event.timestamp)
         }
-        // Sort groups: Today first, Yesterday second, rest by date descending
-        let order = ["Today", "Yesterday"]
-        let sorted = grouped.keys.sorted { a, b in
-            let ia = order.firstIndex(of: a) ?? Int.max
-            let ib = order.firstIndex(of: b) ?? Int.max
-            if ia != ib { return ia < ib }
-            return a > b // date strings sort descending
+        return grouped.keys.sorted(by: >).map { day in
+            (dayLabel(for: day), grouped[day] ?? [])
         }
-        return sorted.compactMap { key in
-            guard let events = grouped[key] else { return nil }
-            return (key, events)
-        }
+    }
+
+    /// Display label for a day group, localized ("Today"/"Yesterday" were raw
+    /// English strings before).
+    private func dayLabel(for day: Date) -> String {
+        let cal = Calendar.current
+        if cal.isDateInToday(day)     { return String(localized: "Today") }
+        if cal.isDateInYesterday(day) { return String(localized: "Yesterday") }
+        return day.formatted(date: .abbreviated, time: .omitted)
     }
 
     var body: some View {
@@ -357,16 +357,16 @@ struct SyncHistoryView: View {
 
     private func eventColor(_ event: SyncEvent) -> Color {
         let a = event.action
-        if a.contains("error") || a.contains("Error") { return .red }
-        if a.contains("warn")  || a.contains("Warn")  { return .orange }
+        if a.contains("error") || a.contains("Error") { return .appError }
+        if a.contains("warn")  || a.contains("Warn")  { return .appWarning }
         switch a {
-        case "sync.complete":          return .green
+        case "sync.complete":          return .appSuccess
         case "sync.start", "scanForDuplicates.start": return Color.accentColor
-        case "add":                    return .green
-        case "update":                 return .blue
-        case "delete":                 return .red
-        case "merge.deferred":         return .orange
-        case "autoMerge", "userMerge": return .purple
+        case "add":                    return .appSuccess
+        case "update":                 return .appInfo
+        case "delete":                 return .appError
+        case "merge.deferred":         return .appWarning
+        case "autoMerge", "userMerge": return .appBrand
         default:                       return .secondary
         }
     }

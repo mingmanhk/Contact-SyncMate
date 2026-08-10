@@ -1,0 +1,29 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "NSContactsUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact SyncMate needs access to your contacts so it can synchronise them with your Google Contacts. Contact data is exchanged only with Google — and with Anthropic's AI duplicate matching only if you explicitly enable that in Settings."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact SyncMate 需要访问您的通讯录，以便与您的 Google 通讯录同步。联系人数据仅与 Google 交换——只有在您于设置中明确启用 Anthropic 的 AI 重复项匹配后，才会与其交换数据。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact SyncMate 需要取用您的聯絡人，以便與您的 Google 聯絡人同步。聯絡人資料僅與 Google 交換——只有在您於設定中明確啟用 Anthropic 的 AI 重複項比對後，才會與其交換資料。"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

@@ -173,6 +173,19 @@ struct DuplicateGroupCard: View {
     let onSelect: () -> Void
     
     var body: some View {
+        // A real Button rather than `.onTapGesture`: selection is now
+        // reachable via Tab / Full Keyboard Access and announced as a button
+        // by VoiceOver. Inner controls (decision buttons, toggle) keep
+        // handling their own clicks.
+        Button(action: onSelect) {
+            cardContent
+        }
+        .buttonStyle(.appRow)
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var cardContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Header with score and type
             HStack(alignment: .top) {
@@ -188,9 +201,9 @@ struct DuplicateGroupCard: View {
                         if let source = group.aiSourceLabel {
                             HStack(spacing: 3) {
                                 Image(systemName: "sparkles")
-                                    .font(.system(size: 9))
+                                    .font(.caption2)
                                 Text(source)
-                                    .font(.system(size: 10, weight: .medium))
+                                    .font(.caption2.weight(.medium))
                             }
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -210,7 +223,7 @@ struct DuplicateGroupCard: View {
                         HStack(spacing: 4) {
                             Image(systemName: aiScore > group.matchScore ? "arrow.up.circle.fill" : "arrow.down.circle.fill")
                                 .font(.caption2)
-                                .foregroundStyle(aiScore > group.matchScore ? .green : .orange)
+                                .foregroundStyle(aiScore > group.matchScore ? Color.appSuccess : Color.appWarning)
                             Text("AI adjusted score: \(group.matchScore) → \(aiScore)")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
@@ -232,9 +245,9 @@ struct DuplicateGroupCard: View {
                        group.userDecision == nil {
                         HStack(spacing: 3) {
                             Image(systemName: "lightbulb.fill")
-                                .font(.system(size: 9))
+                                .font(.caption2)
                             Text("AI: \(aiAction.aiLabel)")
-                                .font(.system(size: 10, weight: .medium))
+                                .font(.caption2.weight(.medium))
                         }
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
@@ -277,13 +290,13 @@ struct DuplicateGroupCard: View {
                                 HStack(spacing: 4) {
                                     ForEach(ai.matchSignals) { signal in
                                         Text(signal.label)
-                                            .font(.system(size: 10))
+                                            .font(.caption2)
                                             .padding(.horizontal, 6)
                                             .padding(.vertical, 2)
                                             .background(
                                                 (signal.isPositive ? Color.appSuccess : Color.appWarning).opacity(0.12)
                                             )
-                                            .foregroundStyle(signal.isPositive ? .green : .orange)
+                                            .foregroundStyle(signal.isPositive ? Color.appSuccess : Color.appWarning)
                                             .clipShape(Capsule())
                                     }
                                 }
@@ -344,9 +357,6 @@ struct DuplicateGroupCard: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
         )
-        .onTapGesture {
-            onSelect()
-        }
     }
     
     private var scoreIndicator: some View {
@@ -376,16 +386,16 @@ struct DuplicateGroupCard: View {
     
     private var scoreColor: Color {
         let score = group.effectiveScore
-        if score >= 80 { return .green }
-        if score >= 50 { return .orange }
-        return .red
+        if score >= 80 { return .appSuccess }
+        if score >= 50 { return .appWarning }
+        return .appError
     }
 
     private func aiActionColor(_ action: DuplicateDecision) -> Color {
         switch action {
-        case .merge:        return .green
-        case .keepSeparate: return .orange
-        case .skip:         return .gray
+        case .merge:        return .appSuccess
+        case .keepSeparate: return .appWarning
+        case .skip:         return .secondary
         }
     }
 }
@@ -398,7 +408,7 @@ struct ContactCandidateRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: candidate.source == .google ? "g.circle.fill" : "desktopcomputer")
-                .foregroundStyle(candidate.source == .google ? .blue : .gray)
+                .foregroundStyle(candidate.source == .google ? Color.appSourceGoogle : Color.appSourceApple)
                 .font(.title3)
             
             VStack(alignment: .leading, spacing: 2) {
@@ -459,9 +469,9 @@ struct DecisionButton: View {
     
     private var buttonColor: Color {
         switch decision {
-        case .merge: return .green
-        case .keepSeparate: return .orange
-        case .skip: return .gray
+        case .merge: return .appSuccess
+        case .keepSeparate: return .appWarning
+        case .skip: return .secondary
         }
     }
 }
@@ -582,7 +592,7 @@ struct MergeChangeRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: change.isConflict ? "exclamationmark.circle.fill" : "arrow.right.circle")
-                .foregroundStyle(change.isConflict ? .orange : .blue)
+                .foregroundStyle(change.isConflict ? Color.appWarning : Color.appInfo)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(change.fieldName)

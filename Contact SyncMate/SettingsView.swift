@@ -2111,6 +2111,7 @@ struct BackupAndRecoverySettingsView: View {
                                     .font(.caption)
                             }
                             .buttonStyle(.borderless)
+                            .accessibilityLabel("Reveal in Finder")
                             .help("Reveal in Finder")
                         }
                     }
@@ -2130,6 +2131,7 @@ struct BackupAndRecoverySettingsView: View {
                             .font(.caption)
                     }
                     .buttonStyle(.borderless)
+                    .accessibilityLabel("Refresh backup files")
                 }
             }
 
@@ -2275,31 +2277,37 @@ private struct SelectableRow: View {
     let action: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            AdaptiveIcon(
-                systemName: icon,
-                color: isSelected ? Palette.accent : Palette.secondaryText,
-                size: 15
-            )
-            .padding(.top, 2)
+        // A real Button, not `.onTapGesture`: tap gestures are invisible to
+        // Tab / Full Keyboard Access and VoiceOver never announces them as
+        // activatable. `.appRow` keeps the row look while adding hover,
+        // pressed, and focus affordances.
+        Button(action: action) {
+            HStack(alignment: .top, spacing: 10) {
+                AdaptiveIcon(
+                    systemName: icon,
+                    color: isSelected ? Palette.accent : Palette.secondaryText,
+                    size: 15
+                )
+                .padding(.top, 2)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).fontWeight(.medium)
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(Palette.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).fontWeight(.medium)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(Palette.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 8)
+
+                if isSelected {
+                    AdaptiveIcon(systemName: "checkmark.circle.fill", color: Palette.accent, size: 16)
+                }
             }
-
-            Spacer(minLength: 8)
-
-            if isSelected {
-                AdaptiveIcon(systemName: "checkmark.circle.fill", color: Palette.accent, size: 16)
-            }
+            .padding(.vertical, 2)
         }
-        .padding(.vertical, 2)
-        .contentShape(Rectangle())
-        .onTapGesture(perform: action)
+        .buttonStyle(.appRow)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
