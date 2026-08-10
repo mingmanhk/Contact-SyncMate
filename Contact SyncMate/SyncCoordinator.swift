@@ -267,7 +267,7 @@ final class SyncCoordinator: ObservableObject {
 
         } catch {
             progressCancellable?.cancel()
-            let friendly = friendlyMessage(for: error)
+            let friendly = Self.friendlyMessage(for: error)
             setFailed(friendly)
             appState?.isSyncing  = false
             appState?.syncProgress = nil
@@ -352,7 +352,7 @@ final class SyncCoordinator: ObservableObject {
 
         } catch {
             progressCancellable?.cancel()
-            let friendly = friendlyMessage(for: error)
+            let friendly = Self.friendlyMessage(for: error)
             setFailed(friendly)
             appState?.isSyncing = false
             appState?.syncProgress = nil
@@ -432,7 +432,9 @@ final class SyncCoordinator: ObservableObject {
 
     // MARK: - Friendly error messages
 
-    func friendlyMessage(for error: Error) -> String {
+    // `nonisolated static`: pure error-to-text mapping with no coordinator
+    // state, callable from tests and any isolation context.
+    nonisolated static func friendlyMessage(for error: Error) -> String {
         if let syncError = error as? SyncEngineError {
             switch syncError {
             case .syncAlreadyInProgress:
@@ -479,18 +481,28 @@ final class SyncCoordinator: ObservableObject {
             }
         }
 
-        if nsError.domain == "com.google.HTTPStatus" {
-            switch nsError.code {
+        // The connector throws GoogleContactsError.apiError — there is no
+        // "com.google.HTTPStatus" NSError domain anywhere in this app, so the
+        // branch that used to match on it was dead code and every 401/429/5xx
+        // fell through to the raw description.
+        if case let GoogleContactsError.apiError(statusCode, _) = error {
+            switch statusCode {
             case 401:
                 return "Google session expired. Sign in again via Settings → Accounts."
             case 403:
-                return "Permission denied by Google. Check your account permissions."
+                // errorDescription already leads with the specific 403
+                // diagnosis (API disabled / missing scope / test-user) —
+                // fall through and keep it.
+                break
             case 429:
                 return "Google API rate limit reached. Try again in a few minutes."
             case 500...599:
                 return "Google's servers returned an error. Try again later."
             default: break
             }
+        }
+        if case GoogleContactsError.invalidToken = error {
+            return "Google session expired. Sign in again via Settings → Accounts."
         }
 
         return error.localizedDescription

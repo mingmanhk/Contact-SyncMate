@@ -740,7 +740,7 @@ struct DashboardView: View {
     // MARK: - Error Handling (used only by the manual-preview path)
 
     private func handleSyncError(_ error: Error) {
-        let friendly = SyncCoordinator.shared.friendlyMessage(for: error)
+        let friendly = SyncCoordinator.friendlyMessage(for: error)
         withAnimation { syncErrorMessage = friendly }
         SyncHistory.shared.log(source: "Dashboard", action: "sync.error",
                                details: "\(friendly) — \(error.localizedDescription)")

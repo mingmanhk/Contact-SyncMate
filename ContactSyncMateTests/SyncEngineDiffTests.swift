@@ -895,3 +895,39 @@ final class ApplyToMacClearingTests: XCTestCase {
         XCTAssertNotNil(mac.imageData)
     }
 }
+
+// MARK: - D-04 regression: Google HTTP statuses map to actionable messages (github issue #4)
+
+final class GoogleErrorMessageTests: XCTestCase {
+
+    private func message(forStatus code: Int, body: String = "x") -> String {
+        SyncCoordinator.friendlyMessage(
+            for: GoogleContactsError.apiError(statusCode: code, message: body))
+    }
+
+    func test_401_promptsSignIn() {
+        XCTAssertTrue(message(forStatus: 401).contains("Sign in again"),
+                      "an expired session must tell the user the one action that fixes it")
+    }
+
+    func test_429_namesTheRateLimit() {
+        XCTAssertTrue(message(forStatus: 429).contains("rate limit"))
+    }
+
+    func test_5xx_blamesGoogleNotTheUser() {
+        XCTAssertTrue(message(forStatus: 500).contains("Google's servers"))
+        XCTAssertTrue(message(forStatus: 503).contains("Google's servers"))
+    }
+
+    func test_403_keepsTheSpecificDiagnosis() {
+        // 403s carry their own diagnosis in errorDescription (API disabled /
+        // missing scope / test user) — friendlyMessage must not flatten it.
+        let msg = message(forStatus: 403, body: "SERVICE_DISABLED for project")
+        XCTAssertTrue(msg.contains("People API"))
+    }
+
+    func test_invalidToken_promptsSignIn() {
+        let msg = SyncCoordinator.friendlyMessage(for: GoogleContactsError.invalidToken)
+        XCTAssertTrue(msg.contains("Sign in again"))
+    }
+}
