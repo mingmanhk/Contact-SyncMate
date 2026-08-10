@@ -1,6 +1,30 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "CFBundleDisplayName" : {
+      "comment" : "Bundle display name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Contact SyncMate"
+          }
+        }
+      }
+    },
+    "CFBundleName" : {
+      "comment" : "Bundle name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Contact SyncMate"
+          }
+        }
+      }
+    },
     "NSContactsUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -20,6 +44,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Contact SyncMate 需要取用您的聯絡人，以便與您的 Google 聯絡人同步。聯絡人資料僅與 Google 交換——只有在您於設定中明確啟用 Anthropic 的 AI 重複項比對後，才會與其交換資料。"
+          }
+        }
+      }
+    },
+    "NSHumanReadableCopyright" : {
+      "comment" : "Copyright (human-readable)",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Copyright © 2026 Victor Lam. All rights reserved."
           }
         }
       }

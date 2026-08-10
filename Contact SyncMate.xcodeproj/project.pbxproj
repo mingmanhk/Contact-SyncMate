@@ -412,7 +412,7 @@
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Contact SyncMate/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "Conact SyncMate";
+				INFOPLIST_KEY_CFBundleDisplayName = "Contact SyncMate";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
@@ -459,7 +459,7 @@
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Contact SyncMate/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "Conact SyncMate";
+				INFOPLIST_KEY_CFBundleDisplayName = "Contact SyncMate";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;

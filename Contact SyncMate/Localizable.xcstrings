@@ -1,7 +1,22 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "" : {},
+    "·" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "·"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "·"
+          }
+        }
+      }
+    },
     "%@ %lld" : {
       "localizations" : {
         "en" : {
@@ -24,23 +39,6 @@
         }
       }
     },
-    "%@ was restored to version %lld." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ 已还原至版本 %2$lld。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ 已還原至版本 %2$lld。"
-          }
-        }
-      }
-    },
     "%@ • %@" : {
       "localizations" : {
         "en" : {
@@ -59,6 +57,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ • %2$@"
+          }
+        }
+      }
+    },
+    "%@ was restored to version %lld." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 已还原至版本 %2$lld。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 已還原至版本 %2$lld。"
           }
         }
       }
@@ -125,38 +140,6 @@
         }
       }
     },
-    "%lld Google" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Google %lld 笔"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Google %lld 筆"
-          }
-        }
-      }
-    },
-    "%lld Mac" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mac %lld 笔"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mac %lld 筆"
-          }
-        }
-      }
-    },
     "%lld account%@ available" : {
       "localizations" : {
         "en" : {
@@ -196,6 +179,7 @@
       }
     },
     "%lld change%@ pending" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -274,6 +258,7 @@
       }
     },
     "%lld conflict%@ need review — tap Details on each highlighted row." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -384,6 +369,22 @@
         }
       }
     },
+    "%lld Google" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Google %lld 笔"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Google %lld 筆"
+          }
+        }
+      }
+    },
     "%lld group%@ found" : {
       "localizations" : {
         "en" : {
@@ -402,6 +403,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "找到 %1$lld 個群組%2$@"
+          }
+        }
+      }
+    },
+    "%lld Mac" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac %lld 笔"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac %lld 筆"
           }
         }
       }
@@ -560,6 +577,39 @@
         }
       }
     },
+    "•" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "•"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "•"
+          }
+        }
+      }
+    },
+    "• %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• %@"
+          }
+        }
+      }
+    },
     "+ %lld more" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -589,22 +639,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "+%lld"
-          }
-        }
-      }
-    },
-    "14 days" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "14 天"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "14 天"
           }
         }
       }
@@ -641,22 +675,6 @@
         }
       }
     },
-    "30 days" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "30 天"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "30 天"
-          }
-        }
-      }
-    },
     "7 days" : {
       "localizations" : {
         "zh-Hans" : {
@@ -669,6 +687,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "7 天"
+          }
+        }
+      }
+    },
+    "14 days" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "14 天"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "14 天"
+          }
+        }
+      }
+    },
+    "30 days" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 天"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 天"
           }
         }
       }
@@ -706,6 +756,7 @@
       }
     },
     "A new backup of current contacts will be created" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -750,108 +801,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已有同步作業正在進行。"
-          }
-        }
-      }
-    },
-    "AI Analysis" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI 分析"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI 分析"
-          }
-        }
-      }
-    },
-    "AI Matching" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI 配对"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI 配對"
-          }
-        }
-      }
-    },
-    "AI Score" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI 评分"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI 評分"
-          }
-        }
-      }
-    },
-    "AI adjusted score: %lld → %lld" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "AI adjusted score: %1$lld → %2$lld"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI 调整后评分：%1$lld → %2$lld"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI 調整後評分：%1$lld → %2$lld"
-          }
-        }
-      }
-    },
-    "AI-Powered Matching" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI 智慧配对"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI 智慧配對"
-          }
-        }
-      }
-    },
-    "AI: %@" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI：%@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI：%@"
           }
         }
       }
@@ -937,6 +886,7 @@
       }
     },
     "Add" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -953,6 +903,7 @@
       }
     },
     "Added" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -984,6 +935,108 @@
         }
       }
     },
+    "AI adjusted score: %lld → %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "AI adjusted score: %1$lld → %2$lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 调整后评分：%1$lld → %2$lld"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 調整後評分：%1$lld → %2$lld"
+          }
+        }
+      }
+    },
+    "AI Analysis" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 分析"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 分析"
+          }
+        }
+      }
+    },
+    "AI Matching" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 配对"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 配對"
+          }
+        }
+      }
+    },
+    "AI Score" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 评分"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 評分"
+          }
+        }
+      }
+    },
+    "AI-Powered Matching" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 智慧配对"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 智慧配對"
+          }
+        }
+      }
+    },
+    "AI: %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI：%@"
+          }
+        }
+      }
+    },
     "All" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1002,6 +1055,7 @@
       }
     },
     "All Accounts" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1018,6 +1072,7 @@
       }
     },
     "All changes skipped" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1050,6 +1105,7 @@
       }
     },
     "All contacts will be updated to match this backup" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1147,6 +1203,22 @@
         }
       }
     },
+    "and %lld more…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还有 %lld 项…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "還有 %lld 項…"
+          }
+        }
+      }
+    },
     "Anthropic API Key" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1196,6 +1268,7 @@
       }
     },
     "Apply %lld Change%@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1251,6 +1324,22 @@
         }
       }
     },
+    "Apply a consistent casing convention to names as they are written" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写入姓名时套用一致的大小写惯例"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "寫入姓名時套用一致的大小寫慣例"
+          }
+        }
+      }
+    },
     "Apply Changes Directly" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1300,22 +1389,6 @@
         }
       }
     },
-    "Apply a consistent casing convention to names as they are written" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "写入姓名时套用一致的大小写惯例"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "寫入姓名時套用一致的大小寫慣例"
-          }
-        }
-      }
-    },
     "Apply high-confidence duplicate merges without asking. Off = always review." : {
       "localizations" : {
         "zh-Hans" : {
@@ -1345,22 +1418,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在套用已檢視的變更…"
-          }
-        }
-      }
-    },
-    "Ask before Sync Now" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "执行「立即同步」前先询问"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "執行「立即同步」前先詢問"
           }
         }
       }
@@ -1398,6 +1455,22 @@
         }
       }
     },
+    "Ask before Sync Now" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "执行「立即同步」前先询问"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "執行「立即同步」前先詢問"
+          }
+        }
+      }
+    },
     "Authenticating…" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1415,6 +1488,7 @@
       }
     },
     "Auto (Recommended)" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1512,6 +1586,23 @@
         }
       }
     },
+    "Automatic backup" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动备份"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動備份"
+          }
+        }
+      }
+    },
     "Automatic Backups" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1541,22 +1632,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自動合併"
-          }
-        }
-      }
-    },
-    "Automatic backup" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "自动备份"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "自動備份"
           }
         }
       }
@@ -1690,6 +1765,23 @@
         }
       }
     },
+    "Backup failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "备份失败"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "備份失敗"
+          }
+        }
+      }
+    },
     "Backup Information" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1738,6 +1830,22 @@
         }
       }
     },
+    "Backup storage exceeds 1 GB" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "备份占用空间已超过 1 GB"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "備份佔用空間已超過 1 GB"
+          }
+        }
+      }
+    },
     "Backup Summary" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1766,39 +1874,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "備份時間軸"
-          }
-        }
-      }
-    },
-    "Backup failed" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "备份失败"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "備份失敗"
-          }
-        }
-      }
-    },
-    "Backup storage exceeds 1 GB" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "备份占用空间已超过 1 GB"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "備份佔用空間已超過 1 GB"
           }
         }
       }
@@ -1886,6 +1961,7 @@
       }
     },
     "Both ways" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1897,22 +1973,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "雙向"
-          }
-        }
-      }
-    },
-    "CSV…" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CSV…"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CSV…"
           }
         }
       }
@@ -1987,22 +2047,6 @@
         }
       }
     },
-    "Change Location…" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "变更位置…"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "變更位置…"
-          }
-        }
-      }
-    },
     "Change failed" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2016,6 +2060,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "變更失敗"
+          }
+        }
+      }
+    },
+    "Change Location…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "变更位置…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "變更位置…"
           }
         }
       }
@@ -2053,22 +2113,6 @@
         }
       }
     },
-    "Choose Your Sync Direction" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择同步方向"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "選擇同步方向"
-          }
-        }
-      }
-    },
     "Choose a different folder for backups" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2081,6 +2125,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "為備份選擇其他資料夾"
+          }
+        }
+      }
+    },
+    "Choose which actions ask for confirmation. Safer defaults are pre-selected; skip confirmations you find repetitive." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择哪些动作需要确认。默认已选较安全的选项;觉得重复的确认可以关闭。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選擇哪些動作需要確認。預設已選較安全的選項;覺得重複的確認可以關閉。"
           }
         }
       }
@@ -2101,18 +2161,18 @@
         }
       }
     },
-    "Choose which actions ask for confirmation. Safer defaults are pre-selected; skip confirmations you find repetitive." : {
+    "Choose Your Sync Direction" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择哪些动作需要确认。默认已选较安全的选项;觉得重复的确认可以关闭。"
+            "value" : "选择同步方向"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "選擇哪些動作需要確認。預設已選較安全的選項;覺得重複的確認可以關閉。"
+            "value" : "選擇同步方向"
           }
         }
       }
@@ -2319,6 +2379,7 @@
       }
     },
     "Completed with errors" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2418,6 +2479,7 @@
       }
     },
     "Conflicts" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2465,22 +2527,6 @@
         }
       }
     },
-    "Connect Google Account" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "连接 Google 账号"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "連接 Google 帳號"
-          }
-        }
-      }
-    },
     "Connect a Google account and grant Contacts access first" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2510,6 +2556,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "請連接兩邊帳號才能同步"
+          }
+        }
+      }
+    },
+    "Connect Google Account" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接 Google 账号"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連接 Google 帳號"
           }
         }
       }
@@ -2578,70 +2640,6 @@
         }
       }
     },
-    "Contact SyncMate" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contact SyncMate"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contact SyncMate"
-          }
-        }
-      }
-    },
-    "Contact SyncMate needs access to your Mac contacts to sync them." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contact SyncMate 需要取用你的 Mac 联系人才能进行同步。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contact SyncMate 需要取用你的 Mac 聯絡人才能進行同步。"
-          }
-        }
-      }
-    },
-    "Contact SyncMate needs permission to read and write your Mac contacts." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contact SyncMate 需要读取及写入你的 Mac 联系人的权限。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contact SyncMate 需要讀取及寫入你的 Mac 聯絡人的權限。"
-          }
-        }
-      }
-    },
-    "Contact SyncMate needs to restart before the interface appears in the language you picked. Your settings are already saved. A sync in progress will be interrupted." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contact SyncMate 需要重新启动,界面才会以你选择的语言显示。你的设置已保存。正在进行的同步会被中断。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contact SyncMate 需要重新啟動,介面才會以你選擇的語言顯示。你的設定已儲存。正在進行的同步會被中斷。"
-          }
-        }
-      }
-    },
     "Contact added" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2705,6 +2703,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "聯絡人已還原"
+          }
+        }
+      }
+    },
+    "Contact SyncMate" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact SyncMate"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact SyncMate"
+          }
+        }
+      }
+    },
+    "Contact SyncMate needs access to your Mac contacts to sync them." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact SyncMate 需要取用你的 Mac 联系人才能进行同步。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact SyncMate 需要取用你的 Mac 聯絡人才能進行同步。"
+          }
+        }
+      }
+    },
+    "Contact SyncMate needs permission to read and write your Mac contacts." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact SyncMate 需要读取及写入你的 Mac 联系人的权限。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact SyncMate 需要讀取及寫入你的 Mac 聯絡人的權限。"
+          }
+        }
+      }
+    },
+    "Contact SyncMate needs to restart before the interface appears in the language you picked. Your settings are already saved. A sync in progress will be interrupted." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact SyncMate 需要重新启动,界面才会以你选择的语言显示。你的设置已保存。正在进行的同步会被中断。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact SyncMate 需要重新啟動,介面才會以你選擇的語言顯示。你的設定已儲存。正在進行的同步會被中斷。"
           }
         }
       }
@@ -3080,6 +3142,22 @@
         }
       }
     },
+    "CSV…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CSV…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CSV…"
+          }
+        }
+      }
+    },
     "Current contacts will be replaced. Make sure you want to continue." : {
       "localizations" : {
         "zh-Hans" : {
@@ -3179,6 +3257,7 @@
       }
     },
     "Delete" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -3277,6 +3356,7 @@
       }
     },
     "Deleted" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -3438,6 +3518,7 @@
       }
     },
     "Done: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -3537,6 +3618,7 @@
       }
     },
     "Edit" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -3668,6 +3750,57 @@
         }
       }
     },
+    "every %lld min" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每 %lld 分钟"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每 %lld 分鐘"
+          }
+        }
+      }
+    },
+    "every %lldh" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每 %lld 小时"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每 %lld 小時"
+          }
+        }
+      }
+    },
+    "every %llds" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每 %lld 秒"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每 %lld 秒"
+          }
+        }
+      }
+    },
     "Excel…" : {
       "localizations" : {
         "zh-Hans" : {
@@ -3733,6 +3866,7 @@
       }
     },
     "Failed: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -3958,6 +4092,22 @@
         }
       }
     },
+    "Get a key at console.anthropic.com — stored securely in the macOS Keychain" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可于 console.anthropic.com 取得密钥 — 会安全保存在 macOS 钥匙串中"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可於 console.anthropic.com 取得密鑰 — 會安全儲存在 macOS 鑰匙串中"
+          }
+        }
+      }
+    },
     "Get Last Sync Status" : {
       "localizations" : {
         "zh-Hans" : {
@@ -3990,22 +4140,6 @@
         }
       }
     },
-    "Get a key at console.anthropic.com — stored securely in the macOS Keychain" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "可于 console.anthropic.com 取得密钥 — 会安全保存在 macOS 钥匙串中"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "可於 console.anthropic.com 取得密鑰 — 會安全儲存在 macOS 鑰匙串中"
-          }
-        }
-      }
-    },
     "Google" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4022,66 +4156,18 @@
         }
       }
     },
-    "Google Account" : {
+    "Google → Mac" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Google 账号"
+            "value" : "Google → Mac"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Google 帳號"
-          }
-        }
-      }
-    },
-    "Google Account not connected" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "尚未连接 Google 账号"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "尚未連接 Google 帳號"
-          }
-        }
-      }
-    },
-    "Google Account:" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Google 账号："
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Google 帳號："
-          }
-        }
-      }
-    },
-    "Google Contacts" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Google 联系人"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Google 聯絡人"
+            "value" : "Google → Mac"
           }
         }
       }
@@ -4099,6 +4185,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Google 授權已過期,請重新登入。"
+          }
+        }
+      }
+    },
+    "Google Account" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Google 账号"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Google 帳號"
           }
         }
       }
@@ -4135,6 +4237,22 @@
         }
       }
     },
+    "Google Account not connected" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未连接 Google 账号"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未連接 Google 帳號"
+          }
+        }
+      }
+    },
     "Google account not connected — open Settings → Accounts to sign in." : {
       "localizations" : {
         "zh-Hans" : {
@@ -4151,6 +4269,22 @@
         }
       }
     },
+    "Google Account:" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Google 账号："
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Google 帳號："
+          }
+        }
+      }
+    },
     "Google and Mac account rows in the menu bar popover" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4163,6 +4297,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "選單列彈出視窗中的 Google 與 Mac 帳號列"
+          }
+        }
+      }
+    },
+    "Google Contacts" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Google 联系人"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Google 聯絡人"
           }
         }
       }
@@ -4197,22 +4347,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Google 拒絕了這個請求。若應用程式的發布狀態為「測試中」，登入的電子郵件必須列在 OAuth 同意畫面的測試使用者名單中。"
-          }
-        }
-      }
-    },
-    "Google → Mac" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Google → Mac"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Google → Mac"
           }
         }
       }
@@ -4384,6 +4518,7 @@
       }
     },
     "ID" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -4614,6 +4749,7 @@
       }
     },
     "Keep your Google and Mac contacts in perfect sync — privately, on your device." : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -4825,6 +4961,22 @@
         }
       }
     },
+    "Mac → Google" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac → Google"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac → Google"
+          }
+        }
+      }
+    },
     "Mac Contacts" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4907,18 +5059,18 @@
         }
       }
     },
-    "Mac → Google" : {
+    "macOS refused to save this contact. It usually means the record is read-only or linked to another account — check whether it lives in a Google or Exchange account inside the Contacts app rather than On My Mac." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mac → Google"
+            "value" : "macOS 拒绝保存此联系人。这通常表示该记录为只读，或已与其他账户关联——请在“通讯录”App 中检查它是否位于 Google 或 Exchange 账户中，而不是“我的 Mac 上”。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mac → Google"
+            "value" : "macOS 拒絕儲存此聯絡人。這通常表示該記錄為唯讀，或已與其他帳號連結——請在「聯絡人」App 中檢查它是否位於 Google 或 Exchange 帳號中，而不是「我的 Mac 上」。"
           }
         }
       }
@@ -4935,6 +5087,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "管理"
+          }
+        }
+      }
+    },
+    "Manual backup" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手动备份"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手動備份"
           }
         }
       }
@@ -4968,22 +5137,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "手動同步…"
-          }
-        }
-      }
-    },
-    "Manual backup" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "手动备份"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "手動備份"
           }
         }
       }
@@ -5038,6 +5191,7 @@
       }
     },
     "Merge" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5065,22 +5219,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "合併行為"
-          }
-        }
-      }
-    },
-    "Merge Preview" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "合并预览"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "合併預覽"
           }
         }
       }
@@ -5134,7 +5272,24 @@
         }
       }
     },
+    "Merge Preview" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "合并预览"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "合併預覽"
+          }
+        }
+      }
+    },
     "Merged" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5167,6 +5322,7 @@
       }
     },
     "Mode" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5194,6 +5350,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "模型"
+          }
+        }
+      }
+    },
+    "more" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更多"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更多"
           }
         }
       }
@@ -5231,6 +5403,7 @@
       }
     },
     "Never synced" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5311,6 +5484,7 @@
       }
     },
     "No %@ changes" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5326,90 +5500,8 @@
         }
       }
     },
-    "No Backups" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "没有备份"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "沒有備份"
-          }
-        }
-      }
-    },
-    "No Contacts Accounts Found" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "找不到联系人账号"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "找不到聯絡人帳號"
-          }
-        }
-      }
-    },
-    "No Duplicates Found" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未找到重复项"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未找到重複項"
-          }
-        }
-      }
-    },
-    "No Sync History" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "没有同步记录"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "沒有同步記錄"
-          }
-        }
-      }
-    },
-    "No Version History" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "没有版本记录"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "沒有版本記錄"
-          }
-        }
-      }
-    },
     "No access" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5442,6 +5534,7 @@
       }
     },
     "No additions pending" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5469,6 +5562,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "尚無備份檔案"
+          }
+        }
+      }
+    },
+    "No Backups" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有备份"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有備份"
           }
         }
       }
@@ -5555,6 +5665,7 @@
       }
     },
     "No conflicts pending" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5566,6 +5677,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "沒有待處理的衝突"
+          }
+        }
+      }
+    },
+    "No Contacts Accounts Found" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到联系人账号"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到聯絡人帳號"
           }
         }
       }
@@ -5604,6 +5731,7 @@
       }
     },
     "No deletions pending" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5619,7 +5747,24 @@
         }
       }
     },
+    "No Duplicates Found" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到重复项"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到重複項"
+          }
+        }
+      }
+    },
     "No edits pending" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5686,6 +5831,23 @@
         }
       }
     },
+    "No Sync History" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有同步记录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有同步記錄"
+          }
+        }
+      }
+    },
     "No sync history yet" : {
       "localizations" : {
         "zh-Hans" : {
@@ -5698,6 +5860,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "尚無同步記錄"
+          }
+        }
+      }
+    },
+    "No Version History" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有版本记录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有版本記錄"
           }
         }
       }
@@ -5895,18 +6074,18 @@
         }
       }
     },
-    "OK" : {
+    "Off — turn on for background sync" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "好"
+            "value" : "已关闭 — 开启即可背景同步"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "好"
+            "value" : "已關閉 — 開啟即可背景同步"
           }
         }
       }
@@ -5927,18 +6106,18 @@
         }
       }
     },
-    "Off — turn on for background sync" : {
+    "OK" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已关闭 — 开启即可背景同步"
+            "value" : "好"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已關閉 — 開啟即可背景同步"
+            "value" : "好"
           }
         }
       }
@@ -6087,6 +6266,22 @@
         }
       }
     },
+    "Open in Finder" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Finder 中开启"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Finder 中開啟"
+          }
+        }
+      }
+    },
     "Open Notification Settings…" : {
       "localizations" : {
         "zh-Hans" : {
@@ -6168,23 +6363,8 @@
         }
       }
     },
-    "Open in Finder" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在 Finder 中开启"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在 Finder 中開啟"
-          }
-        }
-      }
-    },
     "Opens %@." : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6370,6 +6550,7 @@
       }
     },
     "Post-sync backup" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6386,6 +6567,7 @@
       }
     },
     "Pre-sync backup" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6417,22 +6599,6 @@
         }
       }
     },
-    "Preview Merged Result" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "预览合并结果"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "預覽合併結果"
-          }
-        }
-      }
-    },
     "Preview and approve each change before syncing" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6446,6 +6612,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "同步前逐項預覽並核准變更"
+          }
+        }
+      }
+    },
+    "Preview Merged Result" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "预览合并结果"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "預覽合併結果"
           }
         }
       }
@@ -6790,6 +6972,22 @@
         }
       }
     },
+    "Reset all settings?" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要重设所有设置吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要重設所有設定嗎？"
+          }
+        }
+      }
+    },
     "Reset Everything" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6853,22 +7051,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「僅重設偏好設定」只還原設定，不動其他。「完整重設」會把 app 還原成首次啟動的狀態：刪除所有備份、同步記錄、聯絡人配對與重複判定，移除已儲存的憑證，登出，然後重新啟動。已刪除的備份無法復原，之後將沒有任何東西可用來還原先前的同步。兩者都不會動到聯絡人本身，無論在這台 Mac 或你的 Google 帳戶中。"
-          }
-        }
-      }
-    },
-    "Reset all settings?" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "要重设所有设置吗？"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "要重設所有設定嗎？"
           }
         }
       }
@@ -6970,23 +7152,6 @@
         }
       }
     },
-    "Restore This Version" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "还原此版本"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "還原此版本"
-          }
-        }
-      }
-    },
     "Restore from Backup" : {
       "localizations" : {
         "zh-Hans" : {
@@ -7016,6 +7181,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "還原未完成"
+          }
+        }
+      }
+    },
+    "Restore This Version" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还原此版本"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "還原此版本"
           }
         }
       }
@@ -7237,22 +7419,6 @@
         }
       }
     },
-    "Run Conditions" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "执行条件"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "執行條件"
-          }
-        }
-      }
-    },
     "Run a sync now using the mode selected below" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -7282,6 +7448,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "同步、檢視待處理變更與活動記錄，都在儀表板（⌘1）中進行。"
+          }
+        }
+      }
+    },
+    "Run Conditions" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "执行条件"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "執行條件"
           }
         }
       }
@@ -7431,23 +7613,6 @@
         }
       }
     },
-    "Score Ranges" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "评分范围"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "評分範圍"
-          }
-        }
-      }
-    },
     "Score must be ≥ %lld for automatic merge" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -7461,6 +7626,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "評分須 ≥ %lld 才會自動合併"
+          }
+        }
+      }
+    },
+    "Score Ranges" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "评分范围"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "評分範圍"
           }
         }
       }
@@ -7514,18 +7696,19 @@
         }
       }
     },
-    "Select Account…" : {
+    "Select a contact to see its saved versions" : {
+      "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择账号…"
+            "value" : "选择联系人以查看其已保存的版本"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "選擇帳號…"
+            "value" : "選擇聯絡人以查看其已儲存的版本"
           }
         }
       }
@@ -7546,19 +7729,18 @@
         }
       }
     },
-    "Select a contact to see its saved versions" : {
-      "extractionState" : "manual",
+    "Select Account…" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择联系人以查看其已保存的版本"
+            "value" : "选择账号…"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "選擇聯絡人以查看其已儲存的版本"
+            "value" : "選擇帳號…"
           }
         }
       }
@@ -7660,22 +7842,6 @@
         }
       }
     },
-    "Show API key" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "显示 API 密钥"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "顯示 API 密鑰"
-          }
-        }
-      }
-    },
     "Show a confirmation dialog before a restore rewrites contacts" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -7738,6 +7904,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "顯示帳號狀態列"
+          }
+        }
+      }
+    },
+    "Show API key" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示 API 密钥"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示 API 密鑰"
           }
         }
       }
@@ -7823,38 +8005,6 @@
         }
       }
     },
-    "Sign In with Google…" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用 Google 登录…"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用 Google 登入…"
-          }
-        }
-      }
-    },
-    "Sign Out" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "登出"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "登出"
-          }
-        }
-      }
-    },
     "Sign in so Contact SyncMate can access your Google Contacts." : {
       "localizations" : {
         "zh-Hans" : {
@@ -7883,6 +8033,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "請先登入 Google(帳號頁籤)才能匯出 Google 聯絡人。"
+          }
+        }
+      }
+    },
+    "Sign In with Google…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Google 登录…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Google 登入…"
+          }
+        }
+      }
+    },
+    "Sign Out" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登出"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登出"
           }
         }
       }
@@ -7916,6 +8098,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "登入失敗：%@"
+          }
+        }
+      }
+    },
+    "sk-ant-…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sk-ant-…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sk-ant-…"
           }
         }
       }
@@ -8018,6 +8216,7 @@
       }
     },
     "Specific Account" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -8237,6 +8436,56 @@
         }
       }
     },
+    "Sync changes in both directions automatically" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动双向同步变更"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動雙向同步變更"
+          }
+        }
+      }
+    },
+    "Sync complete" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步完成"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步完成"
+          }
+        }
+      }
+    },
+    "Sync completed" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步完成"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步完成"
+          }
+        }
+      }
+    },
     "Sync Configuration" : {
       "localizations" : {
         "zh-Hans" : {
@@ -8269,6 +8518,38 @@
         }
       }
     },
+    "Sync deleted contacts" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步已删除的联系人"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步已刪除的聯絡人"
+          }
+        }
+      }
+    },
+    "Sync direction" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步方向"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步方向"
+          }
+        }
+      }
+    },
     "Sync Direction" : {
       "localizations" : {
         "zh-Hans" : {
@@ -8281,6 +8562,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "同步方向"
+          }
+        }
+      }
+    },
+    "Sync error" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步错误"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步錯誤"
+          }
+        }
+      }
+    },
+    "Sync errors" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步错误"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步錯誤"
           }
         }
       }
@@ -8335,6 +8649,22 @@
         }
       }
     },
+    "Sync finished." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步已结束。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步已結束。"
+          }
+        }
+      }
+    },
     "Sync History" : {
       "localizations" : {
         "zh-Hans" : {
@@ -8363,6 +8693,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "同步記錄與備份"
+          }
+        }
+      }
+    },
+    "Sync history will appear here" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步记录会显示在这里"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步記錄會顯示在這裡"
+          }
+        }
+      }
+    },
+    "Sync history will record this restoration" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步记录将记录此次恢复"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步記錄將記錄此次回復"
+          }
+        }
+      }
+    },
+    "Sync in progress…" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步进行中…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步進行中…"
           }
         }
       }
@@ -8432,200 +8813,6 @@
         }
       }
     },
-    "Sync Status" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步状态"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步狀態"
-          }
-        }
-      }
-    },
-    "Sync changes in both directions automatically" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "自动双向同步变更"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "自動雙向同步變更"
-          }
-        }
-      }
-    },
-    "Sync complete" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步完成"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步完成"
-          }
-        }
-      }
-    },
-    "Sync completed" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步完成"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步完成"
-          }
-        }
-      }
-    },
-    "Sync deleted contacts" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步已删除的联系人"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步已刪除的聯絡人"
-          }
-        }
-      }
-    },
-    "Sync direction" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步方向"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步方向"
-          }
-        }
-      }
-    },
-    "Sync error" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步错误"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步錯誤"
-          }
-        }
-      }
-    },
-    "Sync errors" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步错误"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步錯誤"
-          }
-        }
-      }
-    },
-    "Sync finished." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步已结束。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步已結束。"
-          }
-        }
-      }
-    },
-    "Sync history will appear here" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步记录会显示在这里"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步記錄會顯示在這裡"
-          }
-        }
-      }
-    },
-    "Sync history will record this restoration" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步记录将记录此次恢复"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步記錄將記錄此次回復"
-          }
-        }
-      }
-    },
-    "Sync in progress…" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步进行中…"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步進行中…"
-          }
-        }
-      }
-    },
     "Sync progress" : {
       "localizations" : {
         "zh-Hans" : {
@@ -8675,7 +8862,24 @@
         }
       }
     },
+    "Sync Status" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步状态"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步狀態"
+          }
+        }
+      }
+    },
     "Synced %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -8692,6 +8896,7 @@
       }
     },
     "Syncing" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -8806,23 +9011,6 @@
         }
       }
     },
-    "The People API is not enabled for this Google Cloud project. Open the project's API Library, enable People API, then wait a minute and try again." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此 Google Cloud 专案尚未启用 People API。请开启专案的 API 程式库，启用 People API，等候约一分钟后再试。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此 Google Cloud 專案尚未啟用 People API。請開啟專案的 API 程式庫，啟用 People API，等候約一分鐘後再試。"
-          }
-        }
-      }
-    },
     "The cloud tier is called only for ambiguous pairs — never for high-confidence matches or when you're offline." : {
       "localizations" : {
         "zh-Hans" : {
@@ -8932,6 +9120,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "介面語言會在 App 重新啟動後變更。"
+          }
+        }
+      }
+    },
+    "The People API is not enabled for this Google Cloud project. Open the project's API Library, enable People API, then wait a minute and try again." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此 Google Cloud 专案尚未启用 People API。请开启专案的 API 程式库，启用 People API，等候约一分钟后再试。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此 Google Cloud 專案尚未啟用 People API。請開啟專案的 API 程式庫，啟用 People API，等候約一分鐘後再試。"
           }
         }
       }
@@ -9075,6 +9280,22 @@
         }
       }
     },
+    "This clears the recorded activity log only. Your backups and contacts are not affected." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这只会清除活动记录，你的备份与联系人不受影响。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這只會清除活動記錄，你的備份與聯絡人不受影響。"
+          }
+        }
+      }
+    },
     "This Client ID belongs to a Desktop or Web OAuth client, which requires a secret. Create an iOS client in Google Cloud Console — that is the type Google requires for macOS apps, and it needs no secret — then run Scripts/set-oauth-client.sh with its Client ID." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9088,22 +9309,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "這個 Client ID 屬於 Desktop 或 Web 類型的 OAuth 用戶端，需要 secret。請在 Google Cloud Console 建立 iOS 類型的用戶端 —— 那是 Google 對 macOS app 要求的類型，且不需要 secret —— 然後用它的 Client ID 執行 Scripts/set-oauth-client.sh。"
-          }
-        }
-      }
-    },
-    "This clears the recorded activity log only. Your backups and contacts are not affected." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这只会清除活动记录，你的备份与联系人不受影响。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "這只會清除活動記錄，你的備份與聯絡人不受影響。"
           }
         }
       }
@@ -9191,6 +9396,7 @@
       }
     },
     "Today" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -9272,6 +9478,7 @@
       }
     },
     "Type" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -9323,6 +9530,7 @@
       }
     },
     "Up to date" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -9339,6 +9547,7 @@
       }
     },
     "Update" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -9355,6 +9564,7 @@
       }
     },
     "Updated" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -9549,6 +9759,57 @@
         }
       }
     },
+    "waiting for AC power" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待接上电源"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待接上電源"
+          }
+        }
+      }
+    },
+    "waiting for an unmetered network" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待非计量网络"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待非計量網路"
+          }
+        }
+      }
+    },
+    "waiting until the Mac is idle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待 Mac 闲置"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待 Mac 閒置"
+          }
+        }
+      }
+    },
     "Welcome to Contact SyncMate" : {
       "localizations" : {
         "zh-Hans" : {
@@ -9662,6 +9923,7 @@
       }
     },
     "Yesterday" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -9694,6 +9956,7 @@
       }
     },
     "You can undo by restoring to another backup" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -9709,23 +9972,8 @@
         }
       }
     },
-    "Your Mac doesn't have any contacts accounts configured" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的 Mac 尚未设置任何联系人账号"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的 Mac 尚未設定任何聯絡人帳號"
-          }
-        }
-      }
-    },
     "Your contacts stay on your device. No third-party servers are involved." : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -9790,214 +10038,18 @@
         }
       }
     },
-    "and %lld more…" : {
+    "Your Mac doesn't have any contacts accounts configured" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "还有 %lld 项…"
+            "value" : "你的 Mac 尚未设置任何联系人账号"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "還有 %lld 項…"
-          }
-        }
-      }
-    },
-    "every %lld min" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "每 %lld 分钟"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "每 %lld 分鐘"
-          }
-        }
-      }
-    },
-    "every %lldh" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "每 %lld 小时"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "每 %lld 小時"
-          }
-        }
-      }
-    },
-    "every %llds" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "每 %lld 秒"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "每 %lld 秒"
-          }
-        }
-      }
-    },
-    "macOS refused to save this contact. It usually means the record is read-only or linked to another account — check whether it lives in a Google or Exchange account inside the Contacts app rather than On My Mac." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "macOS 拒绝保存此联系人。这通常表示该记录为只读，或已与其他账户关联——请在“通讯录”App 中检查它是否位于 Google 或 Exchange 账户中，而不是“我的 Mac 上”。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "macOS 拒絕儲存此聯絡人。這通常表示該記錄為唯讀，或已與其他帳號連結——請在「聯絡人」App 中檢查它是否位於 Google 或 Exchange 帳號中，而不是「我的 Mac 上」。"
-          }
-        }
-      }
-    },
-    "more" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "更多"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "更多"
-          }
-        }
-      }
-    },
-    "sk-ant-…" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "sk-ant-…"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "sk-ant-…"
-          }
-        }
-      }
-    },
-    "waiting for AC power" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "等待接上电源"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "等待接上電源"
-          }
-        }
-      }
-    },
-    "waiting for an unmetered network" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "等待非计量网络"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "等待非計量網路"
-          }
-        }
-      }
-    },
-    "waiting until the Mac is idle" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "等待 Mac 闲置"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "等待 Mac 閒置"
-          }
-        }
-      }
-    },
-    "·" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "·"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "·"
-          }
-        }
-      }
-    },
-    "•" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "•"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "•"
-          }
-        }
-      }
-    },
-    "• %@" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "• %@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "• %@"
+            "value" : "你的 Mac 尚未設定任何聯絡人帳號"
           }
         }
       }
