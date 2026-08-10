@@ -416,6 +416,10 @@ struct DashboardView: View {
                             .font(.caption)
                             .foregroundStyle(.tertiary)
                             .monospacedDigit()
+                        Button("Cancel") { sync.cancelSync() }
+                            .buttonStyle(.borderless)
+                            .controlSize(.small)
+                            .help("Stop the sync at the next contact")
                     }
                 }
                 .padding(.horizontal, 4)

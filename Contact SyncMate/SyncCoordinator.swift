@@ -107,11 +107,36 @@ final class SyncCoordinator: ObservableObject {
     /// Whether a sync is running right now.
     var isRunning: Bool { phase.isActive }
 
+    /// The task that owns the currently-running sync. Held so `cancelSync()`
+    /// has something to cancel — without it, a wrong-direction 500-contact
+    /// sync over a slow network could only be watched to the end.
+    private var currentRunTask: Task<Void, Never>?
+
+    /// Stop the running sync at the next safe boundary.
+    ///
+    /// The engine checks for cancellation between contacts, so nothing is
+    /// abandoned mid-write: whatever was applied stays applied and counted,
+    /// and the history records where the run stopped.
+    func cancelSync() {
+        guard isRunning else { return }
+        SyncHistory.shared.log(source: "SyncCoordinator", action: "sync.cancelRequested",
+                               details: stepLabel)
+        currentRunTask?.cancel()
+    }
+
     /// Start a sync using the current AppSettings configuration.
     /// Safe to call from any async context — always runs on MainActor.
     func runSync() async {
         guard !isRunning else { return }
+        // A coordinator-owned Task, so cancelSync() holds the handle; awaiting
+        // its value keeps every caller's structure unchanged.
+        let task = Task { await self.runSyncBody() }
+        currentRunTask = task
+        await task.value
+        currentRunTask = nil
+    }
 
+    private func runSyncBody() async {
         let settings  = AppSettings.shared
         let direction = settings.autoSyncDirection
 
@@ -297,7 +322,13 @@ final class SyncCoordinator: ObservableObject {
     /// Spotlight entry. Two ways to finish a sync is how they drift apart.
     func applyReviewed(_ session: SyncSession) async {
         guard !isRunning else { return }
+        let task = Task { await self.applyReviewedBody(session) }
+        currentRunTask = task
+        await task.value
+        currentRunTask = nil
+    }
 
+    private func applyReviewedBody(_ session: SyncSession) async {
         setPhase(.syncing(0), step: "Applying reviewed changes…", progress: 0)
         appState?.isSyncing = true
 
@@ -435,6 +466,13 @@ final class SyncCoordinator: ObservableObject {
     // `nonisolated static`: pure error-to-text mapping with no coordinator
     // state, callable from tests and any isolation context.
     nonisolated static func friendlyMessage(for error: Error) -> String {
+        // User-initiated, not a failure — reached when a cancel lands during
+        // the prepare phase (fetches), which throws rather than returning a
+        // partial result.
+        if error is CancellationError {
+            return "Sync cancelled."
+        }
+
         if let syncError = error as? SyncEngineError {
             switch syncError {
             case .syncAlreadyInProgress:

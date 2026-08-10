@@ -84,10 +84,14 @@ class SyncEngine: ObservableObject {
         do {
             // Fetch contacts from both sides
             let googleContacts = try await googleConnector.fetchAllContacts()
+            // The fetches are the long part of prepare — honour a cancel
+            // between them instead of finishing minutes of work first.
+            try Task.checkCancellation()
             // Off the main actor: see fetchAllContactsOffMainActor. Driving
             // contactsd XPC from a user-interactive thread inverts priority and
             // corrupts subsequent faulting.
             let macContacts = try await macConnector.fetchAllContactsOffMainActor()
+            try Task.checkCancellation()
 
             // Convert to unified format
             var unifiedGoogleContacts = googleContacts.map { ContactMapper.toUnified(from: $0) }
@@ -227,6 +231,16 @@ class SyncEngine: ObservableObject {
 
         // Execute each change
         for (index, change) in session.contactChanges.enumerated() {
+            // A user cancel stops at a change boundary: whatever was applied
+            // stays applied and counted, nothing is abandoned mid-write, and
+            // the result reports the partial run honestly.
+            if Task.isCancelled {
+                SyncHistory.shared.log(
+                    source: "SyncEngine", action: "sync.cancelled",
+                    details: "Stopped by the user after \(index) of \(session.contactChanges.count) changes")
+                break
+            }
+
             // Update progress
             await MainActor.run {
                 progress = SyncProgress(

@@ -116,6 +116,13 @@ struct MenuBarView: View {
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("Sync progress")
                     .accessibilityValue(Text("\(Int(sync.progress * 100)) percent"))
+
+                    // Outside the combined element above, so VoiceOver reaches
+                    // it as its own control.
+                    Button("Cancel") { sync.cancelSync() }
+                        .buttonStyle(.borderless)
+                        .controlSize(.small)
+                        .help("Stop the sync at the next contact")
                 }
 
                 syncNowButton
