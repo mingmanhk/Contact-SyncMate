@@ -809,9 +809,11 @@ class ContactBackupManager: ObservableObject {
                 return .success(session)
             }
 
-            try backupQueue.sync(flags: .barrier) {
-                try saveBackupSession(session)
-            }
+            // No queue wrapper here: saveBackupSession serialises internally
+            // with a sync barrier on this same queue, so wrapping the call in
+            // another sync barrier re-entered the lock we would already be
+            // holding — a guaranteed deadlock on every import.
+            try saveBackupSession(session)
 
             SyncHistory.shared.log(
                 source: "BackupManager",
@@ -953,14 +955,16 @@ class ContactBackupManager: ObservableObject {
         // Concurrent append and whole-array assignment on a Swift Array is
         // undefined behaviour, in the component whose entire job is to be the
         // undo for everything else.
-        let indexData: Data
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(session)
 
-        indexData = try backupQueue.sync(flags: .barrier) { () throws -> Data in
+        // One barrier block: append, snapshot the index, and take the count —
+        // a second blocking `sync` just to read the count doubled the
+        // main-thread wait for no benefit.
+        let (indexData, count) = try backupQueue.sync(flags: .barrier) { () throws -> (Data, Int) in
             backupSessions.append(session)
-            return try encoder.encode(backupSessions)
+            return (try encoder.encode(backupSessions), backupSessions.count)
         }
 
         try withBackupDirectory { dir in
@@ -971,7 +975,6 @@ class ContactBackupManager: ObservableObject {
         }
 
         // Update published properties on main thread
-        let count = backupQueue.sync { backupSessions.count }
         let size = calculateEstimatedSize()
         let timestamp = session.timestamp
         DispatchQueue.main.async { [weak self] in
@@ -1014,9 +1017,15 @@ class ContactBackupManager: ObservableObject {
                 }
             }
         } catch {
-            // Initialize empty if load fails (first launch or corrupted index)
+            // Initialize empty if load fails (first launch or corrupted index).
+            // Through the barrier queue like every other write: this path also
+            // runs when the user re-points the backup folder at runtime, where
+            // a direct assignment can race an in-flight pruneOldBackups
+            // barrier block mutating the same array.
             print("ContactBackupManager: Could not load backup index: \(error.localizedDescription)")
-            backupSessions = []
+            backupQueue.async(flags: .barrier) { [weak self] in
+                self?.backupSessions = []
+            }
         }
     }
 }
