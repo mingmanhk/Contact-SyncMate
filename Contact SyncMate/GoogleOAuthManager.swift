@@ -828,11 +828,19 @@ class GoogleOAuthManager: NSObject, ObservableObject {
     
     private func saveToKeychain(key: String, value: String) throws {
         let data = value.data(using: .utf8)!
-        
+
+        // Device-bound on purpose. Without an explicit accessibility class the
+        // item takes the syncable default, so a refresh token with full
+        // read/write to the user's Google contacts could ride iCloud Keychain
+        // onto every device (and their backups) — the widened theft surface
+        // signOut()'s own comment worries about. ThisDeviceOnly keeps the
+        // credential where the user granted it; other devices can sign in
+        // themselves.
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
             kSecAttrService as String: "ContactSyncMate",
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
             kSecValueData as String: data
         ]
         
