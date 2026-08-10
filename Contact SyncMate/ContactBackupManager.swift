@@ -206,7 +206,12 @@ class ContactBackupManager: ObservableObject {
         var sessionWithVersions = backupSession
         sessionWithVersions.contactVersions = versions
 
-        try saveBackupSession(sessionWithVersions)
+        // A pre-sync backup failure used to abort the whole sync: with a full
+        // or read-only custom backup folder the user could never sync again,
+        // and the error said nothing about why. Falling back to the container
+        // directory keeps the safety net *and* the sync; only a failure of
+        // both locations still throws.
+        try saveBackupSession(sessionWithVersions, allowContainerFallback: true)
 
         return sessionWithVersions
     }
@@ -930,7 +935,65 @@ class ContactBackupManager: ObservableObject {
             action: "backupFolder.changed",
             details: url.lastPathComponent
         )
+
+        // Backups are plaintext JSON holding both address books in full. A
+        // folder that a cloud service mirrors silently uploads all of that
+        // off-device, so the choice is honoured but never silent: it goes in
+        // the history log and in front of the user, like every other
+        // confirmation of a consequence in this app.
+        if Self.isCloudSyncedLocation(url) {
+            SyncHistory.shared.log(
+                source: "BackupManager",
+                action: "backupFolder.cloudSyncWarning",
+                details: "\"\(url.lastPathComponent)\" is inside a cloud-synced location — "
+                    + "backup files are unencrypted and will be uploaded by the sync service"
+            )
+            let alert = NSAlert()
+            alert.messageText = "This Folder Syncs to the Cloud"
+            alert.informativeText = """
+                The folder you chose appears to be synced by a cloud service \
+                (such as iCloud Drive, Dropbox, Google Drive, or OneDrive).
+
+                Backups are not encrypted: they contain your contacts' names, \
+                phone numbers, email addresses, photos, and notes in plain text, \
+                and the sync service will upload them to its servers.
+
+                Backups will still be saved here. Choose a different folder if \
+                you do not want them leaving this Mac.
+                """
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+        }
+
         loadBackupIndex()
+    }
+
+    /// Whether `url` lies inside a folder a cloud service mirrors off-device.
+    ///
+    /// Covers iCloud Drive (`~/Library/Mobile Documents/…`, including
+    /// `com~apple~CloudDocs`), the modern File Provider mount point every
+    /// current cloud client uses (`~/Library/CloudStorage/<Provider>-…`), and
+    /// the legacy direct-in-home folders older Dropbox / Google Drive /
+    /// OneDrive installs left behind. Component-based on purpose: the panel
+    /// hands back real user paths, not container-relative ones, so matching a
+    /// sandboxed "home" prefix would miss all of them.
+    static func isCloudSyncedLocation(_ url: URL) -> Bool {
+        let components = url.standardizedFileURL.pathComponents
+
+        if components.contains("Mobile Documents")
+            || components.contains("com~apple~CloudDocs")
+            || components.contains("CloudStorage") {
+            return true
+        }
+
+        // Legacy sync folders sit directly in the home directory:
+        // /Users/<name>/Dropbox, /Users/<name>/Google Drive, /Users/<name>/OneDrive.
+        if components.count >= 4, components[1] == "Users" {
+            return ["Dropbox", "Google Drive", "OneDrive"].contains(components[3])
+        }
+
+        return false
     }
 
     /// Return to the default (container) backup folder and drop the bookmark.
@@ -945,7 +1008,15 @@ class ContactBackupManager: ObservableObject {
         backupDirectoryURL().appendingPathComponent("backup_index.json")
     }
 
-    private func saveBackupSession(_ session: BackupSession) throws {
+    /// Write a backup session and the updated index to disk.
+    ///
+    /// With `allowContainerFallback`, a failed write to a user-chosen custom
+    /// folder (full disk, revoked permissions, read-only volume) is retried in
+    /// the default container directory instead of thrown. Both files — the
+    /// session JSON and the index — go to the same directory either way, so a
+    /// restore that loads the index always finds the session file next to it.
+    private func saveBackupSession(_ session: BackupSession,
+                                   allowContainerFallback: Bool = false) throws {
         // Appending on the caller's thread was a data race.
         //
         // Every other access to `backupSessions` is serialised on `backupQueue`
@@ -967,11 +1038,28 @@ class ContactBackupManager: ObservableObject {
             return (try encoder.encode(backupSessions), backupSessions.count)
         }
 
-        try withBackupDirectory { dir in
+        func write(to dir: URL) throws {
             try data.write(to: dir.appendingPathComponent("\(session.id).json"),
                            options: [.atomic])
             try indexData.write(to: dir.appendingPathComponent("backup_index.json"),
                                 options: [.atomic])
+        }
+
+        do {
+            try withBackupDirectory { dir in try write(to: dir) }
+        } catch {
+            // Only fall back when a custom folder is in play: without one,
+            // `withBackupDirectory` already targeted the container, and
+            // retrying the same location would just fail the same way.
+            guard allowContainerFallback, hasCustomBackupFolder else { throw error }
+
+            try write(to: containerBackupDirectory())
+            SyncHistory.shared.log(
+                source: "BackupManager",
+                action: "backup.savedToFallback",
+                details: "Custom backup folder was not writable (\(error.localizedDescription)) — "
+                    + "backup \(session.id) was written to the default folder instead"
+            )
         }
 
         // Update published properties on main thread
