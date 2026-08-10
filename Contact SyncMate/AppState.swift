@@ -10,6 +10,12 @@ import Combine
 import Contacts
 
 /// Central app state observable object
+///
+/// `@MainActor` is explicit rather than inherited from the project's
+/// default-isolation setting: every `@Published` property here feeds SwiftUI,
+/// so main-actor confinement is part of this type's contract and must not
+/// silently change when the build default does (e.g. a Swift 6 migration).
+@MainActor
 class AppState: ObservableObject {
     @Published var isSyncing = false
 

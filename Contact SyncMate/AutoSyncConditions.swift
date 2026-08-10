@@ -109,7 +109,12 @@ enum AutoSyncConditions {
     /// A single long-lived monitor. `NWPathMonitor` reports the current path only
     /// after it has started, so creating one per check would always read a stale
     /// or empty path.
-    private static let pathMonitor: NWPathMonitor = {
+    ///
+    /// `nonisolated`: the monitor updates on its own background queue while
+    /// `currentPath` is read from the MainActor — Apple documents that read as
+    /// safe, and `NWPathMonitor` is `Sendable`, so no `unsafe` opt-out is
+    /// needed; the annotation records the cross-isolation use as intended.
+    nonisolated private static let pathMonitor: NWPathMonitor = {
         let monitor = NWPathMonitor()
         monitor.start(queue: DispatchQueue(label: "com.victorlam.ContactSyncMate.path"))
         return monitor

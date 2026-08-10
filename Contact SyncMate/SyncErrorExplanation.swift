@@ -55,8 +55,10 @@ nonisolated enum SyncErrorExplanation {
                 return "The save was rolled back. Another app may have changed "
                      + "this contact at the same time."
             case 134060:
-                return "The contact failed validation — a field is longer or "
-                     + "differently shaped than Contacts allows."
+                let base = "The contact failed validation — a field is longer or "
+                         + "differently shaped than Contacts allows."
+                guard let fields = offendingFields(in: ns) else { return base }
+                return base + " Failing field: \(fields)."
             case 4, 260:
                 return "The contact no longer exists. It was probably deleted "
                      + "after this sync was planned."
@@ -80,12 +82,54 @@ nonisolated enum SyncErrorExplanation {
             // and there is no `validationUnsupportedField` case at all.
             case .validationConfigurationError, .validationMultipleErrors,
                  .validationTypeMismatch:
-                return "Contacts rejected one of the fields on this contact."
+                // Three distinct codes share one sentence because the code
+                // alone never says which field failed — but the userInfo often
+                // does, and that is the part the user can actually act on.
+                let base = "Contacts rejected one of the fields on this contact."
+                guard let fields = offendingFields(in: ns) else { return base }
+                return base + " Failing field: \(fields)."
             default:
                 return nil
             }
         }
 
         return nil
+    }
+
+    /// The key path(s) a validation error blames, or nil when the OS kept it
+    /// to itself. The generic sentence stays as the fallback: an error without
+    /// this detail is still explained, just less precisely.
+    ///
+    /// Contacts is not consistent about where it puts the culprit. CNErrorDomain
+    /// validation errors carry an array of failing key paths under "CNKeyPaths"
+    /// (observed in userInfo alongside "CNInvalidRecords"; the framework exports
+    /// no constant for it), while the Cocoa-domain validation codes reuse Core
+    /// Data's convention — NSValidationKeyErrorKey, whose raw string is spelled
+    /// here because importing CoreData for one literal is not worth it. A
+    /// multiple-errors code wraps the per-field errors in NSDetailedErrors, so
+    /// those are unwrapped and mined the same way.
+    private static func offendingFields(in ns: NSError) -> String? {
+        var fields: [String] = []
+
+        func collect(from userInfo: [String: Any]) {
+            if let keyPaths = userInfo["CNKeyPaths"] as? [String] {
+                fields += keyPaths
+            }
+            if let key = userInfo["NSValidationErrorKey"] as? String {
+                fields.append(key)
+            }
+        }
+
+        collect(from: ns.userInfo)
+        if let detailed = ns.userInfo["NSDetailedErrors"] as? [NSError] {
+            for sub in detailed { collect(from: sub.userInfo) }
+        }
+
+        // Dedupe, preserving order, so "phoneNumbers, phoneNumbers" cannot
+        // happen when the same field is blamed at two levels.
+        var seen = Set<String>()
+        let unique = fields.filter { !$0.isEmpty && seen.insert($0).inserted }
+
+        return unique.isEmpty ? nil : unique.joined(separator: ", ")
     }
 }

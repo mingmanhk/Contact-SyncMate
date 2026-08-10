@@ -43,6 +43,13 @@ import AppKit
 /// 3. Configure the same redirect URI in Google Cloud Console
 ///
 /// See `OAUTH_CONFIGURATION.md` for detailed setup instructions.
+///
+/// `@MainActor` is spelled out rather than inherited from the project's
+/// default-isolation setting: the `@Published` state drives SwiftUI, so
+/// main-actor confinement is a requirement of this type, not an accident of
+/// build configuration — and it must survive a Swift 6 migration that changes
+/// the default.
+@MainActor
 class GoogleOAuthManager: NSObject, ObservableObject {
     static let shared = GoogleOAuthManager()
     
@@ -118,6 +125,12 @@ class GoogleOAuthManager: NSObject, ObservableObject {
             Task {
                 try? await refreshAccessToken(refreshToken: refreshToken)
             }
+        } else {
+            // Expired with no refresh token: nothing can revive this session,
+            // so the flag must be resolved here and now. Leaving it untouched
+            // reproduces exactly the failure the init comment warns about —
+            // a UI claiming "connected" while every API call 401s.
+            isAuthenticated = false
         }
     }
     
@@ -246,63 +259,71 @@ class GoogleOAuthManager: NSObject, ObservableObject {
         let authURL = buildAuthorizationURL()
         
         return try await withCheckedThrowingContinuation { continuation in
+            // The session's completion handler arrives on an arbitrary queue,
+            // and the token exchange finishes inside a Task on yet another —
+            // either can reach a resume first. A checked continuation traps if
+            // resumed twice, so every exit funnels through this gate, which
+            // lets exactly one caller through. A bare Bool here was only safe
+            // by ordering luck; the lock makes the at-most-once claim hold
+            // under any interleaving.
+            let resumeLock = NSLock()
+            var isResumed = false
+            let resumeOnce: (Result<Void, Error>) -> Void = { result in
+                resumeLock.lock()
+                let isFirst = !isResumed
+                isResumed = true
+                resumeLock.unlock()
+                if isFirst { continuation.resume(with: result) }
+            }
+            // Read-only peek for skipping work whose result nobody will
+            // receive; correctness never depends on it, only the gate above.
+            let alreadyResumed: () -> Bool = {
+                resumeLock.lock()
+                defer { resumeLock.unlock() }
+                return isResumed
+            }
+
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else {
-                    continuation.resume(throwing: GoogleOAuthError.unknown)
+                    resumeOnce(.failure(GoogleOAuthError.unknown))
                     return
                 }
-                
-                var isResumed = false
-                
+
                 self.authSession = ASWebAuthenticationSession(
                     url: authURL,
                     callbackURLScheme: self.getCallbackScheme()
                 ) { callbackURL, error in
-                    guard !isResumed else { return }
-                    
+                    guard !alreadyResumed() else { return }
+
                     if let error = error {
-                        isResumed = true
-                        continuation.resume(throwing: GoogleOAuthError.authCancelled(error))
+                        resumeOnce(.failure(GoogleOAuthError.authCancelled(error)))
                         return
                     }
-                    
+
                     guard let callbackURL = callbackURL else {
-                        isResumed = true
-                        continuation.resume(throwing: GoogleOAuthError.noCallbackURL)
+                        resumeOnce(.failure(GoogleOAuthError.noCallbackURL))
                         return
                     }
-                    
+
                     Task {
                         do {
                             try await self.handleCallback(url: callbackURL)
-                            if !isResumed {
-                                isResumed = true
-                                continuation.resume()
-                            }
+                            resumeOnce(.success(()))
                         } catch {
-                            if !isResumed {
-                                isResumed = true
-                                continuation.resume(throwing: error)
-                            }
+                            resumeOnce(.failure(error))
                         }
                     }
                 }
-                
+
                 self.authSession?.presentationContextProvider = self
                 self.authSession?.prefersEphemeralWebBrowserSession = false
-                
+
                 guard let session = self.authSession else {
-                    if !isResumed {
-                        isResumed = true
-                        continuation.resume(throwing: GoogleOAuthError.sessionStartFailed)
-                    }
+                    resumeOnce(.failure(GoogleOAuthError.sessionStartFailed))
                     return
                 }
                 if !session.start() {
-                    if !isResumed {
-                        isResumed = true
-                        continuation.resume(throwing: GoogleOAuthError.sessionStartFailed)
-                    }
+                    resumeOnce(.failure(GoogleOAuthError.sessionStartFailed))
                 }
             }
         }

@@ -31,6 +31,14 @@ final class AutoSyncScheduler: ObservableObject {
     private var timer: DispatchSourceTimer?
     private var cancellables = Set<AnyCancellable>()
 
+    /// Identifies the currently armed timer. A fire handler suspends across
+    /// `triggerSync`, and the user can change the interval (or disable
+    /// auto-sync) while it is suspended; when it resumes, only the handler
+    /// whose generation still matches may publish `nextScheduledSync` —
+    /// otherwise it would overwrite the replacement timer's fire date with one
+    /// computed from the superseded interval.
+    private var generation = 0
+
     // MARK: - Init
 
     init(appState: AppState) {
@@ -75,6 +83,8 @@ final class AutoSyncScheduler: ObservableObject {
     private func reschedule() {
         stop() // cancel any existing timer first
 
+        let currentGeneration = generation
+
         let interval = max(60, settings.autoSyncInterval) // floor at 1 minute
         let fireDate = Date().addingTimeInterval(interval)
         appState?.nextScheduledSync = fireDate
@@ -88,8 +98,13 @@ final class AutoSyncScheduler: ObservableObject {
         source.setEventHandler { [weak self] in
             Task { @MainActor [weak self] in
                 await self?.triggerSync?()
-                // Re-publish next fire date after each execution
-                self?.appState?.nextScheduledSync = Date().addingTimeInterval(interval)
+                // Re-publish next fire date after each execution — but only if
+                // this timer is still the armed one. `reschedule()`/`stop()`
+                // may have run while `triggerSync` was suspended, and the new
+                // state (a fresh fire date, or nil) must not be clobbered with
+                // a date computed from the old interval.
+                guard let self, self.generation == currentGeneration else { return }
+                self.appState?.nextScheduledSync = Date().addingTimeInterval(interval)
             }
         }
         source.resume()
@@ -98,6 +113,9 @@ final class AutoSyncScheduler: ObservableObject {
 
     /// Cancel the active timer and clear the next-sync display.
     private func stop() {
+        // Invalidate any fire handler still awaiting `triggerSync`, so it
+        // cannot resurrect a next-sync date after the timer is gone.
+        generation += 1
         timer?.cancel()
         timer = nil
         appState?.nextScheduledSync = nil
