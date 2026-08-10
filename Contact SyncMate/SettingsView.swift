@@ -1020,6 +1020,22 @@ struct AIMatchingSettingsView: View {
                             .foregroundStyle(Palette.secondaryText)
                     }
 
+                    // Explicit disclosure + consent. The key alone does not
+                    // authorise sending contact data anywhere: the matcher's
+                    // cloud tier is hard-gated on this flag, so the promise
+                    // made in onboarding stays true until the user reads
+                    // exactly what leaves the Mac and agrees.
+                    VStack(alignment: .leading, spacing: 6) {
+                        Toggle(isOn: $settings.aiCloudConsentGiven) {
+                            Text("Send ambiguous duplicates to Anthropic")
+                                .fontWeight(.medium)
+                        }
+                        Text("When local checks cannot decide whether two contacts are the same person, their names, organisation, job title, email addresses and phone numbers are sent to api.anthropic.com for comparison using your key. Until you allow this, AI matching runs fully on-device.")
+                            .font(.caption)
+                            .foregroundStyle(Palette.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
                     // 2. Model choice — always visible so users can see
                     //    what's available before entering a key.
                     Picker("Model", selection: $settings.aiModel) {

@@ -37,7 +37,7 @@
 
 	<!-- Contacts privacy description (required for CNContactStore access) -->
 	<key>NSContactsUsageDescription</key>
-	<string>Contact SyncMate needs access to your contacts so it can synchronise them with your Google Contacts. All processing happens on this Mac — your contacts are never sent to the developer.</string>
+	<string>Contact SyncMate needs access to your contacts so it can synchronise them with your Google Contacts. Contact data is exchanged only with Google — and with Anthropic's AI duplicate matching only if you explicitly enable that in Settings.</string>
 
 	<!-- OAuth redirect URL scheme (Google sign-in callback) -->
 	<key>CFBundleURLTypes</key>

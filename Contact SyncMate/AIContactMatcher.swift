@@ -338,6 +338,12 @@ class AIContactMatcher {
         apiKey: String
     ) async -> AIMatchResult? {
 
+        // Consent gate: this is the one place contact fields leave the device.
+        // Nothing is sent until the user has read the Cloud AI disclosure in
+        // Settings → AI Matching and switched consent on — the AI-matching
+        // toggle alone is not consent, because it defaults to on.
+        guard AppSettings.shared.aiCloudConsentGiven else { return nil }
+
         guard let url = URL(string: "https://api.anthropic.com/v1/messages") else { return nil }
 
         var req = URLRequest(url: url)

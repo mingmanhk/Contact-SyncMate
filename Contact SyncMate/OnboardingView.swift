@@ -156,7 +156,7 @@ private struct OnboardingWelcomeStep: View {
                     .font(.largeTitle)
                     .fontWeight(.bold)
 
-                Text("Keep your Google and Mac contacts in perfect sync — privately, on your device.")
+                Text("Keep your Google and Mac contacts in perfect sync — directly between this Mac and your Google account.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -245,7 +245,7 @@ private struct OnboardingGoogleStep: View {
                     .accessibilityLabel("Sign-in failed: \(failure)")
             }
 
-            Text("Your contacts stay on your device. No third-party servers are involved.")
+            Text("Your contacts sync directly between this Mac and Google — no developer servers involved. Optional AI duplicate matching sends data to Anthropic only with your explicit consent in Settings.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

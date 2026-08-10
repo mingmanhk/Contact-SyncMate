@@ -167,6 +167,18 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(aiMatchingEnabled, forKey: "aiMatchingEnabled") }
     }
 
+    /// Explicit user consent for the Cloud AI tier.
+    ///
+    /// AI matching is on by default, so that toggle is not consent to send
+    /// anything anywhere. This flag is set only by the disclosure toggle in
+    /// Settings → AI Matching, and the Anthropic call refuses to run while it
+    /// is false — so the onboarding promise that contacts stay between this
+    /// Mac and Google holds until the user explicitly reads and accepts the
+    /// trade.
+    @Published var aiCloudConsentGiven: Bool = UserDefaults.standard.object(forKey: "aiCloudConsentGiven") as? Bool ?? false {
+        didSet { UserDefaults.standard.set(aiCloudConsentGiven, forKey: "aiCloudConsentGiven") }
+    }
+
     /// Anthropic API key — stored in the macOS Keychain (not UserDefaults).
     /// On first launch after upgrade, any pre-existing key in UserDefaults is
     /// migrated into the Keychain and then removed from UserDefaults.
