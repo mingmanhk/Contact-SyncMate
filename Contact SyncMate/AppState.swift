@@ -103,6 +103,11 @@ struct SyncResult {
     /// this names *why* they were skipped so the UI can offer a review.
     var deferredDeletions: Int = 0
 
+    /// Merges held back because the run was not user-reviewed and the match
+    /// was never confirmed (`userOverride == nil`). Counted inside `skipped`;
+    /// named so the UI can send the user to the sync preview to decide.
+    var deferredMerges: Int = 0
+
     /// Contacts skipped because they have failed repeatedly. Counted inside
     /// `skipped`; named separately so the UI can point at the list rather than
     /// letting them vanish into an anonymous skip count.
@@ -132,6 +137,10 @@ struct SyncResult {
         if deferredDeletions > 0 {
             text += "\nHeld back for review: \(deferredDeletions) deletion"
                  + (deferredDeletions == 1 ? "" : "s")
+        }
+        if deferredMerges > 0 {
+            text += "\nHeld back for review: \(deferredMerges) unconfirmed merge"
+                 + (deferredMerges == 1 ? "" : "s")
         }
         return text
     }

@@ -2,6 +2,7 @@
 // Sync engine diff logic and ContactMapper tests
 
 import XCTest
+import Contacts
 @testable import Contact_SyncMate
 
 extension UnifiedContact {
@@ -781,13 +782,91 @@ final class SyncFailureKeyTests: XCTestCase {
     }
 
     func test_unreviewedMerge_isDeferred() {
-        // D-01: a scheduled (unreviewed) sync applies a `.merge` nobody
-        // confirmed. Desired behavior: like deletions, an unconfirmed merge is
-        // recorded and deferred to the sync preview.
-        XCTExpectFailure("Known bug — github issue #1") {
-            XCTAssertTrue(SyncEngine.deletionIsHeldBack(
-                action: .merge, session: session(reviewed: false), settings: AppSettings.shared),
-                "an unreviewed merge rewrites both sides and must wait for review")
-        }
+        // D-01 regression (github issue #1): a `.merge` nobody confirmed is a
+        // proposal, not a decision — an unreviewed run defers it to the sync
+        // preview instead of rewriting both address books.
+        let proposal = ContactChange(
+            contactName: "David Chan", action: .merge, direction: .twoWay,
+            changes: ["Possible match: same name only"],
+            sourceContact: .diffMake(givenName: "David"),
+            targetContact: .diffMake(givenName: "David"))
+        XCTAssertTrue(SyncEngine.mergeIsHeldBack(
+            change: proposal, session: session(reviewed: false)),
+            "an unreviewed merge rewrites both sides and must wait for review")
+        XCTAssertFalse(SyncEngine.mergeIsHeldBack(
+            change: proposal, session: session(reviewed: true)),
+            "a reviewed session's merges were seen and applied by the user")
+    }
+
+    func test_confirmedMerge_isNotDeferred() {
+        // The auto-apply set is deliberate: a shared-email match or an explicit
+        // "merge both sides" preference carries userOverride == .merge and
+        // still applies on a scheduled run.
+        let confirmed = ContactChange(
+            contactName: "David Chan", action: .merge, direction: .twoWay,
+            changes: ["Matched on a shared email address"],
+            userOverride: .merge,
+            sourceContact: .diffMake(givenName: "David"),
+            targetContact: .diffMake(givenName: "David"))
+        XCTAssertFalse(SyncEngine.mergeIsHeldBack(
+            change: confirmed, session: session(reviewed: false)))
+    }
+}
+
+// MARK: - D-02 regression: field clearing propagates and converges (github issue #2)
+
+final class ApplyToMacClearingTests: XCTestCase {
+
+    func test_emptiedPhones_clearMacPhones() {
+        let mac = CNMutableContact()
+        mac.phoneNumbers = [CNLabeledValue(
+            label: CNLabelPhoneNumberMobile,
+            value: CNPhoneNumber(stringValue: "+15551234567"))]
+        ContactMapper.applyToMac(from: .diffMake(givenName: "Ann"), to: mac)
+        XCTAssertTrue(mac.phoneNumbers.isEmpty,
+                      "all phones deleted on the other side must delete here, or the diff re-fires forever")
+    }
+
+    func test_clearedGivenName_clearsMacGivenName() {
+        let mac = CNMutableContact()
+        mac.givenName = "Old"
+        mac.familyName = "Name"
+        ContactMapper.applyToMac(from: .diffMake(familyName: "Name"), to: mac)
+        XCTAssertEqual(mac.givenName, "",
+                       "Google reports a cleared name as nil; the Mac stores it as \"\" — the diff's nonBlank comparison treats them as equal, so this converges")
+        XCTAssertEqual(mac.familyName, "Name")
+    }
+
+    func test_optedOutFields_areNeverTouched() {
+        // The engine strips opted-out fields to nil/empty before writing.
+        // Stripped-because-opted-out must not read as cleared-by-the-user.
+        let mac = CNMutableContact()
+        mac.jobTitle = "Engineer"
+        mac.birthday = DateComponents(year: 1990, month: 5, day: 1)
+        mac.urlAddresses = [CNLabeledValue(
+            label: CNLabelURLAddressHomePage,
+            value: "https://example.com" as NSString)]
+        let postal = CNMutablePostalAddress()
+        postal.street = "1 Main St"
+        mac.postalAddresses = [CNLabeledValue(label: CNLabelHome, value: postal)]
+
+        var mask = ContactMapper.MacWriteFields.all
+        mask.jobTitle = false; mask.birthday = false
+        mask.websites = false; mask.addresses = false
+        ContactMapper.applyToMac(from: .diffMake(givenName: "Ann"), to: mac, fields: mask)
+
+        XCTAssertEqual(mac.jobTitle, "Engineer")
+        XCTAssertNotNil(mac.birthday)
+        XCTAssertEqual(mac.urlAddresses.count, 1)
+        XCTAssertEqual(mac.postalAddresses.count, 1)
+    }
+
+    func test_absentPhoto_doesNotClearMacPhoto() {
+        // Photos travel Google → Mac only, and diffFields never reports a photo
+        // removal — clearing here would wipe a photo no preview ever showed.
+        let mac = CNMutableContact()
+        mac.imageData = Data([0xFF, 0xD8])
+        ContactMapper.applyToMac(from: .diffMake(givenName: "Ann"), to: mac)
+        XCTAssertNotNil(mac.imageData)
     }
 }

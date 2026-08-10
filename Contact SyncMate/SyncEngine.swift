@@ -212,6 +212,7 @@ class SyncEngine: ObservableObject {
         var merged = 0
         var skipped = 0
         var deferredDeletions = 0
+        var deferredMerges = 0
         var setAside = 0
         var errors: [SyncError] = []
 
@@ -262,6 +263,20 @@ class SyncEngine: ObservableObject {
                     source: "SyncEngine", action: "delete.heldForReview",
                     details: "\(change.contactName) — enable Sync Now review to apply, "
                            + "or turn off Settings → Confirmations → Ask before deleting contacts"
+                )
+                continue
+            }
+
+            // A merge nobody confirmed is deferred, not applied. The reviewed
+            // preview gates these with needsReview; this is the same gate for
+            // runs that never see a preview.
+            if Self.mergeIsHeldBack(change: change, session: session) {
+                skipped += 1
+                deferredMerges += 1
+                SyncHistory.shared.log(
+                    source: "SyncEngine", action: "merge.heldForReview",
+                    details: "\(change.contactName) — possible match not confirmed; "
+                           + "run Sync Now and review to merge or keep separate"
                 )
                 continue
             }
@@ -391,6 +406,7 @@ class SyncEngine: ObservableObject {
             skipped: skipped,
             errors: errors,
             deferredDeletions: deferredDeletions,
+            deferredMerges: deferredMerges,
             setAside: setAside
         )
 
@@ -1247,6 +1263,22 @@ class SyncEngine: ObservableObject {
         action == .delete && settings.confirmPendingDeletions && !session.userReviewed
     }
 
+    /// Whether an unconfirmed merge should be held back from an unreviewed run.
+    ///
+    /// A `.merge` with no `userOverride` is a proposal, not a decision: the
+    /// preview path marks exactly these as needs-review, but a scheduled run
+    /// never reaches a preview, and until now they fell straight through to
+    /// `performMerge` — fusing two people who share only a name and writing the
+    /// union to both address books. A wrong merge is worse than a duplicate: it
+    /// destroys the fact that these were two records. Confirmed merges
+    /// (`userOverride == .merge` — a shared-email match, an explicit
+    /// "merge both sides" preference, or the user's own choice in review)
+    /// still apply.
+    static func mergeIsHeldBack(change: ContactChange,
+                                session: SyncSession) -> Bool {
+        change.action == .merge && change.userOverride == nil && !session.userReviewed
+    }
+
     /// Whether a change writes to Google, resolving `.twoWay` the way the
     /// per-contact apply paths do.
     ///
@@ -1446,6 +1478,20 @@ class SyncEngine: ObservableObject {
             details: "\(change.contactName) → \(direction == .googleToMac ? "Mac" : "Google")")
     }
 
+    /// The settings-derived write mask for Mac writes of engine-stripped
+    /// contacts. `applyFieldSettings` empties opted-out fields, and
+    /// `applyToMac` clears whatever the mask allows — passing `.all` for a
+    /// stripped contact would erase every opted-out field from the Mac copy.
+    private var macWriteFields: ContactMapper.MacWriteFields {
+        ContactMapper.MacWriteFields(
+            jobTitle:  settings.syncJobTitle,
+            notes:     settings.syncNotes,
+            birthday:  settings.syncBirthday,
+            websites:  settings.syncWebsites,
+            addresses: settings.syncAddresses,
+            photos:    settings.syncPhotos)
+    }
+
     private func performUpdate(change: ContactChange, direction: SyncDirection) async throws {
         guard let rawSource = change.sourceContact else {
             throw SyncEngineError.missingContactData(change.contactName)
@@ -1461,10 +1507,11 @@ class SyncEngine: ObservableObject {
             // and doing it here kept a priority inversion on the hot path.
             let c = macConnector
             let unified = source
+            let mask = macWriteFields
             try await MacContactsConnector.performWriteOffMain {
                 guard let existing = try c.fetchContactSync(withIdentifier: mID) else { return }
                 let mutableContact = existing.mutableCopy() as! CNMutableContact
-                ContactMapper.applyToMac(from: unified, to: mutableContact)
+                ContactMapper.applyToMac(from: unified, to: mutableContact, fields: mask)
                 try c.updateContactSync(mutableContact)
             }
 
@@ -1590,10 +1637,11 @@ class SyncEngine: ObservableObject {
             // the hot path — the fetch is XPC too.
             let c = macConnector
             let unified = finalMerged
+            let mask = macWriteFields
             try await MacContactsConnector.performWriteOffMain {
                 guard let existing = try c.fetchContactSync(withIdentifier: mID) else { return }
                 let mutable = existing.mutableCopy() as! CNMutableContact
-                ContactMapper.applyToMac(from: unified, to: mutable)
+                ContactMapper.applyToMac(from: unified, to: mutable, fields: mask)
                 try c.updateContactSync(mutable)
             }
         }
@@ -1973,24 +2021,57 @@ enum ContactMapper {
         return mac
     }
 
+    /// Which of the user-toggleable field groups a Mac write may touch.
+    ///
+    /// `applyToMac` clears a field when the incoming contact lacks it — that is
+    /// what makes a deletion on Google converge instead of re-diffing forever.
+    /// But the engine strips opted-out fields to nil/empty *before* writing
+    /// (`applyFieldSettings`), which is indistinguishable from "cleared on the
+    /// other side". Without this mask, turning a field's sync toggle off would
+    /// erase that field from every Mac contact on the next sync. Callers that
+    /// write engine-stripped contacts must pass the settings-derived mask;
+    /// restore/dedup paths write full contacts and use `.all`.
+    struct MacWriteFields {
+        var jobTitle  = true
+        var notes     = true
+        var birthday  = true
+        var websites  = true
+        var addresses = true
+        var photos    = true
+        static let all = MacWriteFields()
+    }
+
     /// Apply fields from a UnifiedContact onto an existing CNMutableContact (for updates)
-    /// Preserves the contact's identifier — only overwrites changed fields.
+    /// Preserves the contact's identifier.
+    ///
+    /// Fields the mask allows are written *unconditionally*: an empty array or
+    /// nil scalar clears the Mac value. The old guards (`if !isEmpty`, `if let`)
+    /// meant a field emptied on Google could never be emptied on the Mac — the
+    /// diff kept reporting "Phone numbers changed", the sync kept "succeeding",
+    /// and the same change fired on every run forever.
     ///
     /// `nonisolated`: pure field copying with no shared state, and it has to run
     /// on the Contacts write queue — hopping to the main actor mid-write would
     /// reintroduce the priority inversion the queue exists to avoid.
-    nonisolated static func applyToMac(from unified: UnifiedContact, to mac: CNMutableContact) {
-        if let v = unified.givenName          { mac.givenName          = v }
-        if let v = unified.middleName         { mac.middleName         = v }
-        if let v = unified.familyName         { mac.familyName         = v }
-        if let v = unified.namePrefix         { mac.namePrefix         = v }
-        if let v = unified.nameSuffix         { mac.nameSuffix         = v }
-        if let v = unified.nickname           { mac.nickname           = v }
-        if let v = unified.phoneticGivenName  { mac.phoneticGivenName  = v }
-        if let v = unified.phoneticFamilyName { mac.phoneticFamilyName = v }
-        if let v = unified.organizationName   { mac.organizationName   = v }
-        if let v = unified.department         { mac.departmentName     = v }
-        if let v = unified.jobTitle           { mac.jobTitle           = v }
+    nonisolated static func applyToMac(from unified: UnifiedContact,
+                                       to mac: CNMutableContact,
+                                       fields: MacWriteFields = .all) {
+        // Always-synced scalars. Google says "no value" by omitting the key
+        // (mapped to nil via nilIfEmpty), Contacts says it with "" — writing ""
+        // for nil is how a name cleared on Google gets cleared here, and the
+        // diff's `nonBlank` comparison treats the two as equal, so it converges.
+        mac.givenName          = unified.givenName          ?? ""
+        mac.middleName         = unified.middleName         ?? ""
+        mac.familyName         = unified.familyName         ?? ""
+        mac.namePrefix         = unified.namePrefix         ?? ""
+        mac.nameSuffix         = unified.nameSuffix         ?? ""
+        mac.nickname           = unified.nickname           ?? ""
+        mac.phoneticGivenName  = unified.phoneticGivenName  ?? ""
+        mac.phoneticFamilyName = unified.phoneticFamilyName ?? ""
+        mac.organizationName   = unified.organizationName   ?? ""
+        mac.departmentName     = unified.department         ?? ""
+
+        if fields.jobTitle { mac.jobTitle = unified.jobTitle ?? "" }
 
         // Guarded, exactly as `toMac` guards it.
         //
@@ -1999,28 +2080,28 @@ enum ContactMapper {
         // just the note — as Cocoa 134092. `toMac` had this guard; this function
         // did not, and it is the one the merge path uses. That is why merges
         // failed with 134092 while adds and updates succeeded.
-        if MacContactsConnector.notesFieldAvailable, let v = unified.note {
-            mac.note = v
+        if MacContactsConnector.notesFieldAvailable, fields.notes {
+            mac.note = unified.note ?? ""
         }
 
-        if let v = unified.photoData          { mac.imageData          = v }
-        if let v = unified.birthday           { mac.birthday           = v }
+        // Photos stay presence-only on purpose: they only travel Google → Mac,
+        // and `diffFields` never reports a photo *removal* — so clearing here
+        // would wipe a Mac photo through a change no preview ever showed.
+        if fields.photos, let v = unified.photoData { mac.imageData = v }
 
-        if !unified.phoneNumbers.isEmpty {
-            mac.phoneNumbers = unified.phoneNumbers.map {
-                CNLabeledValue<CNPhoneNumber>(
-                    label: cnLabelFromString($0.label),
-                    value: CNPhoneNumber(stringValue: $0.value))
-            }
+        if fields.birthday { mac.birthday = unified.birthday }
+
+        mac.phoneNumbers = unified.phoneNumbers.map {
+            CNLabeledValue<CNPhoneNumber>(
+                label: cnLabelFromString($0.label),
+                value: CNPhoneNumber(stringValue: $0.value))
         }
-        if !unified.emailAddresses.isEmpty {
-            mac.emailAddresses = unified.emailAddresses.map {
-                CNLabeledValue<NSString>(
-                    label: cnLabelFromString($0.label),
-                    value: $0.value as NSString)
-            }
+        mac.emailAddresses = unified.emailAddresses.map {
+            CNLabeledValue<NSString>(
+                label: cnLabelFromString($0.label),
+                value: $0.value as NSString)
         }
-        if !unified.postalAddresses.isEmpty {
+        if fields.addresses {
             mac.postalAddresses = unified.postalAddresses.map { addr in
                 let cn = CNMutablePostalAddress()
                 cn.street = addr.street ?? ""; cn.city = addr.city ?? ""
@@ -2030,7 +2111,7 @@ enum ContactMapper {
                 return CNLabeledValue<CNPostalAddress>(label: cnLabelFromString(addr.label), value: cn)
             }
         }
-        if !unified.urls.isEmpty {
+        if fields.websites {
             mac.urlAddresses = unified.urls.map {
                 CNLabeledValue<NSString>(
                     label: cnLabelFromString($0.label),
