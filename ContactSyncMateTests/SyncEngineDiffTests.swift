@@ -811,6 +811,31 @@ final class SyncFailureKeyTests: XCTestCase {
         XCTAssertFalse(SyncEngine.mergeIsHeldBack(
             change: confirmed, session: session(reviewed: false)))
     }
+
+    func test_setAsideContact_isExcludedFromBatch() {
+        // N-01 regression (github issue #24): set aside means set aside — the
+        // batch pre-pass must not submit what the per-contact loop would skip.
+        let key = "mac:test-batch-setaside"
+        defer { SyncFailureStore.shared.clearFailure(key: key) }
+
+        var s = SyncSession(mode: .manual, direction: .macToGoogle,
+                            startTime: Date(), contactChanges: [])
+        s.userReviewed = true
+        let c = change(source: .diffMake(macContactIdentifier: "test-batch-setaside"),
+                       target: .diffMake(googleResourceName: "people/g9"))
+
+        XCTAssertTrue(SyncEngine.batchMaySend(c, session: s, settings: AppSettings.shared))
+
+        for _ in 1...SyncFailureStore.attemptsBeforeSkipping {
+            _ = SyncFailureStore.shared.recordFailure(key: key, name: "T", reason: "x")
+        }
+        XCTAssertFalse(SyncEngine.batchMaySend(c, session: s, settings: AppSettings.shared),
+                       "a set-aside contact must not reach the wire via the batch")
+
+        SyncFailureStore.shared.clearFailure(key: key)
+        XCTAssertTrue(SyncEngine.batchMaySend(c, session: s, settings: AppSettings.shared),
+                      "clearing the failure restores batch eligibility")
+    }
 }
 
 // MARK: - D-02 regression: field clearing propagates and converges (github issue #2)

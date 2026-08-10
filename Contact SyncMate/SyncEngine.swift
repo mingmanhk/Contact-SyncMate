@@ -1298,6 +1298,26 @@ class SyncEngine: ObservableObject {
         }
     }
 
+    /// Whether the batch pre-pass may write this change to Google.
+    ///
+    /// Mirrors every gate the per-contact loop applies *before* writing.
+    /// The batch used to check only the deletion hold-back — so a contact set
+    /// aside after three failures was still submitted to Google on every sync,
+    /// its rejection never recorded (the per-contact loop `continue`s at the
+    /// set-aside check before it reads batch failures), and a set-aside
+    /// contact whose batch write *succeeded* was still counted as skipped,
+    /// never cleared, and its Mac half never written. Set-aside means set
+    /// aside: the contact must not reach the wire at all.
+    static func batchMaySend(_ change: ContactChange,
+                             session: SyncSession,
+                             settings: AppSettings) -> Bool {
+        let action = change.userOverride ?? change.action
+        if deletionIsHeldBack(action: action, session: session, settings: settings) { return false }
+        if let key = failureKey(for: change),
+           SyncFailureStore.shared.shouldSkip(key: key) { return false }
+        return writesToGoogle(change, action: action, session: session)
+    }
+
     /// Apply every Google-bound add/update/delete through the People API batch
     /// endpoints before the per-contact loop runs.
     ///
@@ -1321,8 +1341,7 @@ class SyncEngine: ObservableObject {
 
         for change in session.contactChanges {
             let action = change.userOverride ?? change.action
-            guard !Self.deletionIsHeldBack(action: action, session: session, settings: settings),
-                  Self.writesToGoogle(change, action: action, session: session),
+            guard Self.batchMaySend(change, session: session, settings: settings),
                   let rawSource = change.sourceContact else { continue }
             let source = applyFieldSettings(to: rawSource)
 
