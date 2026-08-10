@@ -2153,12 +2153,30 @@ enum ContactMapper {
 
 // MARK: - Contact Mapping Store
 
-/// Stores mappings between Google and Mac contact IDs
-class ContactMappingStore {
+/// Stores mappings between Google and Mac contact IDs.
+///
+/// One shared instance, one in-memory dictionary, mutated only on the main
+/// actor. The previous shape — a concurrent queue with sync readers, async-
+/// barrier writers, and *eight* call sites each constructing a private
+/// instance over the same JSON file — had three real failure modes:
+/// blocking `queue.sync` parked the main thread behind the barrier queue; an
+/// async-barrier write followed by a sync read could miss its own write; and
+/// because `saveToDisk` rewrites the whole file from one instance's snapshot,
+/// a stale instance's flush silently resurrected mappings another instance
+/// had just deleted (the Unlink-undoes-itself bug). All production access now
+/// goes through `.shared`: reads and writes are plain main-actor dictionary
+/// operations (read-your-write is trivially true, nothing blocks), and only
+/// the disk write leaves the main thread, in order, on a serial IO queue.
+final class ContactMappingStore {
+
+    /// The one production store. Constructing a private instance re-creates
+    /// the last-writer-wins file race — only tests should use `init`.
+    static let shared = ContactMappingStore()
 
     // In-memory store (backed by JSON on disk for persistence)
     private var mappings: [String: ContactMapping] = [:] // keyed by googleResourceName
-    private let queue = DispatchQueue(label: "ContactMappingStore", attributes: .concurrent)
+    /// Disk writes only. Serial, so snapshots land in mutation order.
+    private let io = DispatchQueue(label: "ContactMappingStore.io", qos: .utility)
     private let persistenceURL: URL
 
     init() {
@@ -2175,29 +2193,25 @@ class ContactMappingStore {
     }
 
     func getAllMappings() -> [ContactMapping] {
-        queue.sync { Array(mappings.values) }
+        Array(mappings.values)
     }
 
     func getMapping(googleResourceName: String) -> ContactMapping? {
-        queue.sync { mappings[googleResourceName] }
+        mappings[googleResourceName]
     }
 
     func getMapping(macIdentifier: String) -> ContactMapping? {
-        queue.sync { mappings.values.first { $0.macContactIdentifier == macIdentifier } }
+        mappings.values.first { $0.macContactIdentifier == macIdentifier }
     }
 
     func saveMapping(_ mapping: ContactMapping) {
-        queue.async(flags: .barrier) {
-            self.mappings[mapping.googleResourceName] = mapping
-            self.saveToDisk()
-        }
+        mappings[mapping.googleResourceName] = mapping
+        persist()
     }
 
     func deleteMapping(googleResourceName: String) {
-        queue.async(flags: .barrier) {
-            self.mappings.removeValue(forKey: googleResourceName)
-            self.saveToDisk()
-        }
+        mappings.removeValue(forKey: googleResourceName)
+        persist()
     }
 
     /// Forget one pairing, addressed from the Mac side.
@@ -2207,12 +2221,10 @@ class ContactMappingStore {
     /// the Sync Failures list needs: a failed `CNSaveRequest` names the Mac
     /// record, not the Google one.
     func deleteMapping(macContactIdentifier: String) {
-        queue.sync(flags: .barrier) {
-            let stale = self.mappings.filter { $0.value.macContactIdentifier == macContactIdentifier }
-            guard !stale.isEmpty else { return }
-            for key in stale.keys { self.mappings.removeValue(forKey: key) }
-            self.saveToDisk()
-        }
+        let stale = mappings.filter { $0.value.macContactIdentifier == macContactIdentifier }
+        guard !stale.isEmpty else { return }
+        for key in stale.keys { mappings.removeValue(forKey: key) }
+        persist()
     }
 
     /// Forget every Google ↔ Mac pairing.
@@ -2221,41 +2233,40 @@ class ContactMappingStore {
     /// identity. That is what makes a retest a genuine first run — with the
     /// mappings still on disk, a "fresh" install behaves like an established one.
     func deleteAllMappings() {
-        queue.sync(flags: .barrier) {
-            self.mappings.removeAll()
-            self.saveToDisk()
-        }
+        mappings.removeAll()
+        persist()
     }
 
     // MARK: - Persistence
 
-    private func saveToDisk() {
-        struct CodableMapping: Codable {
-            var googleResourceName: String
-            var macContactIdentifier: String
-            var lastSyncedAt: Date
-            var googleEtag: String?
-        }
+    private struct CodableMapping: Codable {
+        var googleResourceName: String
+        var macContactIdentifier: String
+        var lastSyncedAt: Date
+        var googleEtag: String?
+    }
+
+    /// Snapshot the current state and write it out off the main thread.
+    /// The serial queue preserves mutation order, so the file always ends at
+    /// the latest state even when saves burst during a large sync.
+    private func persist() {
         let codable = mappings.values.map {
             CodableMapping(googleResourceName: $0.googleResourceName,
                            macContactIdentifier: $0.macContactIdentifier,
                            lastSyncedAt: $0.lastSyncedAt,
                            googleEtag: $0.googleEtag)
         }
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        if let data = try? encoder.encode(codable) {
-            try? data.write(to: persistenceURL, options: .atomic)
+        let url = persistenceURL
+        io.async {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            if let data = try? encoder.encode(codable) {
+                try? data.write(to: url, options: .atomic)
+            }
         }
     }
 
     private func loadFromDisk() {
-        struct CodableMapping: Codable {
-            var googleResourceName: String
-            var macContactIdentifier: String
-            var lastSyncedAt: Date
-            var googleEtag: String?
-        }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         guard let data = try? Data(contentsOf: persistenceURL),

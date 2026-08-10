@@ -127,7 +127,7 @@ final class SyncCoordinator: ObservableObject {
         let engine = SyncEngine(
             googleConnector: GoogleContactsConnector(),
             macConnector: MacContactsConnector(),
-            mappingStore: ContactMappingStore()
+            mappingStore: ContactMappingStore.shared
         )
 
         // Forward engine progress to our phase
@@ -178,7 +178,7 @@ final class SyncCoordinator: ObservableObject {
                     let scan = await coordinator.scanForDuplicates(
                         googleContacts: google,
                         macContacts: mac,
-                        existingMappings: ContactMappingStore().getAllMappings(),
+                        existingMappings: ContactMappingStore.shared.getAllMappings(),
                         // Honour the user's confirmation preference — silent
                         // auto-merge only when explicitly opted in.
                         autoApplyIfSafe: settings.allowSilentAutoMerge
@@ -304,7 +304,7 @@ final class SyncCoordinator: ObservableObject {
         let engine = SyncEngine(
             googleConnector: GoogleContactsConnector(),
             macConnector: MacContactsConnector(),
-            mappingStore: ContactMappingStore()
+            mappingStore: ContactMappingStore.shared
         )
 
         var progressCancellable: AnyCancellable?

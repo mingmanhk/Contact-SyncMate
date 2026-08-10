@@ -189,7 +189,7 @@ struct SyncFailuresView: View {
     /// loose with the same broken pairing still in place.
     private func unlink(_ failure: SyncFailure) {
         let macID = String(failure.id.dropFirst("mac:".count))
-        ContactMappingStore().deleteMapping(macContactIdentifier: macID)
+        ContactMappingStore.shared.deleteMapping(macContactIdentifier: macID)
         SyncFailureStore.shared.clearFailure(key: failure.id)
         SyncHistory.shared.log(
             source: "SyncFailures", action: "mapping.unlinked",

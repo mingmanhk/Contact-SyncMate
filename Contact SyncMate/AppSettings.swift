@@ -523,7 +523,7 @@ class AppSettings: ObservableObject {
     func resetEverything(signOutGoogle: Bool = false) {
         resetToDefaults()
 
-        ContactMappingStore().deleteAllMappings()
+        ContactMappingStore.shared.deleteAllMappings()
         ContactBackupManager.shared.deleteAllBackups()
         DeduplicationDecisionStore.shared.clearAll()
         SyncFailureStore.shared.clearAll()

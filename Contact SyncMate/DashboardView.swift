@@ -710,7 +710,7 @@ struct DashboardView: View {
                 let engine = SyncEngine(
                     googleConnector: GoogleContactsConnector(),
                     macConnector: MacContactsConnector(),
-                    mappingStore: ContactMappingStore()
+                    mappingStore: ContactMappingStore.shared
                 )
 
                 let session = try await engine.prepareManualSync(

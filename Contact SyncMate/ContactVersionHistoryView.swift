@@ -174,7 +174,7 @@ struct ContactVersionHistoryView: View {
             let engine = SyncEngine(
                 googleConnector: GoogleContactsConnector(),
                 macConnector: MacContactsConnector(),
-                mappingStore: ContactMappingStore()
+                mappingStore: ContactMappingStore.shared
             )
 
             do {
