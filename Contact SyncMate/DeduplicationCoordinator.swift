@@ -210,15 +210,31 @@ class DeduplicationCoordinator: ObservableObject {
             // success log below still claimed the merge worked. A failure has to
             // reach the catch, because a half-done merge is worse than none.
             for other in others {
+                // Mapping cleanup rides with each deletion, not after the loop:
+                // if a later deletion throws, the records already gone must not
+                // keep mappings pointing at them — a stale mapping to a deleted
+                // record is exactly the corruption Unlink exists to clean up.
                 if other.source == .google, let gID = other.contact.googleResourceName {
                     try await googleConnector.deleteContact(resourceName: gID)
+                    ContactMappingStore.shared.deleteMapping(googleResourceName: gID)
                 }
                 if other.source == .mac, let mID = other.contact.macContactIdentifier {
                     let c = macConnector
                     try await MacContactsConnector.performWriteOffMain {
                         try c.deleteContactSync(withIdentifier: mID)
                     }
+                    ContactMappingStore.shared.deleteMapping(macContactIdentifier: mID)
                 }
+            }
+
+            // The survivor holds the merged payload on both sides as of now —
+            // record that, or the next sync re-diffs the merge as a change.
+            if let gID = merged.googleResourceName?.nonBlank,
+               let mID = merged.macContactIdentifier?.nonBlank {
+                ContactMappingStore.shared.saveMapping(ContactMapping(
+                    googleResourceName: gID,
+                    macContactIdentifier: mID,
+                    lastSyncedAt: Date()))
             }
 
             history.log(
@@ -227,6 +243,24 @@ class DeduplicationCoordinator: ObservableObject {
                 details: "group=\(group.id), merged \(group.contacts.count) contacts → \(merged.displayName)"
             )
         } catch {
+            // A thrown deletion means the merged payload is already written and
+            // some duplicates may already be gone — a partial merge. The history
+            // line alone made that invisible; record it where the user actually
+            // looks (Settings → Sync Failures), keyed the same way SyncEngine
+            // keys its per-contact failures.
+            let explained = SyncErrorExplanation.describe(error)
+            var failureKey: String?
+            if let mID = merged.macContactIdentifier?.nonBlank {
+                failureKey = "mac:" + mID
+            } else if let gID = merged.googleResourceName?.nonBlank {
+                failureKey = "google:" + gID
+            }
+            if let failureKey {
+                _ = SyncFailureStore.shared.recordFailure(
+                    key: failureKey,
+                    name: merged.displayName,
+                    reason: "Merge did not complete — \(explained)")
+            }
             history.log(
                 source: "DeduplicationCoordinator",
                 action: "\(trigger).failed",
@@ -270,7 +304,7 @@ class DeduplicationCoordinator: ObservableObject {
             jobTitle: primary.jobTitle?.isEmpty == false ? primary.jobTitle : secondary.jobTitle,
             phoneNumbers: mergeUniquePhones(primary.phoneNumbers, secondary.phoneNumbers),
             emailAddresses: mergeUniqueEmails(primary.emailAddresses, secondary.emailAddresses),
-            postalAddresses: primary.postalAddresses.isEmpty ? secondary.postalAddresses : primary.postalAddresses,
+            postalAddresses: mergeUniqueAddresses(primary.postalAddresses, secondary.postalAddresses),
             urls: primary.urls + secondary.urls.filter { u in !primary.urls.contains { $0.value == u.value } },
             birthday: primary.birthday ?? secondary.birthday,
             note: {
@@ -293,6 +327,19 @@ class DeduplicationCoordinator: ObservableObject {
         var result = a
         let existing = Set(a.map { $0.value.lowercased() })
         for e in b where !existing.contains(e.value.lowercased()) { result.append(e) }
+        return result
+    }
+
+    /// Union, keyed on the full normalized address. "Primary wins if it has
+    /// any" threw away every secondary address the moment the primary had one —
+    /// a merge is supposed to combine the two records, and a distinct address
+    /// is exactly the data a duplicate pair tends to disagree on.
+    func mergeUniqueAddresses(_ a: [UnifiedContact.PostalAddress], _ b: [UnifiedContact.PostalAddress]) -> [UnifiedContact.PostalAddress] { // internal for testing
+        var result = a
+        var seen = Set(a.map(SyncEngine.normalizedAddress))
+        for addr in b where seen.insert(SyncEngine.normalizedAddress(addr)).inserted {
+            result.append(addr)
+        }
         return result
     }
 

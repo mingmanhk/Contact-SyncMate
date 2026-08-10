@@ -891,17 +891,15 @@ final class DeduplicationMergeIntoTests: XCTestCase {
     }
 
     func test_mergeInto_keepsSecondaryAddresses() {
-        // D-05: when the primary has any postal address, every secondary
-        // address is dropped wholesale — data loss on the merge write-back.
+        // D-05: postal addresses union like phones and emails do — a distinct
+        // secondary address must not be dropped because the primary has one.
         var primary = UnifiedContact.make(givenName: "Amy")
         primary.postalAddresses = [UnifiedContact.PostalAddress(street: "1 Main St", city: "Springfield")]
         var secondary = UnifiedContact.make(givenName: "Amy")
         secondary.postalAddresses = [UnifiedContact.PostalAddress(street: "2 Oak Ave", city: "Shelbyville")]
         let merged = coordinator.mergeInto(primary: primary, secondary: secondary)
-        XCTExpectFailure("Known bug — github issue #5") {
-            XCTAssertEqual(merged.postalAddresses.count, 2,
-                           "a distinct secondary address must survive the merge")
-        }
+        XCTAssertEqual(merged.postalAddresses.count, 2,
+                       "a distinct secondary address must survive the merge")
     }
 }
 

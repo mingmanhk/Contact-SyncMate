@@ -241,6 +241,27 @@ final class SyncEngineDiffTests: XCTestCase {
         XCTAssertEqual(normalized.country, "Freedonia")
     }
 
+    // MARK: - Diff-reason histogram keys (N-04)
+
+    func test_histogramKey_emailMatchReason_isNameFree() {
+        // The histogram promises to count reasons, not people: the reason
+        // strings put per-contact detail after a colon, and the key stops there.
+        let key = SyncEngine.histogramKey(for: "Matched on a shared email address: Dana Scully")
+        XCTAssertEqual(key, "Matched on a shared email address")
+        XCTAssertFalse(key.contains("Dana"))
+    }
+
+    func test_histogramKey_possibleMatchReason_isNameFree() {
+        let key = SyncEngine.histogramKey(
+            for: "Possible match: Fox Mulder (same name only — review before merging)")
+        XCTAssertEqual(key, "Possible match")
+    }
+
+    func test_histogramKey_reasonWithoutColon_passesThrough() {
+        XCTAssertEqual(SyncEngine.histogramKey(for: "New contact from Google"),
+                       "New contact from Google")
+    }
+
     // MARK: - Empty inputs
 
     func test_empty_returns_no_changes() {
@@ -673,27 +694,23 @@ final class SyncEngineMergeHelperTests: XCTestCase {
     }
 
     func test_mergeAddresses_keepsSecondaryAddressWithoutStreet() {
-        // D-05: an address whose street is nil (city/PO-box-only) is silently
-        // dropped from the secondary side because the dedup key is the street.
+        // D-05: an address whose street is nil (city/PO-box-only) carries real
+        // data — the de-dup key is the full normalized address, not the street.
         let a = [UnifiedContact.PostalAddress(street: "1 Main St", city: "Springfield")]
         let b = [UnifiedContact.PostalAddress(city: "Shelbyville", postalCode: "62565")]
         let merged = makeEngine().mergeAddresses(a, b)
-        XCTExpectFailure("Known bug — github issue #5") {
-            XCTAssertEqual(merged.count, 2,
-                           "a street-less secondary address carries real data and must survive the merge")
-        }
+        XCTAssertEqual(merged.count, 2,
+                       "a street-less secondary address carries real data and must survive the merge")
     }
 
     func test_mergeAddresses_keepsSameStreetDifferentCity() {
         // D-05: "1 Main St, Springfield" and "1 Main St, Shelbyville" are
-        // different places, but the street-only dedup key collapses them.
+        // different places; only the full address may collapse them.
         let a = [UnifiedContact.PostalAddress(street: "1 Main St", city: "Springfield")]
         let b = [UnifiedContact.PostalAddress(street: "1 Main St", city: "Shelbyville")]
         let merged = makeEngine().mergeAddresses(a, b)
-        XCTExpectFailure("Known bug — github issue #5") {
-            XCTAssertEqual(merged.count, 2,
-                           "same street in a different city is a different address")
-        }
+        XCTAssertEqual(merged.count, 2,
+                       "same street in a different city is a different address")
     }
 }
 

@@ -62,12 +62,14 @@ class SyncEngine: ObservableObject {
         guard !isRunning else {
             throw SyncEngineError.syncAlreadyInProgress
         }
-        
-        await MainActor.run {
-            isRunning = true
-            progress = SyncProgress(currentStep: "Fetching contacts...", completedItems: 0, totalItems: 0)
-        }
-        
+
+        // Set in the same isolated step as the guard. The engine is already
+        // MainActor-isolated, so an `await MainActor.run` here is not a no-op:
+        // it suspends between check and set, and two overlapping calls can
+        // both pass the guard before either marks the sync as running.
+        isRunning = true
+        progress = SyncProgress(currentStep: "Fetching contacts...", completedItems: 0, totalItems: 0)
+
         // Released synchronously, not via `Task { @MainActor in … }`.
         // SyncEngine is main-actor isolated, so a deferred Task can only run once
         // the actor yields — but SyncCoordinator calls prepareManualSync and then
@@ -184,16 +186,18 @@ class SyncEngine: ObservableObject {
         guard !isRunning else {
             throw SyncEngineError.syncAlreadyInProgress
         }
-        
-        await MainActor.run {
-            isRunning = true
-            progress = SyncProgress(
-                currentStep: "Syncing...",
-                completedItems: 0,
-                totalItems: session.contactChanges.count
-            )
-        }
-        
+
+        // Set in the same isolated step as the guard. The engine is already
+        // MainActor-isolated, so an `await MainActor.run` here is not a no-op:
+        // it suspends between check and set, and two overlapping calls can
+        // both pass the guard before either marks the sync as running.
+        isRunning = true
+        progress = SyncProgress(
+            currentStep: "Syncing...",
+            completedItems: 0,
+            totalItems: session.contactChanges.count
+        )
+
         // Released synchronously, not via `Task { @MainActor in … }`.
         // SyncEngine is main-actor isolated, so a deferred Task can only run once
         // the actor yields — but SyncCoordinator calls prepareManualSync and then
@@ -673,8 +677,13 @@ class SyncEngine: ObservableObject {
                 changes.append(ContactChange(
                     contactName: gContact.displayName, action: .merge,
                     direction: .twoWay,
+                    // Variable detail after the colon on both branches: the
+                    // diff-reason histogram keys on everything before the first
+                    // colon, so a name embedded mid-sentence became its own
+                    // bucket — and put the name in sync_history.json, which the
+                    // histogram promises never to do.
                     changes: [autoApply
-                        ? "Matched \(mContact.displayName) on a shared email address"
+                        ? "Matched on a shared email address: \(mContact.displayName)"
                         : "Possible match: \(mContact.displayName) (same name only — review before merging)"],
                     userOverride: autoApply ? .merge : nil,
                     sourceContact: gContact, targetContact: mContact))
@@ -1000,12 +1009,7 @@ class SyncEngine: ObservableObject {
         var counts: [String: Int] = [:]
         for change in changes {
             for reason in change.changes {
-                // Collapse the per-contact detail ("Potential match: Dana …")
-                // down to the reason itself.
-                let key = reason.contains(":")
-                    ? String(reason.prefix(upTo: reason.firstIndex(of: ":")!))
-                    : reason
-                counts[key, default: 0] += 1
+                counts[histogramKey(for: reason), default: 0] += 1
             }
         }
 
@@ -1025,6 +1029,16 @@ class SyncEngine: ObservableObject {
         SyncHistory.shared.log(
             source: "SyncEngine", action: "diff.reasons",
             details: "\(changes.count) changes — by action: \(byAction) — top fields: \(ranked)")
+    }
+
+    /// The histogram bucket for one diff reason: everything before the first
+    /// colon. Reason strings put their per-contact detail — a name, a field
+    /// value — after the colon, so this is what keeps the histogram's
+    /// name-free promise; a reason that embeds a name before the colon (or has
+    /// none) leaks it into `sync_history.json` as its own bucket.
+    nonisolated static func histogramKey(for reason: String) -> String {
+        guard let colon = reason.firstIndex(of: ":") else { return reason }
+        return String(reason.prefix(upTo: colon))
     }
 
     /// A birthday reduced to the three numbers that mean one.
@@ -1367,8 +1381,31 @@ class SyncEngine: ObservableObject {
             }
         }
 
-        await runCreateBatch(creates, into: &outcome)
-        await runUpdateBatch(updates, into: &outcome)
+        // Pairs that still have a Mac-bound half coming in the per-contact
+        // loop. Invariant: `lastSyncedAt` may only reach "now" once *both*
+        // sides of a pair are confirmed written. The batch writes the Google
+        // half only, and stamping "now" for it meant a later Mac-side failure
+        // left the mapping claiming "synced" — so the next diff's
+        // `modified > lastSyncedAt` test silently dropped the genuinely
+        // pending edit. The Mac write path advances the stamp itself once its
+        // half lands.
+        var awaitingMacWrite: Set<String> = []
+        for change in session.contactChanges {
+            let action = change.userOverride ?? change.action
+            guard action == .add || action == .update,
+                  !Self.writesToGoogle(change, action: action, session: session) else { continue }
+            if let gID = (change.sourceContact?.googleResourceName
+                            ?? change.targetContact?.googleResourceName)?.nonBlank {
+                awaitingMacWrite.insert("google:" + gID)
+            }
+            if let mID = (change.targetContact?.macContactIdentifier
+                            ?? change.sourceContact?.macContactIdentifier)?.nonBlank {
+                awaitingMacWrite.insert("mac:" + mID)
+            }
+        }
+
+        await runCreateBatch(creates, awaitingMacWrite: awaitingMacWrite, into: &outcome)
+        await runUpdateBatch(updates, awaitingMacWrite: awaitingMacWrite, into: &outcome)
         await runDeleteBatch(deletes, into: &outcome)
 
         if !outcome.applied.isEmpty || !outcome.failures.isEmpty {
@@ -1381,7 +1418,24 @@ class SyncEngine: ObservableObject {
         return outcome
     }
 
+    /// The `lastSyncedAt` a batch write may record for a pair.
+    ///
+    /// "Now" only when the Google half just written is the whole change. If
+    /// the same pair still has a Mac-bound half in this session's per-contact
+    /// loop, the stamp keeps its previous value (`.distantPast` for a new
+    /// pair), so a Mac-side failure leaves the pending edit visible to the
+    /// next diff; the Mac write path stamps "now" when its half completes.
+    private func batchSyncStamp(googleResourceName: String, macID: String,
+                                awaitingMacWrite: Set<String>) -> Date {
+        guard awaitingMacWrite.contains("google:" + googleResourceName)
+                || awaitingMacWrite.contains("mac:" + macID) else { return Date() }
+        return mappingStore.getMapping(googleResourceName: googleResourceName)?.lastSyncedAt
+            ?? mappingStore.getMapping(macIdentifier: macID)?.lastSyncedAt
+            ?? .distantPast
+    }
+
     private func runCreateBatch(_ creates: [(id: UUID, name: String, macID: String?, contact: GoogleContact)],
+                                awaitingMacWrite: Set<String>,
                                 into outcome: inout BatchOutcome) async {
         guard creates.count >= Self.minimumBatchSize else { return }
         do {
@@ -1397,7 +1451,9 @@ class SyncEngine: ObservableObject {
                     mappingStore.saveMapping(ContactMapping(
                         googleResourceName: person.resourceName,
                         macContactIdentifier: macID,
-                        lastSyncedAt: Date()))
+                        lastSyncedAt: batchSyncStamp(googleResourceName: person.resourceName,
+                                                     macID: macID,
+                                                     awaitingMacWrite: awaitingMacWrite)))
                 }
                 outcome.applied.insert(item.id)
             }
@@ -1409,6 +1465,7 @@ class SyncEngine: ObservableObject {
     }
 
     private func runUpdateBatch(_ updates: [(id: UUID, name: String, macID: String?, contact: GoogleContact)],
+                                awaitingMacWrite: Set<String>,
                                 into outcome: inout BatchOutcome) async {
         guard updates.count >= Self.minimumBatchSize else { return }
         do {
@@ -1422,7 +1479,9 @@ class SyncEngine: ObservableObject {
                     mappingStore.saveMapping(ContactMapping(
                         googleResourceName: item.contact.resourceName,
                         macContactIdentifier: macID,
-                        lastSyncedAt: Date()))
+                        lastSyncedAt: batchSyncStamp(googleResourceName: item.contact.resourceName,
+                                                     macID: macID,
+                                                     awaitingMacWrite: awaitingMacWrite)))
                 }
                 outcome.applied.insert(item.id)
             }
@@ -1638,11 +1697,31 @@ class SyncEngine: ObservableObject {
         }
 
         // Merge: combine data from both source and target, then write to both sides
-        guard let source = change.sourceContact,
-              let target = change.targetContact else {
+        guard var source = change.sourceContact,
+              var target = change.targetContact else {
             SyncHistory.shared.log(source: "SyncEngine", action: "merge.deferred",
                 details: "\(change.contactName) — missing contact data for merge")
             return
+        }
+
+        // The Mac half is re-read at write time below, but the Google half was
+        // captured when the diff was computed — and a reviewed merge can be
+        // applied minutes later (dedup scan, AI matching, the review sheet
+        // itself). A Google-side edit made in that window would be silently
+        // overwritten by the stale union. Re-fetch the individual contact so
+        // the merge combines current values; caching its etag also lets the
+        // update below assert against the version it actually read.
+        if let gID = (target.googleResourceName ?? source.googleResourceName)?.nonBlank {
+            let fetched = try await googleConnector.fetchContact(resourceName: gID)
+            googleConnector.cacheETags(from: [fetched])
+            var fresh = ContactMapper.toUnified(from: fetched)
+            if target.googleResourceName?.nonBlank == gID {
+                fresh.macContactIdentifier = target.macContactIdentifier
+                target = fresh
+            } else {
+                fresh.macContactIdentifier = source.macContactIdentifier
+                source = fresh
+            }
         }
 
         // Build a merged contact: prefer source for non-empty fields, keep target's extras
@@ -1735,13 +1814,14 @@ class SyncEngine: ObservableObject {
     }
 
     func mergeAddresses(_ a: [UnifiedContact.PostalAddress], _ b: [UnifiedContact.PostalAddress]) -> [UnifiedContact.PostalAddress] { // internal for testing
-        // Keep all from primary; add from secondary only if street differs
+        // De-dup on the full normalized address, not the street line: the same
+        // street exists in different cities, and a city/PO-box-only address has
+        // no street at all — keying on street alone collapsed the former and
+        // dropped the latter outright.
         var result = a
-        let existingStreets = Set(a.compactMap { $0.street?.lowercased() })
-        for addr in b {
-            if let street = addr.street?.lowercased(), !existingStreets.contains(street) {
-                result.append(addr)
-            }
+        var seen = Set(a.map(Self.normalizedAddress))
+        for addr in b where seen.insert(Self.normalizedAddress(addr)).inserted {
+            result.append(addr)
         }
         return result
     }
@@ -2050,14 +2130,16 @@ enum ContactMapper {
     /// erase that field from every Mac contact on the next sync. Callers that
     /// write engine-stripped contacts must pass the settings-derived mask;
     /// restore/dedup paths write full contacts and use `.all`.
-    struct MacWriteFields {
+    struct MacWriteFields: Sendable {
         var jobTitle  = true
         var notes     = true
         var birthday  = true
         var websites  = true
         var addresses = true
         var photos    = true
-        static let all = MacWriteFields()
+        // `nonisolated`: referenced as the default argument of the
+        // nonisolated `applyToMac`, which runs on the Contacts write queue.
+        nonisolated static let all = MacWriteFields()
     }
 
     /// Apply fields from a UnifiedContact onto an existing CNMutableContact (for updates)

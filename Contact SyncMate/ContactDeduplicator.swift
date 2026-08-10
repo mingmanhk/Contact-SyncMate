@@ -408,9 +408,15 @@ class ContactDeduplicator {
     ) async -> [DuplicateGroup] {
 
         var groups: [DuplicateGroup] = []
-        let mappingByGoogle = Dictionary(uniqueKeysWithValues: existingMappings.map {
-            ($0.googleResourceName, $0.macContactIdentifier)
-        })
+        // `uniquingKeysWith`, not `uniqueKeysWithValues`: the store keys on
+        // googleResourceName so duplicates should not exist — but a legacy or
+        // hand-imported mappings file can carry them, and `uniqueKeysWithValues`
+        // traps. Last mapping wins, matching compute1WayChanges and the store's
+        // own semantics.
+        let mappingByGoogle = Dictionary(
+            existingMappings.map { ($0.googleResourceName, $0.macContactIdentifier) },
+            uniquingKeysWith: { _, latest in latest }
+        )
         let lowThreshold = max(30, config.confirmationThreshold - 20)
 
         for gContact in googleContacts {
