@@ -5,6 +5,15 @@ import XCTest
 import Contacts
 @testable import Contact_SyncMate
 
+extension ContactMappingStore {
+    /// A hermetic store over a unique temp file — tests must never touch the
+    /// real mapping file (github issue #45).
+    static func testStore() -> ContactMappingStore {
+        ContactMappingStore(persistenceURL: FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-mappings-\(UUID().uuidString).json"))
+    }
+}
+
 extension UnifiedContact {
     /// Convenience factory for diff tests
     static func diffMake(
@@ -68,7 +77,7 @@ final class SyncEngineDiffTests: XCTestCase {
         SyncEngine(
             googleConnector: GoogleContactsConnector(),
             macConnector: MacContactsConnector(),
-            mappingStore: ContactMappingStore()
+            mappingStore: ContactMappingStore.testStore()
         )
     }
 
@@ -80,7 +89,7 @@ final class SyncEngineDiffTests: XCTestCase {
     func test_photoOnlyOnMac_isNotReportedAsAChange() {
         let gID = "people/photo-mac-only"
         let mID = "mac/photo-mac-only"
-        let store = ContactMappingStore()
+        let store = ContactMappingStore.testStore()
         store.saveMapping(ContactMapping(
             googleResourceName: gID, macContactIdentifier: mID,
             lastSyncedAt: Date(timeIntervalSince1970: 0)))
@@ -108,7 +117,7 @@ final class SyncEngineDiffTests: XCTestCase {
     func test_photoOnlyOnGoogle_isReported() {
         let gID = "people/photo-google-only"
         let mID = "mac/photo-google-only"
-        let store = ContactMappingStore()
+        let store = ContactMappingStore.testStore()
         store.saveMapping(ContactMapping(
             googleResourceName: gID, macContactIdentifier: mID,
             lastSyncedAt: Date(timeIntervalSince1970: 0)))
@@ -139,7 +148,7 @@ final class SyncEngineDiffTests: XCTestCase {
     // which is what made every contact look edited on every sync.
 
     private func mappedPair(gID: String, mID: String) -> ContactMappingStore {
-        let store = ContactMappingStore()
+        let store = ContactMappingStore.testStore()
         store.saveMapping(ContactMapping(
             googleResourceName: gID, macContactIdentifier: mID,
             lastSyncedAt: Date(timeIntervalSince1970: 0)))
@@ -287,7 +296,7 @@ final class SyncEngineDiffTests: XCTestCase {
     func test_googleToMac_alreadyMapped_noAdd() {
         let gID  = "people/mapped"
         let mID  = "mac/mapped"
-        let store = ContactMappingStore()
+        let store = ContactMappingStore.testStore()
         store.saveMapping(ContactMapping(
             googleResourceName: gID, macContactIdentifier: mID, lastSyncedAt: Date()))
         // Allow async barrier write to flush
@@ -311,7 +320,7 @@ final class SyncEngineDiffTests: XCTestCase {
         let past = Date(timeIntervalSinceNow: -3600)
         let now  = Date()
 
-        let store = ContactMappingStore()
+        let store = ContactMappingStore.testStore()
         store.saveMapping(ContactMapping(
             googleResourceName: gID, macContactIdentifier: mID, lastSyncedAt: past))
         Thread.sleep(forTimeInterval: 0.05)
@@ -367,7 +376,7 @@ final class SyncEngineDiffTests: XCTestCase {
         let past = Date(timeIntervalSinceNow: -7200)
         let now  = Date()
 
-        let store = ContactMappingStore()
+        let store = ContactMappingStore.testStore()
         store.saveMapping(ContactMapping(
             googleResourceName: gID, macContactIdentifier: mID, lastSyncedAt: past))
         Thread.sleep(forTimeInterval: 0.05)
@@ -512,7 +521,7 @@ final class ConflictAutoResolutionTests: XCTestCase {
         AppSettings.shared.defaultConflictResolution = resolution
         let gID = "people/conf-\(UUID().uuidString)"
         let mID = "mac/conf-\(UUID().uuidString)"
-        let store = ContactMappingStore()
+        let store = ContactMappingStore.testStore()
         store.saveMapping(ContactMapping(
             googleResourceName: gID, macContactIdentifier: mID, lastSyncedAt: lastSynced))
         Thread.sleep(forTimeInterval: 0.05)
@@ -616,7 +625,7 @@ final class SyncEngineMergeHelperTests: XCTestCase {
         SyncEngine(
             googleConnector: GoogleContactsConnector(),
             macConnector: MacContactsConnector(),
-            mappingStore: ContactMappingStore())
+            mappingStore: ContactMappingStore.testStore())
     }
 
     func test_mergeContacts_primaryWins_secondaryFillsGaps() {

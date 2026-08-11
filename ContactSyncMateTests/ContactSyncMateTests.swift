@@ -335,7 +335,7 @@ final class ContactMappingStoreTests: XCTestCase {
     var store: ContactMappingStore!
 
     override func setUp() {
-        store = ContactMappingStore()
+        store = ContactMappingStore.testStore()
     }
 
     func test_getAllMappings_initiallyEmpty() {

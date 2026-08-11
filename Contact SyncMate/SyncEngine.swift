@@ -2344,16 +2344,24 @@ final class ContactMappingStore {
     private let io = DispatchQueue(label: "ContactMappingStore.io", qos: .utility)
     private let persistenceURL: URL
 
-    init() {
-        let fm = FileManager.default
-        let appSupport = (try? fm.url(for: .applicationSupportDirectory,
-                                      in: .userDomainMask,
-                                      appropriateFor: nil,
-                                      create: true)) ?? fm.temporaryDirectory
-        let dir = appSupport.appendingPathComponent(
-            Bundle.main.bundleIdentifier ?? "ContactSyncMate", isDirectory: true)
-        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
-        persistenceURL = dir.appendingPathComponent("contact_mappings.json")
+    /// `persistenceURL` exists for tests: a private instance over the real
+    /// file re-creates the last-writer-wins race the singleton removed, and
+    /// test writes were landing in the developer's live mapping file.
+    /// Production always uses `.shared` with the default path.
+    init(persistenceURL: URL? = nil) {
+        if let persistenceURL {
+            self.persistenceURL = persistenceURL
+        } else {
+            let fm = FileManager.default
+            let appSupport = (try? fm.url(for: .applicationSupportDirectory,
+                                          in: .userDomainMask,
+                                          appropriateFor: nil,
+                                          create: true)) ?? fm.temporaryDirectory
+            let dir = appSupport.appendingPathComponent(
+                Bundle.main.bundleIdentifier ?? "ContactSyncMate", isDirectory: true)
+            try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+            self.persistenceURL = dir.appendingPathComponent("contact_mappings.json")
+        }
         loadFromDisk()
     }
 
