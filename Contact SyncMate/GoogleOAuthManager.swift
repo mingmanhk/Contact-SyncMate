@@ -96,7 +96,35 @@ class GoogleOAuthManager: NSObject, ObservableObject {
     private let accessTokenKey = "GoogleAccessToken"
     private let refreshTokenKey = "GoogleRefreshToken"
     private let tokenExpiryKey = "GoogleTokenExpiry"
-    
+
+    // MARK: - Networking
+
+    /// The one session every Google request goes through — token, userinfo and
+    /// revoke calls here, and all People API traffic in
+    /// `GoogleContactsConnector`.
+    ///
+    /// `URLSession.shared` carried two defaults this app must not have: the
+    /// shared on-disk `URLCache`, which would happily persist contact JSON if
+    /// response headers ever permitted it, and a 60-second per-request timeout
+    /// whose only backstop was the coordinator's 300-second watchdog. So:
+    /// `.ephemeral` plus `urlCache = nil` keeps every payload out of any cache,
+    /// 30 seconds fails a stalled request while retrying is still worthwhile,
+    /// and `waitsForConnectivity = false` turns "offline" into an immediate
+    /// `URLError` instead of a silent wait — the offline-launch recovery below
+    /// depends on seeing that error promptly.
+    ///
+    /// `nonisolated` for the same reason as `AutoSyncConditions.pathMonitor`:
+    /// `URLSession` is `Sendable` and callers off the main actor (e.g. the
+    /// detached revoke task in `signOut`) must reach it without a hop.
+    nonisolated static let apiSession: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 30
+        configuration.urlCache = nil
+        configuration.waitsForConnectivity = false
+        return URLSession(configuration: configuration)
+    }()
+
+
     override private init() {
         super.init()
         // Must run before checkExistingAuth(): tokens minted under a revoked
@@ -104,10 +132,30 @@ class GoogleOAuthManager: NSObject, ObservableObject {
         // UI claiming "connected" while every API call fails.
         purgeLegacyCachedClientSecret()
         checkExistingAuth()
+
+        // Revive an offline launch the moment connectivity returns.
+        // Registered unconditionally rather than only when a refresh is
+        // pending: checkExistingAuth's refresh finishes asynchronously, so at
+        // this point nobody knows yet whether it will fail offline — the
+        // callback itself is a no-op unless the pending flag is set.
+        AutoSyncConditions.onNetworkSatisfied { [weak self] in
+            self?.retryRefreshAfterReconnect()
+        }
     }
-    
+
     // MARK: - Authentication
-    
+
+    /// Credentials exist and look revivable, but the launch-time refresh
+    /// failed because the network was down.
+    ///
+    /// This is the "credentials present, refresh pending" state: without it,
+    /// an offline launch with an expired access token left `isAuthenticated`
+    /// false for the whole session — every call path gates on that Bool, so
+    /// perfectly valid tokens showed as "not connected" until relaunch. All
+    /// reads and writes happen on the MainActor, which is what keeps the
+    /// set-in-catch / clear-in-retry pair race-free.
+    private var refreshPendingConnectivity = false
+
     /// Check if we have valid stored credentials
     private func checkExistingAuth() {
         guard let _ = getAccessToken(),
@@ -115,7 +163,7 @@ class GoogleOAuthManager: NSObject, ObservableObject {
             isAuthenticated = false
             return
         }
-        
+
         // Check if token is still valid
         if expiry > Date() {
             isAuthenticated = true
@@ -123,7 +171,24 @@ class GoogleOAuthManager: NSObject, ObservableObject {
         } else if let refreshToken = getRefreshToken() {
             // Try to refresh the token
             Task {
-                try? await refreshAccessToken(refreshToken: refreshToken)
+                do {
+                    try await refreshAccessToken(refreshToken: refreshToken)
+                } catch is URLError {
+                    // Offline at launch. The credentials are fine — only the
+                    // network is missing — so failing silently here would
+                    // strand a valid session. Record the pending state; the
+                    // connectivity callback registered in init re-runs the
+                    // refresh when the path becomes satisfied.
+                    refreshPendingConnectivity = true
+                    SyncHistory.shared.log(
+                        source: "GoogleOAuth",
+                        action: "refresh.waitingForNetwork",
+                        details: "offline at launch; will refresh when connectivity returns"
+                    )
+                } catch {
+                    // Terminal failures (invalid_grant, 4xx) have already
+                    // published their state inside refreshAccessToken.
+                }
             }
         } else {
             // Expired with no refresh token: nothing can revive this session,
@@ -405,7 +470,7 @@ class GoogleOAuthManager: NSObject, ObservableObject {
                 .data(using: .utf8)
 
             do {
-                let (_, response) = try await URLSession.shared.data(for: request)
+                let (_, response) = try await GoogleOAuthManager.apiSession.data(for: request)
                 let status = (response as? HTTPURLResponse)?.statusCode ?? -1
                 SyncHistory.shared.log(
                     source: "GoogleOAuth",
@@ -551,7 +616,7 @@ class GoogleOAuthManager: NSObject, ObservableObject {
             .joined(separator: "&")
             .data(using: String.Encoding.utf8)
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await Self.apiSession.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
@@ -646,7 +711,7 @@ class GoogleOAuthManager: NSObject, ObservableObject {
             .joined(separator: "&")
             .data(using: String.Encoding.utf8)
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await Self.apiSession.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
@@ -679,6 +744,15 @@ class GoogleOAuthManager: NSObject, ObservableObject {
 
             SyncHistory.shared.log(source: "GoogleOAuth", action: "refresh.failed",
                                    details: detail)
+
+            // A 5xx is Google's fault, not the grant's, and it is the one
+            // failure worth retrying — thrown as its own case, carrying the
+            // status, so `refreshAccessTokenWithRetry` can classify it as
+            // transient. Everything else (invalid_grant is handled above;
+            // other 4xx mean the request itself is wrong) stays terminal.
+            if (500...599).contains(status) {
+                throw GoogleOAuthError.tokenServerError(status: status, detail: detail)
+            }
             throw GoogleOAuthError.authError(detail)
         }
 
@@ -775,7 +849,18 @@ class GoogleOAuthManager: NSObject, ObservableObject {
             } catch GoogleOAuthError.noRefreshToken {
                 throw GoogleOAuthError.noRefreshToken   // revoked — do not retry
             } catch {
-                let isTransient = (error as? URLError) != nil
+                // Transient means the failure is outside the grant: the
+                // connection dropped (`URLError`) or the token endpoint itself
+                // answered 5xx. `invalid_grant` surfaces above as
+                // `noRefreshToken`, and other 4xx arrive as `authError`, which
+                // deliberately falls through to terminal.
+                let isTransient: Bool
+                switch error {
+                case is URLError, GoogleOAuthError.tokenServerError:
+                    isTransient = true
+                default:
+                    isTransient = false
+                }
                 guard isTransient, attempt < maxAttempts else { throw error }
 
                 SyncHistory.shared.log(
@@ -788,8 +873,38 @@ class GoogleOAuthManager: NSObject, ObservableObject {
         }
     }
     
+    /// Re-run the launch-time refresh once connectivity returns.
+    ///
+    /// Fired by `AutoSyncConditions` on the satisfied-transition of its path
+    /// monitor. MainActor keeps it race-free: the flag is tested and cleared
+    /// in one hop, so two transitions in quick succession cannot both start a
+    /// refresh — the second finds the flag already cleared.
+    private func retryRefreshAfterReconnect() {
+        guard refreshPendingConnectivity else { return }
+        refreshPendingConnectivity = false
+
+        guard let refreshToken = getRefreshToken() else { return }
+        Task {
+            do {
+                try await refreshAccessToken(refreshToken: refreshToken)
+                SyncHistory.shared.log(
+                    source: "GoogleOAuth",
+                    action: "refresh.revivedAfterReconnect",
+                    details: "session restored without a relaunch"
+                )
+                fetchUserEmail()
+            } catch is URLError {
+                // The path flapped — satisfied for a moment, gone again.
+                // Re-arm so the next transition tries once more.
+                refreshPendingConnectivity = true
+            } catch {
+                // Terminal — refreshAccessToken has already published the state.
+            }
+        }
+    }
+
     // MARK: - User Info
-    
+
     private func fetchUserEmail() {
         Task {
             do {
@@ -798,7 +913,7 @@ class GoogleOAuthManager: NSObject, ObservableObject {
                 var request = URLRequest(url: url)
                 request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
                 
-                let (data, _) = try await URLSession.shared.data(for: request)
+                let (data, _) = try await Self.apiSession.data(for: request)
                 let userInfo = try JSONDecoder().decode(UserInfo.self, from: data)
                 
                 await MainActor.run {
@@ -850,6 +965,22 @@ class GoogleOAuthManager: NSObject, ObservableObject {
     private func saveToKeychain(key: String, value: String) throws {
         let data = value.data(using: .utf8)!
 
+        // Delete any existing item first — with a query that deliberately
+        // names neither kSecAttrAccessible nor kSecUseDataProtectionKeychain.
+        // On macOS a query *without* kSecUseDataProtectionKeychain searches
+        // both the legacy file keychain and the data protection keychain, and
+        // omitting the accessibility attribute keeps it matching items written
+        // by older builds, whose stored accessibility differs from what the
+        // add below sets. This is the upgrade migration: remove the legacy
+        // item wherever it lives, then add the protected one — which is also
+        // what guarantees SecItemAdd can never hit errSecDuplicateItem.
+        let deleteQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: key,
+            kSecAttrService as String: "ContactSyncMate"
+        ]
+        SecItemDelete(deleteQuery as CFDictionary)
+
         // Device-bound on purpose. Without an explicit accessibility class the
         // item takes the syncable default, so a refresh token with full
         // read/write to the user's Google contacts could ride iCloud Keychain
@@ -857,25 +988,35 @@ class GoogleOAuthManager: NSObject, ObservableObject {
         // signOut()'s own comment worries about. ThisDeviceOnly keeps the
         // credential where the user granted it; other devices can sign in
         // themselves.
-        let query: [String: Any] = [
+        //
+        // kSecUseDataProtectionKeychain is what makes that true on macOS: in
+        // the legacy file keychain the accessibility class is silently
+        // ignored, so the attribute alone was a no-op. In the data protection
+        // keychain it is enforced — and the item still never leaves this Mac,
+        // because iCloud sync additionally requires kSecAttrSynchronizable,
+        // which is never set here.
+        let addQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
             kSecAttrService as String: "ContactSyncMate",
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+            kSecUseDataProtectionKeychain as String: true,
             kSecValueData as String: data
         ]
-        
-        // Delete any existing item
-        SecItemDelete(query as CFDictionary)
-        
-        // Add new item
-        let status = SecItemAdd(query as CFDictionary, nil)
+
+        let status = SecItemAdd(addQuery as CFDictionary, nil)
         guard status == errSecSuccess else {
             throw GoogleOAuthError.keychainError(status)
         }
     }
-    
+
     private func getFromKeychain(key: String) -> String? {
+        // No kSecUseDataProtectionKeychain here, and that is load-bearing: a
+        // read query carrying that key searches *only* the data protection
+        // keychain, which would lose sight of tokens written by older builds
+        // into the legacy file keychain before the first post-upgrade save
+        // migrates them. Left absent, the search spans both keychains, so it
+        // finds legacy items pre-migration and protected items after.
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
@@ -1014,6 +1155,11 @@ enum GoogleOAuthError: LocalizedError {
     /// and has nothing actionable to go on.
     case tokenExchangeFailed(String)
     case tokenRefreshFailed
+    /// The token endpoint answered with a server-side failure. Distinct from
+    /// `authError`, and carrying the HTTP status, so the refresh retry loop
+    /// can recognise it as transient — a Google 503 is theirs to fix and ours
+    /// to retry, unlike `invalid_grant`, which no retry can revive.
+    case tokenServerError(status: Int, detail: String)
     case noRefreshToken
     case keychainError(OSStatus)
     /// The app's own OAuth configuration is wrong — carries the specific
@@ -1044,6 +1190,8 @@ enum GoogleOAuthError: LocalizedError {
                 : "Failed to exchange code for tokens — \(detail)"
         case .tokenRefreshFailed:
             return "Failed to refresh access token."
+        case .tokenServerError(let status, let detail):
+            return "Google's sign-in service failed (HTTP \(status)): \(detail)"
         case .noRefreshToken:
             return "No refresh token available. Please sign in again."
         case .keychainError(let status):

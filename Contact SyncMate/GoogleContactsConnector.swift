@@ -100,7 +100,11 @@ class GoogleContactsConnector: ObservableObject {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = body
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+            // The shared configured session, not URLSession.shared: ephemeral
+            // with no URLCache, so contact payloads can never land in the
+            // shared on-disk cache, and a 30s request timeout so a stall
+            // fails fast enough to retry. See GoogleOAuthManager.apiSession.
+            let (data, response) = try await GoogleOAuthManager.apiSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw GoogleContactsError.networkError(NSError(domain: "InvalidResponse", code: -1))

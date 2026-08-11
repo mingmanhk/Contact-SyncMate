@@ -43,6 +43,15 @@ enum AutoSyncConditions {
     static func blocker() -> Blocker? {
         let settings = AppSettings.shared
 
+        // Not gated on a toggle, unlike the three below: a sync without a
+        // network cannot succeed for anyone, it can only fail in fetch and
+        // post a failure notification — every interval, for as long as the
+        // Mac stays offline. Checked first so an offline Mac logs a quiet
+        // skip instead.
+        if pathMonitor.currentPath.status != .satisfied {
+            return Blocker(reason: String(localized: "waiting for a network connection"))
+        }
+
         if settings.autoSyncOnlyOnPower, !isOnACPower() {
             return Blocker(reason: String(localized: "waiting for AC power"))
         }
@@ -106,6 +115,23 @@ enum AutoSyncConditions {
 
     // MARK: - Network monitoring
 
+    /// Runs on the main actor each time the network path transitions from
+    /// unsatisfied to satisfied. Single-slot on purpose: the one client is
+    /// `GoogleOAuthManager`'s offline-launch recovery, and a list of observers
+    /// would be machinery nothing needs yet.
+    private static var networkSatisfiedCallback: (() -> Void)?
+
+    /// Register interest in connectivity returning.
+    ///
+    /// Touching `pathMonitor` here matters: the monitor is lazy, and on a
+    /// launch where no scheduled sync has consulted `blocker()` yet, nothing
+    /// else would have started it — a registered callback that no running
+    /// monitor can ever fire is exactly the silent failure this exists to fix.
+    static func onNetworkSatisfied(_ callback: @escaping () -> Void) {
+        networkSatisfiedCallback = callback
+        _ = pathMonitor
+    }
+
     /// A single long-lived monitor. `NWPathMonitor` reports the current path only
     /// after it has started, so creating one per check would always read a stale
     /// or empty path.
@@ -116,6 +142,25 @@ enum AutoSyncConditions {
     /// needed; the annotation records the cross-isolation use as intended.
     nonisolated private static let pathMonitor: NWPathMonitor = {
         let monitor = NWPathMonitor()
+        // Edge detection stays on the monitor's own serial queue, where
+        // updates arrive in order. Hopping every update to the main actor
+        // first and comparing there would let two Tasks run out of order and
+        // read a transition backwards; only the confirmed satisfied-edge
+        // crosses to the main actor.
+        // Boxed rather than a captured var: the handler runs on the monitor's
+        // serial queue (ordered, no races), but a mutable capture in a
+        // @Sendable closure is an error in Swift 6 mode.
+        final class SatisfiedFlag: @unchecked Sendable { var value = false }
+        let wasSatisfied = SatisfiedFlag()
+        monitor.pathUpdateHandler = { path in
+            let satisfied = path.status == .satisfied
+            let cameBack = satisfied && !wasSatisfied.value
+            wasSatisfied.value = satisfied
+            guard cameBack else { return }
+            Task { @MainActor in
+                networkSatisfiedCallback?()
+            }
+        }
         monitor.start(queue: DispatchQueue(label: "com.victorlam.ContactSyncMate.path"))
         return monitor
     }()
