@@ -58,6 +58,12 @@ struct Contact_SyncMateApp: App {
 
 // MARK: - AppDelegate
 
+/// `@MainActor` is explicit, not inherited from the project's
+/// default-isolation build setting: toolchains that predate that setting
+/// (CI's Xcode among them) otherwise compile this class nonisolated and
+/// reject its `AppState()`/UI work — and AppKit delegates are main-thread
+/// types by contract anyway.
+@MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     // Single shared AppState for the whole app
     let appState = AppState()
