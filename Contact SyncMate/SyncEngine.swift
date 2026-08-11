@@ -1007,12 +1007,28 @@ class SyncEngine: ObservableObject {
             // next sync has nothing to say about it.
             let google = a.googleResourceName != nil ? a : b
             let mac    = a.macContactIdentifier != nil ? a : b
-            if google.photoData != nil && mac.photoData == nil {
+            // "Google has a photo" means bytes already in hand *or* a
+            // non-default photoUrl. Fetches never download photo bytes, so
+            // photoData alone was always nil on the Google side and this rule
+            // could never fire — the syncPhotos setting was a silent no-op.
+            // The apply path downloads the URL just in time (see
+            // resolvingGooglePhoto), and once the Mac side has an image the
+            // rule goes quiet, so it still converges.
+            if Self.googlePhotoNeedsCopy(google: google, mac: mac) {
                 diffs.append("Photo changed")
             }
         }
 
         return diffs
+    }
+
+    /// The photo rule of the diff, extracted pure so it is testable: Google
+    /// has a real photo (bytes or a non-default URL) and the Mac side has
+    /// none. Once the Mac holds any image this returns false — that is the
+    /// convergence guarantee.
+    nonisolated static func googlePhotoNeedsCopy(google: UnifiedContact,
+                                                 mac: UnifiedContact) -> Bool {
+        (google.photoData != nil || google.photoUrl != nil) && mac.photoData == nil
     }
 
     /// Strip fields that the user has disabled in Settings → Common Sync → Fields to Sync
@@ -1031,7 +1047,8 @@ class SyncEngine: ObservableObject {
         if !settings.syncWebsites  { c.urls            = []  }
         if !settings.syncAddresses { c.postalAddresses = []  }
         if !settings.syncJobTitle  { c.jobTitle        = nil }
-        if !settings.syncPhotos    { c.photoData       = nil }
+        if !settings.syncPhotos    { c.photoData       = nil
+                                     c.photoUrl        = nil }
 
         // "Normalise postal country codes". Google returns ISO codes, the Mac
         // stores whatever was typed, so the same address round-trips as
@@ -1581,6 +1598,63 @@ class SyncEngine: ObservableObject {
         }
     }
 
+    // MARK: - Google → Mac photo download
+
+    /// Upper bound on a downloaded contact photo. Google-served contact photos
+    /// are far smaller than this in practice; the cap is a guard against a
+    /// pathological response filling a CNContact (and every backup of it) with
+    /// megabytes of image.
+    private static let maxPhotoBytes = 5 * 1024 * 1024
+
+    /// Whether this run has already logged a photo download problem. One line
+    /// per sync: an unreachable photo host would otherwise emit a failure per
+    /// contact, and the write itself still succeeds without the photo.
+    private var loggedPhotoDownloadFailure = false
+
+    /// Fill in `photoData` from `photoUrl` just in time for a Mac write.
+    ///
+    /// `convertToPerson` never downloads photo bytes — that would fetch every
+    /// photo on every sync. Instead the URL rides along on the unified contact
+    /// and the bytes are fetched here, only when a Google → Mac write actually
+    /// needs them. On any failure the contact is written without the photo:
+    /// the photo rule will simply report it again next sync.
+    private func resolvingGooglePhoto(_ contact: UnifiedContact) async -> UnifiedContact {
+        guard settings.syncPhotos,
+              contact.photoData == nil,
+              let urlString = contact.photoUrl,
+              let url = URL(string: urlString) else { return contact }
+
+        var resolved = contact
+        do {
+            // The shared ephemeral session: same no-cache guarantees as every
+            // other Google request this app makes.
+            let (data, response) = try await GoogleOAuthManager.apiSession.data(from: url)
+            guard let http = response as? HTTPURLResponse,
+                  (200...299).contains(http.statusCode) else {
+                logPhotoDownloadProblem(
+                    "HTTP \((response as? HTTPURLResponse)?.statusCode ?? -1)")
+                return resolved
+            }
+            guard !data.isEmpty, data.count <= Self.maxPhotoBytes else {
+                logPhotoDownloadProblem("\(data.count) bytes exceeds the \(Self.maxPhotoBytes)-byte cap")
+                return resolved
+            }
+            resolved.photoData = data
+        } catch {
+            logPhotoDownloadProblem(error.localizedDescription)
+        }
+        return resolved
+    }
+
+    private func logPhotoDownloadProblem(_ details: String) {
+        guard !loggedPhotoDownloadFailure else { return }
+        loggedPhotoDownloadFailure = true
+        SyncHistory.shared.log(
+            source: "SyncEngine", action: "photo.downloadFailed",
+            details: "\(details) — the contact was written without its photo; "
+                   + "further photo failures this sync are not logged individually")
+    }
+
     private func performAdd(change: ContactChange, direction: SyncDirection) async throws {
         guard let rawSource = change.sourceContact else {
             throw SyncEngineError.missingContactData(change.contactName)
@@ -1590,8 +1664,10 @@ class SyncEngine: ObservableObject {
 
         switch direction {
         case .googleToMac:
-            // Add Google contact to Mac
-            let cnContact = ContactMapper.toMac(from: source)
+            // Add Google contact to Mac — downloading its photo bytes just in
+            // time, since the fetch only carried the URL.
+            let withPhoto = await resolvingGooglePhoto(source)
+            let cnContact = ContactMapper.toMac(from: withPhoto)
             // Off-main: contactsd XPC from a user-interactive thread inverts
             // priority, and that contention is what fails the faulting during
             // save (Cocoa 134092).
@@ -1658,10 +1734,15 @@ class SyncEngine: ObservableObject {
         case .googleToMac:
             // Update Mac contact with Google data
             guard let mID = change.targetContact?.macContactIdentifier else { return }
+            // Only fetch photo bytes when the Mac side lacks an image:
+            // `applyToMac` is presence-only for photos, and a Mac contact that
+            // already has one keeps it, so downloading would be wasted work.
+            let unified = change.targetContact?.photoData == nil
+                ? await resolvingGooglePhoto(source)
+                : source
             // Fetch and write on the same off-main queue: the fetch is XPC too,
             // and doing it here kept a priority inversion on the hot path.
             let c = macConnector
-            let unified = source
             let mask = macWriteFields
             try await MacContactsConnector.performWriteOffMain {
                 guard let existing = try c.fetchContactSync(withIdentifier: mID) else { return }
@@ -1803,7 +1884,9 @@ class SyncEngine: ObservableObject {
 
         // Build a merged contact: prefer source for non-empty fields, keep target's extras
         let merged = mergeContacts(primary: source, secondary: target)
-        let finalMerged = applyFieldSettings(to: merged)
+        // Photo bytes just in time, before the Mac write below. A no-op when
+        // either side already contributed photoData or photo sync is off.
+        let finalMerged = await resolvingGooglePhoto(applyFieldSettings(to: merged))
 
         // Write merged result to Mac side
         if let mID = target.macContactIdentifier ?? source.macContactIdentifier {
@@ -1868,6 +1951,7 @@ class SyncEngine: ObservableObject {
             birthday: primary.birthday ?? secondary.birthday,
             note: mergeNotes(primary.note, secondary.note),
             photoData: primary.photoData ?? secondary.photoData,
+            photoUrl: primary.photoUrl ?? secondary.photoUrl,
             lastModified: Date()
         )
     }
@@ -1955,6 +2039,9 @@ enum ContactMapper {
         unified.jobTitle            = googleContact.jobTitle?.nilIfEmpty
         unified.note                = googleContact.note?.nilIfEmpty
         unified.photoData           = googleContact.photoData
+        // Non-default photos only — the connector already dropped Google's
+        // silhouette placeholder at conversion.
+        unified.photoUrl            = googleContact.photoUrl
         unified.lastModified        = googleContact.updateTime
 
         // Phone numbers

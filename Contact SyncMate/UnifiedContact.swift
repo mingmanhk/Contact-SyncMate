@@ -60,7 +60,13 @@ struct UnifiedContact: Identifiable, Equatable {
     var birthday: DateComponents?
     var note: String?
     var photoData: Data?
-    
+    /// Where Google keeps this contact's photo, when the contact came from
+    /// Google and carries a real (non-default) photo. The bytes are downloaded
+    /// just in time by the Google → Mac apply path — carrying the URL through
+    /// the diff lets "Google has a photo the Mac lacks" be detected without
+    /// downloading every photo up front.
+    var photoUrl: String?
+
     // Metadata
     var lastModified: Date?
     
@@ -245,6 +251,7 @@ extension UnifiedContact {
         merged.birthday = choose(birthday, other.birthday)
         merged.note = mergeNotes(note, other.note)
         merged.photoData = choose(photoData, other.photoData)
+        merged.photoUrl = choose(photoUrl, other.photoUrl)
         
         // Metadata: prefer most recent
         if let myDate = lastModified, let theirDate = other.lastModified {

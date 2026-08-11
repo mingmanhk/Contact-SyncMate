@@ -1,1 +1,0 @@
-The sign-in callback is not set up. GoogleOAuthConfig.json expects the URL scheme “%@”, but this build registers “%@”. Run Scripts/set-oauth-client.sh with your Google Client ID to write both from one value.

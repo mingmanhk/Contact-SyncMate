@@ -182,28 +182,46 @@ class GoogleContactsConnector: ObservableObject {
                 URLQueryItem(name: "personFields", value: personFields),
                 URLQueryItem(name: "pageSize", value: "1000")
             ]
-            
+
             if let pageToken = pageToken {
                 queryItems.append(URLQueryItem(name: "pageToken", value: pageToken))
             }
-            
+
             components.queryItems = queryItems
-            
+
             let (data, _) = try await makeRequest(url: components.url!)
-            let response = try JSONDecoder().decode(PeopleAPIResponse.self, from: data)
-            
-            if let connections = response.connections {
-                let page = connections.compactMap { convertToPerson($0) }
-                // Harvest etags while we have them: every update later in this
-                // sync needs one, and without this each would pay its own GET.
-                cacheETags(from: page)
-                allContacts.append(contentsOf: page)
-            }
-            
-            pageToken = response.nextPageToken
+
+            // Decode and convert off the main actor, mirroring
+            // MacContactsConnector.fetchAllContactsOffMainActor. This class is
+            // main-actor isolated under the project default, so doing the JSON
+            // decode plus a per-contact convert for a 1000-contact page inline
+            // was 1–3s of main-thread stall per sync on large address books.
+            let page = try await Task.detached(priority: .userInitiated) {
+                try Self.decodePage(data)
+            }.value
+
+            // Back on the actor for actor state. Harvest etags while we have
+            // them: every update later in this sync needs one, and without
+            // this each would pay its own GET.
+            cacheETags(from: page.contacts)
+            allContacts.append(contentsOf: page.contacts)
+
+            pageToken = page.nextPageToken
         } while pageToken != nil
-        
+
         return allContacts
+    }
+
+    /// One page of `people/me/connections`, decoded and converted.
+    ///
+    /// `nonisolated static` so `fetchAllContacts` can run it inside a detached
+    /// task — pure data-in/data-out, with the etag cache and every other piece
+    /// of actor state left to the caller on the actor.
+    nonisolated static func decodePage(_ data: Data) throws
+        -> (contacts: [GoogleContact], nextPageToken: String?) {
+        let response = try JSONDecoder().decode(PeopleAPIResponse.self, from: data)
+        let contacts = (response.connections ?? []).compactMap { convertToPerson($0) }
+        return (contacts, response.nextPageToken)
     }
     
     func fetchContact(resourceName: String) async throws -> GoogleContact {
@@ -221,7 +239,7 @@ class GoogleContactsConnector: ObservableObject {
         let (data, _) = try await makeRequest(url: components.url!)
         let person = try JSONDecoder().decode(PeopleAPIPerson.self, from: data)
         
-        guard let contact = convertToPerson(person) else {
+        guard let contact = Self.convertToPerson(person) else {
             throw GoogleContactsError.apiError(statusCode: 404, message: "Contact not found")
         }
         
@@ -242,7 +260,7 @@ class GoogleContactsConnector: ObservableObject {
         let (data, _) = try await makeRequest(url: url, method: "POST", body: body)
         let createdPerson = try JSONDecoder().decode(PeopleAPIPerson.self, from: data)
         
-        guard let createdContact = convertToPerson(createdPerson) else {
+        guard let createdContact = Self.convertToPerson(createdPerson) else {
             throw GoogleContactsError.apiError(statusCode: 500, message: "Failed to parse created contact")
         }
         
@@ -341,7 +359,7 @@ class GoogleContactsConnector: ObservableObject {
         let (data, _) = try await makeRequest(url: components.url!, method: "PATCH", body: body)
         let updatedPerson = try JSONDecoder().decode(PeopleAPIPerson.self, from: data)
 
-        guard let updatedContact = convertToPerson(updatedPerson) else {
+        guard let updatedContact = Self.convertToPerson(updatedPerson) else {
             throw GoogleContactsError.apiError(statusCode: 500, message: "Failed to parse updated contact")
         }
 
@@ -407,7 +425,7 @@ class GoogleContactsConnector: ObservableObject {
         // createdPeople comes back in request order. Pad to the request length so
         // a short response cannot silently misalign the caller's mapping writes.
         var created: [GoogleContact?] = response.people.map {
-            $0.person.flatMap { convertToPerson($0) }
+            $0.person.flatMap { Self.convertToPerson($0) }
         }
         if created.count < contacts.count {
             created += Array(repeating: nil, count: contacts.count - created.count)
@@ -488,7 +506,7 @@ class GoogleContactsConnector: ObservableObject {
             // that came back without a person failed — leaving them out of the
             // result is what tells the caller to report them.
             for (name, outcome) in response.updateResult {
-                if let person = outcome.person, let contact = convertToPerson(person) {
+                if let person = outcome.person, let contact = Self.convertToPerson(person) {
                     results[name] = contact
                 }
             }
@@ -602,8 +620,31 @@ class GoogleContactsConnector: ObservableObject {
     }
     
     // MARK: - Conversion Helpers
-    
-    private func convertToPerson(_ apiPerson: PeopleAPIPerson) -> GoogleContact? {
+
+    /// Allocated once: the previous per-contact allocation inside
+    /// `convertToPerson` was the hottest allocation in a full fetch.
+    ///
+    /// `nonisolated(unsafe)` rather than `nonisolated` because the class is
+    /// not `Sendable` — the same trade `MacContactsConnector.shared` makes:
+    /// `ISO8601DateFormatter` (NSISO8601DateFormatter) is documented
+    /// thread-safe, and it is only ever read after this immutable `let`
+    /// initialises.
+    nonisolated(unsafe) private static let updateTimeFormatter = ISO8601DateFormatter()
+
+    /// The URL of a photo actually worth syncing, or nil.
+    ///
+    /// Google gives every contact a photo entry even when the user never chose
+    /// one — the grey silhouette / monogram placeholder, marked
+    /// `"default": true` in its metadata. Copying those to the Mac would stamp
+    /// placeholder images into real contacts, so they are dropped at
+    /// conversion: a non-nil `photoUrl` means "Google has a real photo".
+    nonisolated static func usablePhotoUrl(from photos: [PersonPhoto]?) -> String? {
+        photos?.first(where: { $0.metadata?.isDefault != true })?.url
+    }
+
+    /// `nonisolated static`: pure conversion with no connector state, so the
+    /// page decode above can run it off the main actor.
+    nonisolated private static func convertToPerson(_ apiPerson: PeopleAPIPerson) -> GoogleContact? {
         guard let resourceName = apiPerson.resourceName else { return nil }
         
         var contact = GoogleContact(id: resourceName)
@@ -665,10 +706,9 @@ class GoogleContactsConnector: ObservableObject {
             contact.birthday = GoogleDate(year: birthday.year, month: birthday.month, day: birthday.day)
         }
         
-        // Photo
-        if let photo = apiPerson.photos?.first {
-            contact.photoUrl = photo.url
-        }
+        // Photo — only a real one; Google's default silhouette placeholder is
+        // skipped here so `photoUrl != nil` can mean "has a photo" downstream.
+        contact.photoUrl = usablePhotoUrl(from: apiPerson.photos)
         
         // Note
         if let bio = apiPerson.biographies?.first {
@@ -683,7 +723,7 @@ class GoogleContactsConnector: ObservableObject {
         // Update time
         if let metadata = apiPerson.metadata,
            let updateTime = metadata.sources?.first?.updateTime {
-            contact.updateTime = ISO8601DateFormatter().date(from: updateTime)
+            contact.updateTime = updateTimeFormatter.date(from: updateTime)
         }
         
         return contact
@@ -779,7 +819,7 @@ class GoogleContactsConnector: ObservableObject {
 
 // MARK: - Models
 
-struct GoogleContact: Identifiable, Codable {
+nonisolated struct GoogleContact: Identifiable, Codable {
     let id: String // resourceName like "people/c1234567890"
     var resourceName: String { id }
     
@@ -823,19 +863,19 @@ struct GoogleContact: Identifiable, Codable {
     var updateTime: Date?
 }
 
-struct GooglePhoneNumber: Codable {
+nonisolated struct GooglePhoneNumber: Codable {
     var value: String
     var type: String? // "home", "work", "mobile", etc.
     var label: String?
 }
 
-struct GoogleEmailAddress: Codable {
+nonisolated struct GoogleEmailAddress: Codable {
     var value: String
     var type: String?
     var label: String?
 }
 
-struct GoogleAddress: Codable {
+nonisolated struct GoogleAddress: Codable {
     var formattedValue: String?
     var streetAddress: String?
     var city: String?
@@ -847,19 +887,19 @@ struct GoogleAddress: Codable {
     var label: String?
 }
 
-struct GoogleUrl: Codable {
+nonisolated struct GoogleUrl: Codable {
     var value: String
     var type: String?
     var label: String?
 }
 
-struct GoogleDate: Codable {
+nonisolated struct GoogleDate: Codable {
     var year: Int?
     var month: Int?
     var day: Int?
 }
 
-struct GoogleContactGroup: Identifiable, Codable {
+nonisolated struct GoogleContactGroup: Identifiable, Codable {
     let id: String // resourceName like "contactGroups/myContacts"
     var resourceName: String { id }
     var name: String
@@ -913,7 +953,7 @@ enum GoogleContactsError: LocalizedError {
 
 // MARK: - Google People API Models
 
-struct PeopleAPIResponse: Codable {
+nonisolated struct PeopleAPIResponse: Codable {
     let connections: [PeopleAPIPerson]?
     let nextPageToken: String?
     let nextSyncToken: String?
@@ -921,7 +961,7 @@ struct PeopleAPIResponse: Codable {
     let totalItems: Int?
 }
 
-struct PeopleAPIPerson: Codable {
+nonisolated struct PeopleAPIPerson: Codable {
     var resourceName: String?
     var etag: String?
     var metadata: PersonMetadata?
@@ -943,26 +983,26 @@ struct PeopleAPIPerson: Codable {
     var memberships: [PersonMembership]?
 }
 
-struct PersonMembership: Codable {
-    struct ContactGroupMembership: Codable {
+nonisolated struct PersonMembership: Codable {
+    nonisolated struct ContactGroupMembership: Codable {
         let contactGroupResourceName: String?
     }
     let contactGroupMembership: ContactGroupMembership?
 }
 
-struct PersonMetadata: Codable {
+nonisolated struct PersonMetadata: Codable {
     let sources: [PersonSource]?
     let deleted: Bool?
 }
 
-struct PersonSource: Codable {
+nonisolated struct PersonSource: Codable {
     let type: String?
     let id: String?
     let etag: String?
     let updateTime: String?
 }
 
-struct PersonName: Codable {
+nonisolated struct PersonName: Codable {
     var givenName: String?
     var middleName: String?
     var familyName: String?
@@ -971,23 +1011,23 @@ struct PersonName: Codable {
     var displayName: String?
 }
 
-struct PersonNickname: Codable {
+nonisolated struct PersonNickname: Codable {
     var value: String
 }
 
-struct PersonEmailAddress: Codable {
-    var value: String
-    var type: String?
-    var formattedType: String?
-}
-
-struct PersonPhoneNumber: Codable {
+nonisolated struct PersonEmailAddress: Codable {
     var value: String
     var type: String?
     var formattedType: String?
 }
 
-struct PersonAddress: Codable {
+nonisolated struct PersonPhoneNumber: Codable {
+    var value: String
+    var type: String?
+    var formattedType: String?
+}
+
+nonisolated struct PersonAddress: Codable {
     var formattedValue: String?
     var streetAddress: String?
     var city: String?
@@ -999,45 +1039,55 @@ struct PersonAddress: Codable {
     var formattedType: String?
 }
 
-struct PersonOrganization: Codable {
+nonisolated struct PersonOrganization: Codable {
     var name: String?
     var department: String?
     var title: String?
     var type: String?
 }
 
-struct PersonBirthday: Codable {
+nonisolated struct PersonBirthday: Codable {
     var date: PersonDate
 }
 
-struct PersonDate: Codable {
+nonisolated struct PersonDate: Codable {
     var year: Int?
     var month: Int?
     var day: Int?
 }
 
-struct PersonPhoto: Codable {
+nonisolated struct PersonPhoto: Codable {
     var url: String?
     var metadata: PhotoMetadata?
 }
 
-struct PhotoMetadata: Codable {
+nonisolated struct PhotoMetadata: Codable {
     let primary: Bool?
     let source: PhotoSource?
+    /// `true` for Google's auto-generated silhouette / monogram placeholder —
+    /// not a photo the user chose, and not worth copying to the Mac. The API
+    /// key is `default`, which is a Swift keyword, hence the mapping.
+    let isDefault: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case primary
+        case source
+        case isDefault = "default"
+    }
 }
 
-struct PhotoSource: Codable {
+nonisolated struct PhotoSource: Codable {
     let type: String?
     let id: String?
 }
 
-struct PersonUrl: Codable {
+nonisolated struct PersonUrl: Codable {
     var value: String
     var type: String?
     var formattedType: String?
 }
 
-struct PersonBiography: Codable {
+nonisolated struct PersonBiography: Codable {
     var value: String
 }
 
