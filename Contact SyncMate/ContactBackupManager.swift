@@ -186,7 +186,10 @@ class ContactBackupManager: ObservableObject {
     /// sessions must not cause numbers to be reused, so pruning never lowers it.
     private var contactVersionsIndex: [String: Int] = [:]
 
-    private let appVersion = "1.0.0" // Should match app version
+    // From the bundle, not a constant: the hardcoded "1.0.0" drifted the
+    // moment MARKETING_VERSION moved, mis-stamping every backup's metadata.
+    private let appVersion = Bundle.main
+        .object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
     // Retention is driven by AppSettings.maxBackupCount (Settings → Backups →
     // "Keep at most"). The former `maxBackupSessions`/`maxVersionsPerContact`
     // constants disagreed with both that setting and each other, and neither was
