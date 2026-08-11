@@ -1,0 +1,118 @@
+# CI for Contact SyncMate.
+#
+# The one non-obvious thing here: the 199 XCTest cases run inside the app
+# itself, and the app is a menu-bar accessory that never quits after the last
+# test — `xcodebuild test`'s exit code is therefore meaningless. The log is
+# the source of truth, exactly as Scripts/verify-contact-syncmate.sh does
+# locally: poll for "Test Suite 'All tests' passed|failed", bound the wait,
+# and reap the orphaned test host by product path.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PROJECT: "Contact SyncMate.xcodeproj"
+  SCHEME: "Contact SyncMate"
+  DERIVED_DATA: DerivedData
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preflight
+        run: |
+          xcodebuild -version
+          # The OAuth loader source and the JSON credential file are both
+          # gitignored (secret-scan hook policy). The loader is credential-
+          # free and materialises from its committed template; the JSON gets
+          # placeholder values, which tests never exercise.
+          bash Scripts/bootstrap-config.sh
+
+      # Best-effort DerivedData cache: exact key on project + sources, prefix
+      # restore-keys so an incremental hit still saves module/PCM work. No
+      # SPM dependencies exist, so there is no package cache to manage.
+      - name: Cache DerivedData
+        uses: actions/cache@v4
+        with:
+          path: DerivedData
+          key: dd-${{ runner.os }}-${{ hashFiles('**/project.pbxproj') }}-${{ hashFiles('Contact SyncMate/**/*.swift', 'ContactSyncMateTests/**/*.swift') }}
+          restore-keys: |
+            dd-${{ runner.os }}-${{ hashFiles('**/project.pbxproj') }}-
+            dd-${{ runner.os }}-
+
+      - name: Build for testing (signing disabled)
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath "$DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            2>&1 | tee build.log
+        # Build failures DO surface through the exit code; only the test
+        # phase needs log parsing.
+
+      - name: Run tests (log-parsed)
+        run: |
+          xcodebuild test-without-building \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -destination 'platform=macOS' \
+            -derivedDataPath "$DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED=NO \
+            > test.log 2>&1 &
+          XCB=$!
+
+          TEST_TIMEOUT=900
+          for _ in $(seq 1 "$TEST_TIMEOUT"); do
+            # "All tests", not the per-suite "Executed" line — the per-suite
+            # line reports whichever suite finished first.
+            grep -q "Test Suite 'All tests' \(passed\|failed\)" test.log 2>/dev/null && break
+            kill -0 "$XCB" 2>/dev/null || break
+            sleep 1
+          done
+
+          kill -9 "$XCB" 2>/dev/null || true
+          wait "$XCB" 2>/dev/null || true
+          # Reap the orphaned test host by product path, never by name.
+          for pid in $(pgrep -f "$DERIVED_DATA/Build/Products/Debug/Contact SyncMate" 2>/dev/null); do
+            kill -9 "$pid" 2>/dev/null || true
+          done
+
+          RESULT=$(grep -E 'Executed [0-9]+ tests' test.log | tail -1 | sed 's/^[[:space:]]*//')
+          echo "Result: ${RESULT:-none}"
+          if [ -z "$RESULT" ]; then
+            echo "::error::Tests never reported an 'All tests' summary within ${TEST_TIMEOUT}s"
+            tail -60 test.log
+            exit 1
+          fi
+          if ! grep -q "Test Suite 'All tests' passed" test.log; then
+            echo "::error::Test failures detected"
+            grep -E ' error: | failed \(' test.log | head -30
+            exit 1
+          fi
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-logs
+          path: |
+            build.log
+            test.log
+          retention-days: 14
