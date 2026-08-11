@@ -12,6 +12,7 @@ import Contacts
 import UniformTypeIdentifiers  // UTType.json for the backup export panel
 import Combine
 import AppKit
+import os
 
 // MARK: - Data Models
 
@@ -170,6 +171,14 @@ extension BackupSession {
 /// Manages contact backups and versions with full rollback capability
 class ContactBackupManager: ObservableObject {
     static let shared = ContactBackupManager()
+
+    /// Unified-log channel for persistence faults, following the
+    /// SyncFailureStore pattern. An unreadable backup index means every past
+    /// backup silently vanishes from the UI — the one failure this subsystem
+    /// must not swallow into a discarded stdout.
+    nonisolated private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "ContactSyncMate",
+        category: "persistence")
 
     @Published var lastBackupDate: Date?
     @Published var backupCount: Int = 0
@@ -1359,7 +1368,11 @@ class ContactBackupManager: ObservableObject {
                 } catch {
                     // Initialize empty if load fails (corrupted index). The
                     // container merge below can still recover fallback sessions.
-                    print("ContactBackupManager: Could not load backup index: \(error.localizedDescription)")
+                    Self.logger.fault("Could not load backup index: \(error.localizedDescription, privacy: .public)")
+                    SyncHistory.shared.log(
+                        source: "ContactBackupManager",
+                        action: "index.loadFailed",
+                        details: "The backup index could not be read — existing backups will not be listed: \(error.localizedDescription)")
                     self.backupSessions = []
                     self.contactVersionsIndex = [:]
                 }

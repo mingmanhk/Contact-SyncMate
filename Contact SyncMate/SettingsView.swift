@@ -8,6 +8,7 @@
 
 import SwiftUI
 import Contacts
+import os
 
 // MARK: - Semantic Colour Palette
 
@@ -297,6 +298,10 @@ struct GeneralSettingsView: View {
     /// while Settings is open would be more machinery than the number is worth.
     @State private var syncFailureCount = 0
     @State private var pendingLanguageRelaunch = false
+    /// Crash diagnostics captured by MetricKit (issue #76). Read once per
+    /// appearance, like the failure count above: the row only exists when a
+    /// previous session crashed, which is rare.
+    @State private var crashDiagnosticFiles: [URL] = []
     // The inline change log used to live here: a cached recentChanges array,
     // an expandable list, failure counts, and icon/tint helpers for each action
     // kind. All of it duplicated the Dashboard's Recent Changes card and the
@@ -549,6 +554,24 @@ struct GeneralSettingsView: View {
                 }
                 .help("Contacts that failed to save repeatedly and are no longer retried")
 
+                // Only when a crash has actually left a diagnostic behind —
+                // an always-visible "Crash Reports (0)" row would just worry
+                // people. Everything stays on this Mac; Reveal in Finder is
+                // for attaching a file to a support email by hand.
+                if !crashDiagnosticFiles.isEmpty {
+                    HStack {
+                        Label("Crash Reports", systemImage: "ladybug")
+                        Text("\(crashDiagnosticFiles.count)")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Reveal in Finder") {
+                            NSWorkspace.shared.activateFileViewerSelecting(crashDiagnosticFiles)
+                        }
+                    }
+                    .help("A previous session crashed. Diagnostics were saved on this Mac only — attach one to a support email if you'd like help.")
+                }
+
                 Button(role: .destructive) {
                     showingResetConfirmation = true
                 } label: {
@@ -606,7 +629,10 @@ struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { syncFailureCount = SyncFailureStore.shared.allFailures().count }
+        .onAppear {
+            syncFailureCount = SyncFailureStore.shared.allFailures().count
+            crashDiagnosticFiles = CrashDiagnosticsSubscriber.capturedDiagnostics()
+        }
         .sheet(isPresented: $showingSyncFailures, onDismiss: {
             syncFailureCount = SyncFailureStore.shared.allFailures().count
         }) {
@@ -1167,6 +1193,14 @@ struct AIMatchingSettingsView: View {
 // ═══════════════════════════════════════════════════════════════════════
 
 struct AccountsSettingsView: View {
+    /// Unified-log channel for sign-in failures — a `print` here vanished into
+    /// a discarded stdout for exactly the path users report ("sign-in did
+    /// nothing"). Default (private) interpolation redaction on the error text:
+    /// OAuth errors can embed response bodies.
+    nonisolated private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "ContactSyncMate",
+        category: "oauth")
+
     @StateObject private var settings = AppSettings.shared
     @EnvironmentObject var appState: AppState
     @StateObject private var googleConnector = GoogleContactsConnector()
@@ -1506,7 +1540,7 @@ struct AccountsSettingsView: View {
                 appState.isGoogleConnected = true
             } catch {
                 signInError = error.localizedDescription
-                print("Google sign-in failed: \(error)")
+                Self.logger.error("Google sign-in failed: \(error.localizedDescription)")
             }
             isSigningIn = false
         }

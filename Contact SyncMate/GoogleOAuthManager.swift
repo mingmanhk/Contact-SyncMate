@@ -11,6 +11,7 @@ import Security
 import CryptoKit
 import Combine
 import AppKit
+import os
 
 /// Manages Google OAuth 2.0 authentication flow
 ///
@@ -52,6 +53,13 @@ import AppKit
 @MainActor
 class GoogleOAuthManager: NSObject, ObservableObject {
     static let shared = GoogleOAuthManager()
+
+    /// Unified-log channel — a `print` here discarded the one clue for "the
+    /// account row never shows my email". Default (private) interpolation
+    /// redaction: OAuth errors can embed response bodies.
+    nonisolated private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "ContactSyncMate",
+        category: "oauth")
     
     // MARK: - Google OAuth Configuration
     // Client ID is loaded from GoogleOAuthConfig (public, safe to embed).
@@ -920,7 +928,7 @@ class GoogleOAuthManager: NSObject, ObservableObject {
                     self.userEmail = userInfo.email
                 }
             } catch {
-                print("Failed to fetch user email: \(error)")
+                Self.logger.error("Failed to fetch user email: \(error.localizedDescription)")
             }
         }
     }

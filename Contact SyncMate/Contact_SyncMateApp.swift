@@ -6,6 +6,7 @@
 import SwiftUI
 import AppKit
 import Combine
+import MetricKit
 import ServiceManagement
 
 @main
@@ -13,23 +14,22 @@ struct Contact_SyncMateApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        // Settings window
-        WindowGroup(id: "settings") {
+        // The native Settings scene, replacing a WindowGroup(id: "settings")
+        // that doubled a hand-built AppDelegate NSWindow hosting the same
+        // view. A WindowGroup can present itself at launch (before the
+        // activation policy flips to .accessory) and File ▸ New Window could
+        // mint extra Settings copies; the Settings scene is single-instance,
+        // never shows at launch, and provides the ⌘, command for free — so
+        // the custom CommandGroup(replacing: .appSettings) is gone too.
+        // Every programmatic open path goes through AppDelegate.openSettings().
+        Settings {
             SettingsView()
                 .environmentObject(appDelegate.appState)
                 .frame(minWidth: 720, idealWidth: 780,
                        minHeight: 520, idealHeight: 620)
         }
-        .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentMinSize)
         .commands {
-            CommandGroup(replacing: .appSettings) {
-                Button("Settings…") {
-                    NotificationCenter.default.post(name: .openSettingsWindow, object: nil)
-                }
-                .keyboardShortcut(",", modifiers: .command)
-            }
-
             // ── Sync menu ──────────────────────────────────────────────
             // App-level menu so every window gets the same commands and
             // keyboard shortcuts (HIG: primary actions belong in the menu
@@ -71,10 +71,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
 
-    // Managed windows
+    // Managed windows. Settings is not among them: the native SwiftUI
+    // Settings scene owns that window (see the App body).
     private var dashboardWindow:  NSWindow?
     private var historyWindow:    NSWindow?
-    private var settingsWindow:   NSWindow?
+
+    // Crash diagnostics (MetricKit). Held strongly — MXMetricManager keeps
+    // subscribers weakly.
+    private let crashDiagnostics = CrashDiagnosticsSubscriber()
 
     // Auto-sync scheduler — owns the repeating timer
     private var autoSyncScheduler: AutoSyncScheduler?
@@ -112,6 +116,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             name: .activationPolicyChanged,
             object: nil
         )
+        // Re-evaluate the policy when a window closes: opening Settings (or
+        // any managed window) promotes a menu-bar-only app to .regular, and
+        // closing the last window is what sends it back to .accessory.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleWindowWillClose),
+            name: NSWindow.willCloseNotification,
+            object: nil
+        )
+
+        // On-device crash diagnostics (no network, no consent needed —
+        // MetricKit writes JSON into Application Support only).
+        MXMetricManager.shared.add(crashDiagnostics)
 
         // Keep AppleLanguages in step with the stored preference. Needed because
         // resetToDefaults() and a fresh install can leave the two disagreeing;
@@ -429,6 +446,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.title = "Sync History & Backups"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.setContentSize(NSSize(width: 860, height: 620))
+        // Dashboard and Settings both set a floor; this window had none and
+        // could be shrunk to a sliver.
+        window.minSize = NSSize(width: 700, height: 480)
         window.center()
         window.isReleasedWhenClosed = false
         historyWindow = window
@@ -449,29 +469,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func openSettings() {
         popover?.performClose(nil)
+
+        // A menu-bar app in .accessory mode must promote itself before the
+        // window opens, or the Settings window comes up behind other apps
+        // with no Dock or ⌘-Tab presence. `handleWindowWillClose` sends the
+        // app back to .accessory when the last window goes away.
+        if NSApp.activationPolicy() == .accessory {
+            NSApp.setActivationPolicy(.regular)
+        }
         NSApp.activate(ignoringOtherApps: true)
 
-        if let window = settingsWindow, window.isVisible {
-            window.makeKeyAndOrderFront(nil)
-            return
-        }
-
-        let contentView = SettingsView()
-            .environmentObject(appState)
-
-        let controller = NSHostingController(rootView: contentView)
-        let window = NSWindow(contentViewController: controller)
-        window.title = "Settings"
-        // Resizable is required: SettingsView's NavigationSplitView needs
-        // minWidth 720 (sidebar + detail Form). A fixed 600-pt window
-        // clipped the detail pane on the right.
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        window.setContentSize(NSSize(width: 780, height: 620))
-        window.minSize = NSSize(width: 720, height: 520)
-        window.center()
-        window.isReleasedWhenClosed = false
-        settingsWindow = window
-        window.makeKeyAndOrderFront(nil)
+        // The native SwiftUI Settings scene owns the one Settings window
+        // (single instance, ⌘, for free). There is no public API to open it
+        // from AppKit, but the scene installs this responder-chain action —
+        // the same one the ⌘, menu item triggers.
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }
 
     // MARK: - Launch at Login (SMAppService, macOS 13+)
@@ -531,7 +543,53 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.appearance = AppSettings.shared.preferredAppearance.nsAppearance
     }
 
+    // MARK: - Termination
+
+    /// Quit during a sync cancels the run at a change boundary and holds the
+    /// termination until the run has unwound — bounded, so a hung run cannot
+    /// hold the quit hostage. Letting the process die mid-write is how a
+    /// Google write lands without its mapping flush, which resurfaces on the
+    /// next launch as an unconfirmed merge or a duplicate.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard SyncCoordinator.shared.isRunning else { return .terminateNow }
+
+        SyncHistory.shared.log(
+            source: "AppDelegate", action: "terminate.waitingForSync",
+            details: "Quit requested mid-sync — cancelling the run and flushing before exit")
+        SyncCoordinator.shared.cancelSync()
+
+        Task { @MainActor in
+            // Poll rather than await the run task (private to the
+            // coordinator); force the reply after ~5s even if the run is
+            // still unwinding, because a quit that never completes is worse.
+            let deadline = ContinuousClock.now + .seconds(5)
+            while SyncCoordinator.shared.isRunning && ContinuousClock.now < deadline {
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // Both stores write through debounced / fire-and-forget IO queues;
+        // drain them so the last seconds of a run survive the quit.
+        // SyncFailureStore needs no flush: it writes synchronously inside its
+        // own barrier on every mutation.
+        SyncHistory.shared.flush()
+        ContactMappingStore.shared.flush()
+    }
+
     // MARK: - Activation Policy
+
+    /// Re-runs the policy check after any window closes. Async because at
+    /// `willClose` time the window still counts as visible; one turn of the
+    /// run loop later it does not.
+    @objc private func handleWindowWillClose(_ notification: Notification) {
+        DispatchQueue.main.async { [weak self] in
+            self?.updateActivationPolicy()
+        }
+    }
 
     @objc private func updateActivationPolicy() {
         if AppSettings.shared.attachToMenuBar {
@@ -550,6 +608,74 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // OAuth URL handling intentionally removed — see comment in
     // `applicationDidFinishLaunching`. ASWebAuthenticationSession handles
     // the callback inside `GoogleOAuthManager`.
+}
+
+// MARK: - Crash diagnostics (MetricKit)
+
+/// Receives MetricKit diagnostic payloads and files crash diagnostics on disk.
+///
+/// On-device only, matching the app's privacy posture: the JSON never leaves
+/// the Mac, no consent flow is required, and Settings → General → Data &
+/// History offers a Reveal in Finder row whenever captured files exist so the
+/// user can attach one to a support email themselves.
+///
+/// `nonisolated`: MXMetricManager delivers payloads on its own background
+/// queue, and everything here — file IO and SyncHistory logging — is safe off
+/// the main actor.
+nonisolated final class CrashDiagnosticsSubscriber: NSObject, MXMetricManagerSubscriber {
+
+    /// Where captured diagnostics land:
+    /// Application Support/<bundle id>/Diagnostics.
+    static var diagnosticsDirectory: URL {
+        let fm = FileManager.default
+        let base = (try? fm.url(for: .applicationSupportDirectory,
+                                in: .userDomainMask,
+                                appropriateFor: nil,
+                                create: true)) ?? fm.temporaryDirectory
+        return base
+            .appendingPathComponent(Bundle.main.bundleIdentifier ?? "ContactSyncMate",
+                                    isDirectory: true)
+            .appendingPathComponent("Diagnostics", isDirectory: true)
+    }
+
+    /// Every diagnostic file captured so far, newest first. Drives the
+    /// Settings row's visibility.
+    static func capturedDiagnostics() -> [URL] {
+        let urls = (try? FileManager.default.contentsOfDirectory(
+            at: diagnosticsDirectory,
+            includingPropertiesForKeys: nil,
+            options: .skipsHiddenFiles)) ?? []
+        return urls
+            .filter { $0.pathExtension == "json" }
+            .sorted { $0.lastPathComponent > $1.lastPathComponent }
+    }
+
+    func didReceive(_ payloads: [MXDiagnosticPayload]) {
+        let crashes = payloads.filter { !($0.crashDiagnostics ?? []).isEmpty }
+        guard !crashes.isEmpty else { return }
+
+        let dir = Self.diagnosticsDirectory
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+
+        let formatter = ISO8601DateFormatter()
+        for payload in crashes {
+            // Timestamped name, sortable in Finder; colons swapped out because
+            // Finder renders them as slashes.
+            let stamp = formatter.string(from: payload.timeStampEnd)
+                .replacingOccurrences(of: ":", with: "-")
+            let url = dir.appendingPathComponent("crash-\(stamp).json")
+            do {
+                try payload.jsonRepresentation().write(to: url, options: .atomic)
+                SyncHistory.shared.log(
+                    source: "CrashDiagnostics", action: "crash.diagnosticCaptured",
+                    details: "A previous session crashed — diagnostic saved as \(url.lastPathComponent)")
+            } catch {
+                SyncHistory.shared.log(
+                    source: "CrashDiagnostics", action: "crash.diagnosticWriteFailed",
+                    details: error.localizedDescription)
+            }
+        }
+    }
 }
 
 // MARK: - Notifications

@@ -7,11 +7,20 @@
 
 import Foundation
 import Combine
+import os
 
 /// Persistent storage for user's duplicate resolution decisions
 class DeduplicationDecisionStore: ObservableObject {
-    
+
     static let shared = DeduplicationDecisionStore()
+
+    /// Unified-log channel for persistence faults, following the
+    /// SyncFailureStore pattern: a decision file that cannot be written means
+    /// the user will be asked the same duplicate questions again, and a
+    /// `print` buried that on a discarded stdout.
+    nonisolated private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "ContactSyncMate",
+        category: "persistence")
     
     private let fileURL: URL
 @Published private(set) var lastUpdated: Date = Date()
@@ -134,7 +143,14 @@ class DeduplicationDecisionStore: ObservableObject {
             let data = try encoder.encode(Array(patterns.values))
             try data.write(to: fileURL, options: [.atomic])
         } catch {
-            print("⚠️ Failed to save deduplication decisions: \(error)")
+            // In-memory decisions still work for this launch; the fault line
+            // and the history event are what stop the loss from being
+            // invisible.
+            Self.logger.fault("Could not persist deduplication decisions: \(error.localizedDescription, privacy: .public)")
+            SyncHistory.shared.log(
+                source: "DeduplicationStore",
+                action: "persistence.failed",
+                details: "Duplicate decisions could not be saved and will not survive a relaunch: \(error.localizedDescription)")
         }
     }
     
