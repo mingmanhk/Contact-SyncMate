@@ -1,0 +1,63 @@
+//
+//  GoogleOAuthConfig.swift
+//  Contact SyncMate
+//
+//  Loads OAuth credentials from GoogleOAuthConfig.json (gitignored).
+//
+//  SECURITY NOTES:
+//  - The Client ID is public and safe to include in the app bundle.
+//  - The Client Secret is stored in the macOS Keychain, NOT in this file
+//    or the JSON config. On first launch the secret is migrated from the
+//    JSON (if present) into the Keychain, after which you should remove
+//    the "clientSecret" key from the JSON file.
+//  - PKCE (RFC 7636) is used for all OAuth flows as an additional layer
+//    of security, per OAuth 2.1 best practices for desktop apps.
+//
+
+import Foundation
+
+struct GoogleOAuthConfig {
+    // MARK: - Public Credential (safe to embed)
+
+    static let clientId: String = {
+        if let url = Bundle.main.url(forResource: "GoogleOAuthConfig", withExtension: "json"),
+           let data = try? Data(contentsOf: url),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: String],
+           let id = json["clientId"], !id.contains("YOUR_CLIENT_ID") {
+            return id
+        }
+        return "YOUR_CLIENT_ID.apps.googleusercontent.com"
+    }()
+
+    static let redirectURI: String = {
+        if let url = Bundle.main.url(forResource: "GoogleOAuthConfig", withExtension: "json"),
+           let data = try? Data(contentsOf: url),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: String],
+           let uri = json["redirectURI"], !uri.contains("YOUR_CLIENT_ID") {
+            return uri
+        }
+        return "com.googleusercontent.apps.YOUR_CLIENT_ID:/oauth2redirect"
+    }()
+
+    // MARK: - Secret (Keychain migration only)
+
+    /// Read the client secret from the JSON **only** for one-time Keychain migration.
+    /// After migration this returns an empty string and is never used again.
+    static let clientSecret: String = {
+        if let url = Bundle.main.url(forResource: "GoogleOAuthConfig", withExtension: "json"),
+           let data = try? Data(contentsOf: url),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: String],
+           let secret = json["clientSecret"], secret != "SET_AT_RUNTIME_OR_CI" {
+            return secret
+        }
+        return ""
+    }()
+
+    // MARK: - Instance Interface (backward compatibility)
+
+    var clientId: String { GoogleOAuthConfig.clientId }
+    var clientSecret: String { GoogleOAuthConfig.clientSecret }
+    var redirectURI: String { GoogleOAuthConfig.redirectURI }
+
+    init() {}
+}
