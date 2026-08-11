@@ -25,7 +25,11 @@ env:
 
 jobs:
   build-and-test:
-    runs-on: macos-15
+    # macos-26, matching the SDK: on macos-15 the newest Xcode (26.3) builds
+    # against the macOS 26 SDK but the 15.x runtime crash-looped the engine
+    # tests with an identical-address invalid free — an SDK/runtime mismatch,
+    # not app logic (the same suite is green locally on macOS 26).
+    runs-on: macos-26
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
