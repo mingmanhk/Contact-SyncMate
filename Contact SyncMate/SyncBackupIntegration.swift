@@ -60,6 +60,10 @@ extension SyncEngine {
                 throw SyncEngineError.missingContactData(version.contactName)
             }
             let connector = macConnector
+            // Pre-v2 snapshots (urls decodes nil) never captured the extended
+            // fields; the mask keeps a legacy restore from clearing them.
+            let mask = ContactMapper.MacWriteFields.forRestore(
+                ofLegacySnapshot: version.data.urls == nil)
             try await MacContactsConnector.performWriteOffMain {
                 guard let existing = try connector.fetchContactSync(withIdentifier: mID) else {
                     // Deleted since the backup — recreate rather than fail, which
@@ -69,7 +73,7 @@ extension SyncEngine {
                     return
                 }
                 let mutable = existing.mutableCopy() as! CNMutableContact
-                ContactMapper.applyToMac(from: unified, to: mutable)
+                ContactMapper.applyToMac(from: unified, to: mutable, fields: mask)
                 try connector.updateContactSync(mutable)
             }
         }
@@ -132,6 +136,15 @@ extension SyncEngine {
         guard let restored = ContactBackupManager.shared.restoreBackupSession(id: backupId) else {
             throw SyncEngineError.backupNotFound
         }
+
+        // One mask for the whole session: a backup is written by one app
+        // version, so if any snapshot lacks the v2 fields (urls is the
+        // reliable marker — v2 always encodes the array, legacy decodes nil),
+        // the entire session predates them and a restore must not clear the
+        // fields it never captured.
+        let sessionIsLegacy = ContactBackupManager.shared.getBackupSession(id: backupId)?
+            .contactVersions.contains { $0.data.urls == nil } ?? false
+        let restoreMask = ContactMapper.MacWriteFields.forRestore(ofLegacySnapshot: sessionIsLegacy)
 
         // Snapshot the current state first. Restoring is destructive — especially
         // with `.remove` — and the user must be able to get back to where they
@@ -233,11 +246,12 @@ extension SyncEngine {
                 let connector = macConnector
                 let snapshot = unified
                 let macID = unified.macContactIdentifier
+                let mask = restoreMask
                 try await MacContactsConnector.performWriteOffMain {
                     if let macID,
                        let existing = try connector.fetchContactSync(withIdentifier: macID) {
                         let mutable = existing.mutableCopy() as! CNMutableContact
-                        ContactMapper.applyToMac(from: snapshot, to: mutable)
+                        ContactMapper.applyToMac(from: snapshot, to: mutable, fields: mask)
                         try connector.updateContactSync(mutable)
                     } else {
                         // The contact was deleted since the backup — recreate it.

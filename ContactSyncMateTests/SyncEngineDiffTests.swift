@@ -829,6 +829,28 @@ final class SyncFailureKeyTests: XCTestCase {
             change: confirmed, session: session(reviewed: false)))
     }
 
+    func test_transientErrors_doNotCountTowardSetAside() {
+        // P-03 regression (github issue #53): environmental failures must not
+        // advance a contact's strike count.
+        XCTAssertFalse(SyncEngine.failureCountsTowardSetAside(URLError(.notConnectedToInternet)))
+        XCTAssertFalse(SyncEngine.failureCountsTowardSetAside(CancellationError()))
+        XCTAssertFalse(SyncEngine.failureCountsTowardSetAside(GoogleContactsError.rateLimitExceeded))
+        XCTAssertFalse(SyncEngine.failureCountsTowardSetAside(GoogleContactsError.invalidToken))
+        XCTAssertFalse(SyncEngine.failureCountsTowardSetAside(
+            GoogleContactsError.apiError(statusCode: 503, message: "backend error")))
+        XCTAssertFalse(SyncEngine.failureCountsTowardSetAside(
+            GoogleContactsError.apiError(statusCode: 429, message: "quota")))
+    }
+
+    func test_contactSpecificErrors_doCountTowardSetAside() {
+        XCTAssertTrue(SyncEngine.failureCountsTowardSetAside(
+            GoogleContactsError.apiError(statusCode: 400, message: "invalid field")),
+            "a 4xx judges this contact's payload and should strike")
+        XCTAssertTrue(SyncEngine.failureCountsTowardSetAside(
+            NSError(domain: CNErrorDomain, code: 134092)),
+            "a Contacts validation rejection is exactly what set-aside exists for")
+    }
+
     func test_setAsideContact_isExcludedFromBatch() {
         // N-01 regression (github issue #24): set aside means set aside — the
         // batch pre-pass must not submit what the per-contact loop would skip.
@@ -910,6 +932,35 @@ final class ApplyToMacClearingTests: XCTestCase {
         mac.imageData = Data([0xFF, 0xD8])
         ContactMapper.applyToMac(from: .diffMake(givenName: "Ann"), to: mac)
         XCTAssertNotNil(mac.imageData)
+    }
+
+    func test_legacyRestoreMask_preservesFieldsTheSnapshotNeverCaptured() {
+        // R-03 regression (github issue #44): pre-v2 snapshots decode the
+        // extended fields as nil — "never captured", not "cleared" — and a
+        // restore must not blank them on the live contact.
+        let mac = CNMutableContact()
+        mac.nickname = "Vic"
+        mac.namePrefix = "Dr."
+        mac.departmentName = "R&D"
+        mac.birthday = DateComponents(year: 1990, month: 1, day: 2)
+        mac.urlAddresses = [CNLabeledValue(
+            label: CNLabelURLAddressHomePage,
+            value: "https://example.com" as NSString)]
+
+        let mask = ContactMapper.MacWriteFields.forRestore(ofLegacySnapshot: true)
+        ContactMapper.applyToMac(from: .diffMake(givenName: "Ann"), to: mac, fields: mask)
+
+        XCTAssertEqual(mac.nickname, "Vic")
+        XCTAssertEqual(mac.namePrefix, "Dr.")
+        XCTAssertEqual(mac.departmentName, "R&D")
+        XCTAssertNotNil(mac.birthday)
+        XCTAssertEqual(mac.urlAddresses.count, 1)
+        XCTAssertEqual(mac.givenName, "Ann", "v1-captured fields still restore")
+
+        // A v2 snapshot restores at full fidelity — including clears.
+        let full = ContactMapper.MacWriteFields.forRestore(ofLegacySnapshot: false)
+        ContactMapper.applyToMac(from: .diffMake(givenName: "Ann"), to: mac, fields: full)
+        XCTAssertEqual(mac.nickname, "")
     }
 }
 

@@ -375,10 +375,11 @@ class SyncEngine: ObservableObject {
                     message: explained,
                     timestamp: Date()
                 ))
-                // Count it against this contact. On the third strike the next
-                // sync will set it aside instead of failing it again.
+                // Count it against this contact — but only when the failure
+                // says something about the contact. On the third strike the
+                // next sync will set it aside instead of failing it again.
                 var attempts = 0
-                if let failureKey {
+                if let failureKey, Self.failureCountsTowardSetAside(error) {
                     attempts = SyncFailureStore.shared.recordFailure(
                         key: failureKey,
                         name: change.contactName,
@@ -1291,6 +1292,35 @@ class SyncEngine: ObservableObject {
         action == .delete && settings.confirmPendingDeletions && !session.userReviewed
     }
 
+    /// Whether a failure is a judgement about *this contact* (malformed
+    /// field, rejected payload) rather than about the world (network down,
+    /// rate limit, server error, expired session, user cancel).
+    ///
+    /// Only contact-specific failures may count toward the three-strike
+    /// set-aside. A dropped connection mid-batch hands the identical error to
+    /// every contact in the chunk — up to 200 at once — and three syncs on
+    /// flaky Wi-Fi could silently set aside half an address book forever,
+    /// which inverts the store's purpose: it exists to absorb *persistent*
+    /// per-contact failures, not transient environmental ones.
+    static func failureCountsTowardSetAside(_ error: Error) -> Bool {
+        if error is CancellationError { return false }
+        if error is URLError { return false }
+        if error is GoogleOAuthError { return false }
+        switch error {
+        case GoogleContactsError.rateLimitExceeded,
+             GoogleContactsError.networkError,
+             GoogleContactsError.notAuthenticated,
+             GoogleContactsError.invalidToken:
+            return false
+        case let GoogleContactsError.apiError(statusCode, _):
+            // 4xx (bar 429) judge the payload — this contact. 429 and 5xx
+            // are Google's problem and will pass on their own.
+            return statusCode != 429 && statusCode < 500
+        default:
+            return true
+        }
+    }
+
     /// Whether an unconfirmed merge should be held back from an unreviewed run.
     ///
     /// A `.merge` with no `userOverride` is a proposal, not a decision: the
@@ -2151,9 +2181,26 @@ enum ContactMapper {
         var websites  = true
         var addresses = true
         var photos    = true
+        /// The scalars added to `ContactSnapshot` after the first release
+        /// (prefix/suffix, nickname, phonetics, department). Restores of
+        /// pre-v2 backups decode them as nil — meaning "never captured", not
+        /// "cleared" — and must not blank the live values.
+        var extendedNames = true
         // `nonisolated`: referenced as the default argument of the
         // nonisolated `applyToMac`, which runs on the Contacts write queue.
         nonisolated static let all = MacWriteFields()
+
+        /// The mask for restoring a backup snapshot: full-fidelity for v2
+        /// snapshots; for legacy snapshots, only the fields v1 captured.
+        nonisolated static func forRestore(ofLegacySnapshot legacy: Bool) -> MacWriteFields {
+            var mask = MacWriteFields()
+            if legacy {
+                mask.websites = false
+                mask.birthday = false
+                mask.extendedNames = false
+            }
+            return mask
+        }
     }
 
     /// Apply fields from a UnifiedContact onto an existing CNMutableContact (for updates)
@@ -2178,13 +2225,16 @@ enum ContactMapper {
         mac.givenName          = unified.givenName          ?? ""
         mac.middleName         = unified.middleName         ?? ""
         mac.familyName         = unified.familyName         ?? ""
-        mac.namePrefix         = unified.namePrefix         ?? ""
-        mac.nameSuffix         = unified.nameSuffix         ?? ""
-        mac.nickname           = unified.nickname           ?? ""
-        mac.phoneticGivenName  = unified.phoneticGivenName  ?? ""
-        mac.phoneticFamilyName = unified.phoneticFamilyName ?? ""
         mac.organizationName   = unified.organizationName   ?? ""
-        mac.departmentName     = unified.department         ?? ""
+
+        if fields.extendedNames {
+            mac.namePrefix         = unified.namePrefix         ?? ""
+            mac.nameSuffix         = unified.nameSuffix         ?? ""
+            mac.nickname           = unified.nickname           ?? ""
+            mac.phoneticGivenName  = unified.phoneticGivenName  ?? ""
+            mac.phoneticFamilyName = unified.phoneticFamilyName ?? ""
+            mac.departmentName     = unified.department         ?? ""
+        }
 
         if fields.jobTitle { mac.jobTitle = unified.jobTitle ?? "" }
 
