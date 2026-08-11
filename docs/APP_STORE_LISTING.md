@@ -12,16 +12,15 @@ console. Character limits are Apple's; counts shown are for the text below.
 | **Name** (30 max) | `Contact SyncMate` — 16 |
 | **Subtitle** (30 max) | `Google ↔ Apple Contacts sync` — 29 |
 | **Bundle ID** | `com.victorlam.ContactSyncMate` |
-| **Primary category** | Productivity |
-| **Secondary category** | Utilities |
+| **Primary category** | Utilities |
+| **Secondary category** | Productivity |
 | **Content rights** | Does not contain, show, or access third-party content |
 | **Age rating** | 4+ (no objectionable content) |
 | **Price** | Free |
 
 > **Subtitle alternatives** if you want a different emphasis:
 > - `Two-way contact sync, privately` — 30
-> - `Sync contacts. Nothing leaves.` — 29
-> - `Contact sync that stays local` — 29
+> - `Contact sync, on your own Mac` — 29
 
 ---
 
@@ -30,11 +29,11 @@ console. Character limits are Apple's; counts shown are for the text below.
 Editable without a new build — use it for release news.
 
 ```
-Two-way sync between Google Contacts and Apple Contacts, running entirely on
-your Mac. Preview every change, undo any sync, and never send a contact to
-anyone's server.
+Two-way sync between Google Contacts and Apple Contacts, on your Mac. Preview
+every change, undo any sync. Optional AI matching sends nothing until you turn
+it on.
 ```
-*168 characters*
+*163 characters*
 
 ---
 
@@ -45,8 +44,9 @@ Contact SyncMate keeps your Google Contacts and your Apple Contacts matching
 each other — in both directions, on a schedule you choose, with every change
 shown to you before it is written.
 
-Everything runs on your Mac. There is no Contact SyncMate account, no server,
-and no way for anyone but you to see your contacts.
+Everything runs on your Mac. There is no Contact SyncMate account and no
+server — and unless you enable optional AI matching, no way for anyone but you
+to see your contacts.
 
 
 WHY YOU MIGHT NEED IT
@@ -110,8 +110,9 @@ field conflicts. Anything ambiguous goes to you. Decisions are remembered, so a
 pair you keep separate is never raised again.
 
 Optionally, bring your own Anthropic API key to have borderline pairs
-adjudicated by Claude. Off by default. When active, only the two records being
-compared are sent — never your address book.
+adjudicated by Claude. Off by default — nothing is sent until you also switch
+on the consent toggle. When active, only the two records being compared are
+sent — never your address book.
 
 
 BUILT FOR macOS
@@ -140,7 +141,7 @@ Export either address book to CSV or Excel whenever you want an archive.
 
 PRIVACY
 
-• All processing happens on your Mac
+• All processing happens on your Mac unless you enable optional AI matching
 • No server operated by the developer receives your contacts — there isn't one
 • No analytics, no telemetry, no advertising, no data sale
 • Sign-in tokens are stored in the macOS Keychain
@@ -159,7 +160,7 @@ The Contacts note field is not synced. Apple restricts it to apps holding a
 special entitlement, which this app does not have; the setting is disabled
 rather than failing silently. Every other field syncs normally.
 ```
-*≈3,750 characters*
+*≈4,550 characters — currently over the 4,000 limit; trim before pasting.*
 
 ---
 
@@ -226,7 +227,7 @@ Some flows still walk you through categories. Answer:
 | Service | Role | Data sent | User-initiated? |
 |---|---|---|---|
 | Google People API | Core function — contact sync | Contact records, to the user's own Google account | Yes — user signs in |
-| Anthropic API | Optional duplicate adjudication | Only the two records being compared | Yes — off by default, requires the user's own API key |
+| Anthropic API | Optional duplicate adjudication | Only the two records being compared | Yes — off by default, requires the user's own API key plus an explicit consent toggle |
 
 Neither transmits data to the developer.
 
@@ -273,8 +274,8 @@ NOTES ON SPECIFIC BEHAVIOURS
   com.apple.developer.contacts.notes entitlement, which we do not hold. The
   toggle is disabled with an explanation rather than failing silently.
 • AI-assisted duplicate matching is disabled by default and requires the user
-  to supply their own Anthropic API key. With no key, matching is fully
-  on-device.
+  to supply their own Anthropic API key and switch on an explicit consent
+  toggle (Settings → AI Matching). Otherwise, matching is fully on-device.
 • Backups default to the app container. If the user picks a custom folder, the
   grant is persisted as a security-scoped bookmark so it survives relaunch.
 • The app requests no entitlements beyond sandbox, Contacts, outgoing network,

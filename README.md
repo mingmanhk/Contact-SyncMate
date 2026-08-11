@@ -4,7 +4,7 @@
 
 # Contact SyncMate
 
-**Two-way contact synchronisation between Google Contacts and Apple Contacts — entirely on your Mac.**
+**Two-way contact synchronisation between Google Contacts and Apple Contacts — on your Mac.**
 
 [![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-000000?logo=apple&logoColor=white)](https://www.apple.com/macos/)
 [![Swift](https://img.shields.io/badge/Swift-5.9-F05138?logo=swift&logoColor=white)](https://swift.org)
@@ -439,7 +439,9 @@ flowchart TD
 
 <br>
 
-Disabled by default. When you supply **your own** Anthropic API key:
+Disabled by default. When you supply **your own** Anthropic API key *and*
+switch on the explicit consent toggle in Settings → AI Matching (the key alone
+does not enable cloud calls):
 
 | Property | Value |
 |---|---|

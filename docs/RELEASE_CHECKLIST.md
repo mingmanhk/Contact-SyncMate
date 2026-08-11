@@ -10,11 +10,13 @@ every release.
 - [ ] **Accept the latest Apple Program License Agreement**
       developer.apple.com → Account → Membership → agree to PLA.
       *Symptom if skipped: "Unable to process request — PLA Update available".*
-- [ ] **Rotate the Google API key** hardcoded in `GoogleAPIConfig.swift`
-      1. Google Cloud Console → Credentials → delete/regenerate the old key
-      2. Put the new key in `GoogleOAuthConfig.json` (gitignored) and load it
-         from there; remove the literal from source
-      3. Treat the old key as compromised (it exists in git history)
+- [ ] **Google OAuth client configured** via `Scripts/set-oauth-client.sh`
+      1. The client ID lives in `Contact SyncMate/GoogleOAuthConfig.json`,
+         which is gitignored — never commit it
+      2. Run `Scripts/set-oauth-client.sh <client-id>` (or point it at a
+         `GoogleService-Info.plist`) to write/update the file
+      3. If a credential was ever committed, treat it as compromised: revoke it
+         in Google Cloud Console → Credentials and issue a fresh client
 - [ ] **Verify OAuth client** — People API enabled, correct redirect URI,
       bundle's URL scheme matches (`Info.plist → CFBundleURLSchemes`)
 
@@ -70,6 +72,10 @@ create-dmg "build/export/Contact SyncMate.app" build/   # brew install create-dm
 # or: ditto -c -k --keepParent "build/export/Contact SyncMate.app" ContactSyncMate-<version>.zip
 ```
 
+- [ ] Verify the privacy manifest shipped in the archive:
+      `PrivacyInfo.xcprivacy` present inside the built app bundle
+      (declares UserDefaults `CA92.1` and file-timestamp `C617.1`/`DDA9.1`
+      API reasons; no tracking)
 - [ ] Gatekeeper check on a clean machine/account:
       `spctl -a -vv "Contact SyncMate.app"` → "accepted, source=Notarized Developer ID"
 
@@ -83,9 +89,13 @@ create-dmg "build/export/Contact SyncMate.app" build/   # brew install create-dm
 
 ## Mac App Store route (additional, when chosen)
 
-- [ ] Add `com.apple.security.app-sandbox` to entitlements
-- [ ] Audit file access under sandbox (backup folder needs user-selected
-      security-scoped bookmarks)
+- [ ] Audit file access under sandbox (already enabled; backup folder needs
+      user-selected security-scoped bookmarks)
 - [ ] App Store Connect listing + privacy nutrition labels
-      (Contacts data — synced, not collected; no tracking)
+      (Contacts data — synced, not collected; no tracking; "Data Not Collected")
+- [ ] Verify the hosted privacy policy
+      (`https://mingmanhk.github.io/Contact-SyncMate/privacy.html`) matches
+      current in-app claims: AI cloud matching is consent-gated and off by
+      default, backups/history are unencrypted on disk, and only the two OAuth
+      scopes are requested
 - [ ] TestFlight round before submission

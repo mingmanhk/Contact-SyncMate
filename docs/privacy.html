@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Privacy Policy — Contact SyncMate</title>
-<meta name="description" content="Privacy Policy for Contact SyncMate, a macOS app that syncs Google Contacts with Apple Contacts entirely on your own Mac.">
+<meta name="description" content="Privacy Policy for Contact SyncMate, a macOS app that syncs Google Contacts with Apple Contacts on your own Mac.">
 <style>
   :root { --fg:#1d1d1f; --muted:#6e6e73; --line:#d2d2d7; --accent:#0b5cd5; --bg:#fff; --card:#f5f5f7; }
   @media (prefers-color-scheme: dark) {
@@ -39,12 +39,15 @@
 </div>
 
 <h1>Privacy Policy</h1>
-<p class="dates"><strong>Contact SyncMate</strong> · Effective 11 November 2025 · Last updated 26 July 2026</p>
+<p class="dates"><strong>Contact SyncMate</strong> · Effective 11 November 2025 · Last updated 10 August 2026</p>
 
 <div class="card">
   <strong>Summary:</strong> Contact SyncMate has no servers. Your contacts are
-  never sent to, stored by, or processed by the developer or any third party.
-  Everything happens locally on your Mac.
+  never sent to, stored by, or processed by the developer. Contact data leaves
+  your Mac only to reach Google — the service you connect — unless you
+  explicitly enable optional AI-assisted matching, in which case limited fields
+  from ambiguous duplicate pairs are sent to Anthropic (see section 5).
+  Everything else happens locally on your Mac.
 </div>
 
 <h2>1. Information we do not collect</h2>
@@ -58,12 +61,16 @@
   <li>Device information or identifiers</li>
   <li>IP addresses or location data</li>
 </ul>
+<p>Contact data leaves your Mac only to reach Google (the service you connect)
+   and — only if you explicitly enable AI-assisted matching — Anthropic, as
+   described in section 5. The developer receives nothing in either case.</p>
 
 <h2>2. How the app works</h2>
-<p>Contact SyncMate operates entirely on your Mac. Data flows directly between:</p>
+<p>Contact SyncMate operates on your Mac, with no intermediary server. Data flows directly between:</p>
 <ul>
   <li>Your Mac and Google’s servers (via the Google People API), and</li>
   <li>Your Mac and Apple Contacts (via Apple’s Contacts framework, local or iCloud)</li>
+  <li>Your Mac and Anthropic’s API — only if you explicitly enable AI-assisted matching (section 5)</li>
 </ul>
 <p>There is no intermediary server. The developer never sees your data.</p>
 
@@ -91,17 +98,24 @@
   <li><strong>Backup snapshots</strong> — a folder you choose (default <code>~/Documents/Contact SyncMate Backups</code>), so any sync can be reviewed and undone.</li>
   <li><strong>Sync history and settings</strong> — <code>~/Library/Application Support/</code> and standard macOS preferences.</li>
 </ul>
+<p>Backup snapshots and sync history are written to disk <strong>unencrypted</strong> —
+   they contain contact data in plain form, protected only by macOS file
+   permissions and FileVault if you have it enabled — and the app warns you if
+   the backup folder you choose is synced to a cloud service, since that would
+   copy the snapshots off your Mac.</p>
 <p>All of this stays on your Mac and is under your control. Deleting the app and
    these folders removes everything.</p>
 
 <h2>5. Optional AI-assisted duplicate matching</h2>
 <p>
   Duplicate detection runs on-device by default. You may optionally supply your
-  own Anthropic API key to improve matching on ambiguous pairs. If — and only if —
-  you enable this and provide a key:
+  own Anthropic API key to improve matching on ambiguous pairs. Nothing is sent
+  unless you also switch on the explicit consent toggle in Settings → AI
+  Matching — entering an API key alone does not enable cloud processing. If —
+  and only if — you give this consent:
 </p>
 <ul>
-  <li>Only the fields needed to compare two specific records (names, and where present email/phone fragments) are sent to Anthropic’s API.</li>
+  <li>Only the fields needed to compare two specific ambiguous records — names, organisation, job title, email addresses, and phone numbers — are sent to Anthropic’s API (<code>api.anthropic.com</code>).</li>
   <li>No full contact list is ever transmitted.</li>
   <li>The request goes directly from your Mac to Anthropic under your own account; the developer is not involved and never receives the data.</li>
   <li>This feature is <strong>off by default</strong> and can be turned off at any time.</li>
