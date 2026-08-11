@@ -112,6 +112,11 @@ final class SyncCoordinator: ObservableObject {
     /// sync over a slow network could only be watched to the end.
     private var currentRunTask: Task<Void, Never>?
 
+    /// Monotonic id of the run that owns `currentRunTask`. `Task` is a value
+    /// type, so identity can't be compared — the generation says whether the
+    /// finishing run is still the one holding the handle.
+    private var runGeneration = 0
+
     /// Stop the running sync at the next safe boundary.
     ///
     /// The engine checks for cancellation between contacts, so nothing is
@@ -127,13 +132,24 @@ final class SyncCoordinator: ObservableObject {
     /// Start a sync using the current AppSettings configuration.
     /// Safe to call from any async context — always runs on MainActor.
     func runSync() async {
-        guard !isRunning else { return }
+        // Both gates, and the phase claimed *synchronously* before any
+        // suspension. The body only marks the phase active once its task gets
+        // a main-actor slot — after this method has already suspended — so a
+        // second call enqueued in the same breath (timer fire racing a click)
+        // used to pass `!isRunning` and spawn a second full run. Claiming the
+        // phase here closes that window; the task-handle gate covers the
+        // watchdog case where the phase was released but the run still lives.
+        guard !isRunning, currentRunTask == nil else { return }
+        setPhase(.preparing, step: "Starting…", progress: 0)
         // A coordinator-owned Task, so cancelSync() holds the handle; awaiting
         // its value keeps every caller's structure unchanged.
-        let task = Task { await self.runSyncBody() }
-        currentRunTask = task
-        await task.value
-        currentRunTask = nil
+        runGeneration += 1
+        let generation = runGeneration
+        currentRunTask = Task { await self.runSyncBody() }
+        await currentRunTask?.value
+        // Only this run's own handle: a watchdog-released run that finishes
+        // late must not disarm Cancel for the successor run.
+        if runGeneration == generation { currentRunTask = nil }
     }
 
     private func runSyncBody() async {
@@ -321,11 +337,15 @@ final class SyncCoordinator: ObservableObject {
     /// same completion phase, same AppState updates, same notification, same
     /// Spotlight entry. Two ways to finish a sync is how they drift apart.
     func applyReviewed(_ session: SyncSession) async {
-        guard !isRunning else { return }
-        let task = Task { await self.applyReviewedBody(session) }
-        currentRunTask = task
-        await task.value
-        currentRunTask = nil
+        // Same double-start closure as runSync: claim the phase before the
+        // first suspension, clear only our own handle afterwards.
+        guard !isRunning, currentRunTask == nil else { return }
+        setPhase(.syncing(0), step: "Applying reviewed changes…", progress: 0)
+        runGeneration += 1
+        let generation = runGeneration
+        currentRunTask = Task { await self.applyReviewedBody(session) }
+        await currentRunTask?.value
+        if runGeneration == generation { currentRunTask = nil }
     }
 
     private func applyReviewedBody(_ session: SyncSession) async {
@@ -436,6 +456,13 @@ final class SyncCoordinator: ObservableObject {
                 action: "sync.abandoned",
                 details: "No progress for \(Int(Self.watchdogTimeout))s — releasing the stuck phase"
             )
+            // Actually cancel the stuck run — releasing only the phase left a
+            // zombie task writing contacts while the message claimed it was
+            // cancelled, and let a new run start and overlap it. The task
+            // handle stays set until the run really ends, so the runSync gate
+            // blocks a successor from overlapping a zombie that ignores
+            // cancellation for a while.
+            self.currentRunTask?.cancel()
             self.setFailed("Sync stopped responding and was cancelled. Please try again.")
             self.appState?.isSyncing = false
             self.appState?.syncProgress = nil
