@@ -210,7 +210,14 @@ final class SyncCoordinator: ObservableObject {
                 let mac    = session.contactChanges.compactMap { $0.targetContact }
                     .filter { $0.macContactIdentifier != nil }
                 if !google.isEmpty || !mac.isEmpty {
-                    let usingAI = settings.aiMatchingEnabled && !settings.anthropicAPIKey.isEmpty
+                    // Consent gates the cloud tier (AIContactMatcher refuses
+                    // without it), so with a key entered but consent declined
+                    // the scan runs purely locally — and the label must not
+                    // claim "AI matching" for a run where nothing leaves the
+                    // device.
+                    let usingAI = settings.aiMatchingEnabled
+                        && settings.aiCloudConsentGiven
+                        && !settings.anthropicAPIKey.isEmpty
                     setPhase(.preparing,
                              step: usingAI ? "AI matching — scanning for duplicates…"
                                            : "Scanning for duplicates…",
@@ -319,7 +326,12 @@ final class SyncCoordinator: ObservableObject {
                 details: Self.failureDetails(friendly: friendly, error: error)
             )
 
-            SyncNotifier.notifySyncFailed(message: friendly)
+            // A cancel is the user's own action, not a failure — the banner
+            // already says "Sync cancelled.", and a system notification titled
+            // "Sync failed" for something they just did is a false alarm.
+            if !(error is CancellationError) {
+                SyncNotifier.notifySyncFailed(message: friendly)
+            }
 
             scheduleIdleReset(after: 12)
         }
@@ -410,7 +422,10 @@ final class SyncCoordinator: ObservableObject {
 
             SyncHistory.shared.log(source: "SyncCoordinator", action: "sync.failed",
                                    details: Self.failureDetails(friendly: friendly, error: error))
-            SyncNotifier.notifySyncFailed(message: friendly)
+            // Same as runSync: a user cancel is not a failure to notify about.
+            if !(error is CancellationError) {
+                SyncNotifier.notifySyncFailed(message: friendly)
+            }
             scheduleIdleReset(after: 12)
         }
     }

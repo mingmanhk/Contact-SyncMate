@@ -235,6 +235,26 @@ class SyncEngine: ObservableObject {
             // stays applied and counted, nothing is abandoned mid-write, and
             // the result reports the partial run honestly.
             if Task.isCancelled {
+                // The batch pre-pass wrote its Google changes before this loop
+                // started, so any it applied that the loop has not reached yet
+                // would vanish from the result — zeroing counters for real
+                // writes and skipping the post-sync backup they earned. Fold
+                // them in before breaking so the report owns every write that
+                // actually landed.
+                for remaining in session.contactChanges[index...]
+                where batched.applied.contains(remaining.id) {
+                    switch remaining.userOverride ?? remaining.action {
+                    case .add:    added += 1
+                    case .update: updated += 1
+                    case .delete: deleted += 1
+                    case .merge, .skip: break
+                    }
+                    // Same bookkeeping the loop does on success: the write
+                    // landed, so past failures no longer count against it.
+                    if let key = Self.failureKey(for: remaining) {
+                        SyncFailureStore.shared.clearFailure(key: key)
+                    }
+                }
                 SyncHistory.shared.log(
                     source: "SyncEngine", action: "sync.cancelled",
                     details: "Stopped by the user after \(index) of \(session.contactChanges.count) changes")
@@ -439,26 +459,39 @@ class SyncEngine: ObservableObject {
         if wroteSomething,
            AppSettings.shared.autoBackupEnabled,
            let syncSessionId = session.syncSessionId {
-            do {
-                let googleContacts = try await googleConnector.fetchAllContacts()
-                // Off the main actor: see fetchAllContactsOffMainActor. Driving
-            // contactsd XPC from a user-interactive thread inverts priority and
-            // corrupts subsequent faulting.
-            let macContacts = try await macConnector.fetchAllContactsOffMainActor()
-
-                _ = try await ContactBackupManager.shared.createPostSyncBackup(
-                    googleContacts: googleContacts.map { ContactMapper.toUnified(from: $0) },
-                    macContacts: macContacts.map { ContactMapper.toUnified(from: $0) },
-                    syncSessionId: syncSessionId,
-                    changesSummary: "Added: \(added), Updated: \(updated), Deleted: \(deleted), Merged: \(merged)"
-                )
-            } catch {
-                // Log but don't fail the sync if backup fails
+            if Task.isCancelled {
+                // The fetches below run inside this task, and a cancelled task
+                // fails them with CancellationError before a single byte moves
+                // — so every cancelled run that wrote something logged
+                // "postSyncBackup.failed". Nothing failed: the user stopped
+                // the run, and the record should say so.
                 SyncHistory.shared.log(
                     source: "SyncEngine",
-                    action: "postSyncBackup.failed",
-                    details: error.localizedDescription
+                    action: "postSyncBackup.skippedCancelled",
+                    details: "Sync cancelled — post-sync snapshot skipped"
                 )
+            } else {
+                do {
+                    let googleContacts = try await googleConnector.fetchAllContacts()
+                    // Off the main actor: see fetchAllContactsOffMainActor. Driving
+                    // contactsd XPC from a user-interactive thread inverts priority and
+                    // corrupts subsequent faulting.
+                    let macContacts = try await macConnector.fetchAllContactsOffMainActor()
+
+                    _ = try await ContactBackupManager.shared.createPostSyncBackup(
+                        googleContacts: googleContacts.map { ContactMapper.toUnified(from: $0) },
+                        macContacts: macContacts.map { ContactMapper.toUnified(from: $0) },
+                        syncSessionId: syncSessionId,
+                        changesSummary: "Added: \(added), Updated: \(updated), Deleted: \(deleted), Merged: \(merged)"
+                    )
+                } catch {
+                    // Log but don't fail the sync if backup fails
+                    SyncHistory.shared.log(
+                        source: "SyncEngine",
+                        action: "postSyncBackup.failed",
+                        details: error.localizedDescription
+                    )
+                }
             }
         }
 
@@ -2193,7 +2226,10 @@ enum ContactMapper {
         /// The mask for restoring a backup snapshot: full-fidelity for v2
         /// snapshots; for legacy snapshots, only the fields v1 captured.
         nonisolated static func forRestore(ofLegacySnapshot legacy: Bool) -> MacWriteFields {
-            var mask = MacWriteFields()
+            // From `.all`, not `MacWriteFields()`: the implicit memberwise
+            // init is main-actor-isolated under the project default and this
+            // function is not.
+            var mask = Self.all
             if legacy {
                 mask.websites = false
                 mask.birthday = false
@@ -2398,6 +2434,7 @@ final class ContactMappingStore {
         guard !stale.isEmpty else { return }
         for key in stale.keys { mappings.removeValue(forKey: key) }
         persist()
+        flush()
     }
 
     /// Forget every Google ↔ Mac pairing.
@@ -2408,6 +2445,18 @@ final class ContactMappingStore {
     func deleteAllMappings() {
         mappings.removeAll()
         persist()
+        flush()
+    }
+
+    /// Block until every queued disk write has landed.
+    ///
+    /// The user-initiated delete paths call this: "Unlink" and "Reset
+    /// Everything" are rare, deliberate actions, and a prompt quit right after
+    /// must not resurrect the mapping the user just removed. Bulk sync saves
+    /// stay fire-and-forget — blocking a 500-contact run on the disk per
+    /// mapping is the reason `persist()` is async in the first place.
+    func flush() {
+        io.sync {}
     }
 
     // MARK: - Persistence

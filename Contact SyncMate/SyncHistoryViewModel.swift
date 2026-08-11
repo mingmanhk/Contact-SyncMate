@@ -18,18 +18,44 @@ class SyncHistoryViewModel: ObservableObject {
     @Published var restoreSuccess = false
 
     private let backupManager = ContactBackupManager.shared
-    private var refreshTimer: Timer?
+    private var historyObserver: NSObjectProtocol?
 
     init() {
         loadHistory()
-        // Set up periodic refresh with proper lifecycle management
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
-            self?.loadHistory()
+        // Refresh when the history actually changes, not on a 5-second poll.
+        // The poll timer ran forever: the AppDelegate retains the History
+        // window (isReleasedWhenClosed = false), so deinit never came and a
+        // closed window kept waking every 5 s to copy and sort up to 1000
+        // events. Event-driven refresh is quiescent whenever the log is —
+        // no sync, no wakeups — window open or closed.
+        historyObserver = NotificationCenter.default.addObserver(
+            forName: SyncHistory.didChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.scheduleRefresh()
         }
     }
 
     deinit {
-        refreshTimer?.invalidate()
+        if let historyObserver {
+            NotificationCenter.default.removeObserver(historyObserver)
+        }
+    }
+
+    /// Coalesce bursts: a large sync logs many events a second, and every
+    /// refresh re-sorts the whole log. One reload a second is plenty for a
+    /// screen a human is reading.
+    private var refreshScheduled = false
+
+    private func scheduleRefresh() {
+        guard !refreshScheduled else { return }
+        refreshScheduled = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+            guard let self else { return }
+            self.refreshScheduled = false
+            self.loadHistory()
+        }
     }
 
     // MARK: - Public Methods

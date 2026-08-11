@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import os
 
 /// A contact that has failed to write repeatedly.
 ///
@@ -58,6 +59,17 @@ nonisolated final class SyncFailureStore: @unchecked Sendable {
     private let queue = DispatchQueue(label: "com.victorlam.ContactSyncMate.failures",
                                       attributes: .concurrent)
     private var failures: [String: SyncFailure] = [:]
+
+    /// Unified-log channel for persistence faults. The failure ledger failing
+    /// to persist is itself a failure worth recording somewhere durable —
+    /// without it, forgotten entries mean the sync silently retries contacts
+    /// it had already set aside.
+    private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "ContactSyncMate",
+        category: "persistence")
+
+    /// One fault per launch about the temp-directory fallback, not one per save.
+    private var warnedTemporaryFallback = false
 
     private init() { load() }
 
@@ -131,8 +143,19 @@ nonisolated final class SyncFailureStore: @unchecked Sendable {
 
     private var fileURL: URL {
         let fm = FileManager.default
-        let base = (try? fm.url(for: .applicationSupportDirectory, in: .userDomainMask,
-                                appropriateFor: nil, create: true)) ?? fm.temporaryDirectory
+        let base: URL
+        if let appSupport = try? fm.url(for: .applicationSupportDirectory, in: .userDomainMask,
+                                        appropriateFor: nil, create: true) {
+            base = appSupport
+        } else {
+            // temporaryDirectory is purged by the OS, so a ledger that lands
+            // there is quietly ephemeral — say so instead of hiding it.
+            if !warnedTemporaryFallback {
+                warnedTemporaryFallback = true
+                Self.logger.fault("Application Support is unreachable; sync failures are falling back to the temporary directory")
+            }
+            base = fm.temporaryDirectory
+        }
         let dir = base.appendingPathComponent(
             Bundle.main.bundleIdentifier ?? "ContactSync", isDirectory: true)
         if (try? dir.checkResourceIsReachable()) != true {
@@ -143,13 +166,32 @@ nonisolated final class SyncFailureStore: @unchecked Sendable {
 
     /// Callers already hold the barrier.
     private func save() {
-        guard let data = try? JSONEncoder().encode(Array(failures.values)) else { return }
-        try? data.write(to: fileURL, options: [.atomic])
+        do {
+            let data = try JSONEncoder().encode(Array(failures.values))
+            try data.write(to: fileURL, options: [.atomic])
+        } catch {
+            // In-memory state still works for this launch; the fault line is
+            // what stops the loss from being invisible.
+            Self.logger.fault("Could not persist sync failures: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     private func load() {
-        guard let data = try? Data(contentsOf: fileURL),
-              let list = try? JSONDecoder().decode([SyncFailure].self, from: data) else { return }
-        failures = Dictionary(list.map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest })
+        let data: Data
+        do {
+            data = try Data(contentsOf: fileURL)
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
+            // First run — nothing recorded yet.
+            return
+        } catch {
+            Self.logger.fault("Could not read sync failures: \(error.localizedDescription, privacy: .public)")
+            return
+        }
+        do {
+            let list = try JSONDecoder().decode([SyncFailure].self, from: data)
+            failures = Dictionary(list.map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest })
+        } catch {
+            Self.logger.fault("Sync failures file is unreadable — starting empty: \(error.localizedDescription, privacy: .public)")
+        }
     }
 }
