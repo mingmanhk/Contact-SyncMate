@@ -18,7 +18,7 @@ struct SyncHistoryAndBackupView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var backupManager = ContactBackupManager.shared
     @StateObject private var viewModel = SyncHistoryViewModel()
-    @State private var selectedBackup: BackupSession?
+    @State private var selectedBackup: BackupSessionSummary?
     @State private var showRestoreConfirmation = false
     /// Off by default: deleting is irreversible from the user's point of view,
     /// so it should be a deliberate choice rather than something that happens
@@ -195,8 +195,8 @@ struct SyncHistoryAndBackupView: View {
 // MARK: - Backup List View
 
 struct BackupListView: View {
-    let backups: [BackupSession]
-    @Binding var selectedBackup: BackupSession?
+    let backups: [BackupSessionSummary]
+    @Binding var selectedBackup: BackupSessionSummary?
     @Binding var showRestoreConfirmation: Bool
     @State private var expandedBackupId: String?
 
@@ -233,7 +233,7 @@ struct BackupListView: View {
 // MARK: - Backup Row View
 
 struct BackupRowView: View {
-    let backup: BackupSession
+    let backup: BackupSessionSummary
     let isExpanded: Bool
     let onTap: () -> Void
     let onRestore: () -> Void
@@ -304,7 +304,7 @@ struct BackupRowView: View {
 
                             Spacer()
 
-                            Text("\(backup.contactVersions.count)")
+                            Text("\(backup.versionCount)")
                                 .font(.caption)
                                 .fontWeight(.semibold)
                         }
@@ -394,7 +394,7 @@ struct BackupRowView: View {
         }
     }
 
-    private func exportBackup(_ backup: BackupSession) {
+    private func exportBackup(_ backup: BackupSessionSummary) {
         ContactBackupManager.shared.exportBackupToFile(id: backup.id)
     }
 }

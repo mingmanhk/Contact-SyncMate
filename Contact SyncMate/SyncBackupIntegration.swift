@@ -133,17 +133,20 @@ extension SyncEngine {
             throw SyncEngineError.syncAlreadyInProgress
         }
 
-        guard let restored = ContactBackupManager.shared.restoreBackupSession(id: backupId) else {
+        // Load the session body once: with the metadata-only index (#56) each
+        // `getBackupSession` call decodes the full `<id>.json` from disk, so
+        // the versions and the restored contacts come from the same load.
+        guard let session = ContactBackupManager.shared.getBackupSession(id: backupId) else {
             throw SyncEngineError.backupNotFound
         }
+        let restored = ContactBackupManager.shared.restoreBackupSession(session)
 
         // One mask for the whole session: a backup is written by one app
         // version, so if any snapshot lacks the v2 fields (urls is the
         // reliable marker — v2 always encodes the array, legacy decodes nil),
         // the entire session predates them and a restore must not clear the
         // fields it never captured.
-        let sessionIsLegacy = ContactBackupManager.shared.getBackupSession(id: backupId)?
-            .contactVersions.contains { $0.data.urls == nil } ?? false
+        let sessionIsLegacy = session.contactVersions.contains { $0.data.urls == nil }
         let restoreMask = ContactMapper.MacWriteFields.forRestore(ofLegacySnapshot: sessionIsLegacy)
 
         // Snapshot the current state first. Restoring is destructive — especially

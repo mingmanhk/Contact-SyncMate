@@ -120,12 +120,49 @@ struct BackupSession: Codable, Identifiable {
 }
 
 /// Metadata for backup session
-struct BackupMetadata: Codable {
+struct BackupMetadata: Codable, Equatable {
     let appVersion: String
     let syncDirection: String? // 2-way, Google→Mac, Mac→Google
     let syncMode: String? // manual, automatic
     let autoResolution: String?
     let customNotes: String?
+}
+
+/// What `backup_index.json` stores: everything about a session *except* the
+/// contact bodies.
+///
+/// The index used to be `[BackupSession]` — every retained session with every
+/// `ContactVersion` including photo bytes, re-encoded in full on each save and
+/// resident in RAM for the app's whole lifetime (#56). Session bodies stay in
+/// the per-session `<id>.json` files and load on demand.
+///
+/// `versionCount` is also the migration sentinel: the legacy index has no such
+/// key, so decoding it as `[BackupSessionSummary]` fails and `loadBackupIndex`
+/// falls through to the legacy decode + one-time rewrite.
+struct BackupSessionSummary: Codable, Identifiable, Equatable {
+    let id: String
+    let timestamp: Date
+    let syncSessionId: String?
+    let type: BackupSession.BackupType
+    let googleContactsCount: Int
+    let macContactsCount: Int
+    let versionCount: Int
+    let metadata: BackupMetadata
+}
+
+extension BackupSession {
+    var summary: BackupSessionSummary {
+        BackupSessionSummary(
+            id: id,
+            timestamp: timestamp,
+            syncSessionId: syncSessionId,
+            type: type,
+            googleContactsCount: googleContactsCount,
+            macContactsCount: macContactsCount,
+            versionCount: contactVersions.count,
+            metadata: metadata
+        )
+    }
 }
 
 // MARK: - Backup Manager
@@ -140,7 +177,14 @@ class ContactBackupManager: ObservableObject {
 
     private let fileManager = FileManager.default
     private let backupQueue = DispatchQueue(label: "ContactBackupManager.queue", attributes: .concurrent)
-    private var backupSessions: [BackupSession] = []
+    /// Metadata only (#56). Session bodies live in `<id>.json` and load on demand.
+    private var backupSessions: [BackupSessionSummary] = []
+    /// Highest version number ever assigned per contact identifier (#57).
+    ///
+    /// Persisted to `contact_versions_index.json` so numbering survives relaunch
+    /// without decoding every session body. Monotonic on purpose: pruning old
+    /// sessions must not cause numbers to be reused, so pruning never lowers it.
+    private var contactVersionsIndex: [String: Int] = [:]
 
     private let appVersion = "1.0.0" // Should match app version
     // Retention is driven by AppSettings.maxBackupCount (Settings → Backups →
@@ -211,7 +255,7 @@ class ContactBackupManager: ObservableObject {
         // and the error said nothing about why. Falling back to the container
         // directory keeps the safety net *and* the sync; only a failure of
         // both locations still throws.
-        try saveBackupSession(sessionWithVersions, allowContainerFallback: true)
+        try await saveBackupSession(sessionWithVersions, allowContainerFallback: true)
 
         return sessionWithVersions
     }
@@ -250,7 +294,7 @@ class ContactBackupManager: ObservableObject {
         var sessionWithVersions = backupSession
         sessionWithVersions.contactVersions = versions
 
-        try saveBackupSession(sessionWithVersions)
+        try await saveBackupSession(sessionWithVersions)
 
         return sessionWithVersions
     }
@@ -288,38 +332,44 @@ class ContactBackupManager: ObservableObject {
         var sessionWithVersions = backupSession
         sessionWithVersions.contactVersions = versions
 
-        try saveBackupSession(sessionWithVersions)
+        try await saveBackupSession(sessionWithVersions)
 
         return sessionWithVersions
     }
 
-    /// Get all backup sessions
-    func getAllBackupSessions() -> [BackupSession] {
-        var result: [BackupSession] = []
+    /// Get all backup sessions (metadata only — bodies load via `getBackupSession(id:)`)
+    func getAllBackupSessions() -> [BackupSessionSummary] {
+        var result: [BackupSessionSummary] = []
         backupQueue.sync {
             result = backupSessions.sorted { $0.timestamp > $1.timestamp }
         }
         return result
     }
 
-    /// Get specific backup session by ID
+    /// Get specific backup session by ID, loading its body from `<id>.json`.
+    ///
+    /// Only sessions present in the index are returned — an orphaned file the
+    /// launch sweep has not deleted yet must not resurrect as a restore target
+    /// (and `importBackupFromFile` relies on this for its duplicate check).
     func getBackupSession(id: String) -> BackupSession? {
-        var result: BackupSession?
-        backupQueue.sync {
-            result = backupSessions.first { $0.id == id }
-        }
-        return result
+        let known = backupQueue.sync { backupSessions.contains { $0.id == id } }
+        guard known else { return nil }
+        return loadSessionFromDisk(id: id)
     }
 
-    /// Get version history for a specific contact
+    /// Get version history for a specific contact.
+    ///
+    /// Scans the per-session files on demand: this runs when the user drills
+    /// into one contact's history, not per contact per backup, so the on-demand
+    /// decode replaces keeping every retained backup resident in RAM.
     func getVersionHistory(for contactIdentifier: String) -> [ContactVersion] {
+        let ids = backupQueue.sync { backupSessions.map(\.id) }
         var versions: [ContactVersion] = []
-        backupQueue.sync {
-            for session in backupSessions {
-                versions.append(contentsOf: session.contactVersions.filter {
-                    $0.contactIdentifier == contactIdentifier
-                })
-            }
+        for id in ids {
+            guard let session = loadSessionFromDisk(id: id) else { continue }
+            versions.append(contentsOf: session.contactVersions.filter {
+                $0.contactIdentifier == contactIdentifier
+            })
         }
         return versions.sorted { $0.versionNumber < $1.versionNumber }
     }
@@ -332,20 +382,20 @@ class ContactBackupManager: ObservableObject {
     func allVersionedContacts() -> [(identifier: String, name: String, versions: Int, latest: Date)] {
         var byIdentifier: [String: (name: String, versions: Int, latest: Date)] = [:]
 
-        backupQueue.sync {
-            for session in backupSessions {
-                for version in session.contactVersions {
-                    let existing = byIdentifier[version.contactIdentifier]
-                    let isNewer = existing.map { version.timestamp > $0.latest } ?? true
-                    byIdentifier[version.contactIdentifier] = (
-                        // Keep the most recent name: a contact renamed since the
-                        // first backup should be findable under what it is called
-                        // now, not what it used to be.
-                        name: isNewer ? version.contactName : (existing?.name ?? version.contactName),
-                        versions: (existing?.versions ?? 0) + 1,
-                        latest: max(existing?.latest ?? .distantPast, version.timestamp)
-                    )
-                }
+        let ids = backupQueue.sync { backupSessions.map(\.id) }
+        for id in ids {
+            guard let session = loadSessionFromDisk(id: id) else { continue }
+            for version in session.contactVersions {
+                let existing = byIdentifier[version.contactIdentifier]
+                let isNewer = existing.map { version.timestamp > $0.latest } ?? true
+                byIdentifier[version.contactIdentifier] = (
+                    // Keep the most recent name: a contact renamed since the
+                    // first backup should be findable under what it is called
+                    // now, not what it used to be.
+                    name: isNewer ? version.contactName : (existing?.name ?? version.contactName),
+                    versions: (existing?.versions ?? 0) + 1,
+                    latest: max(existing?.latest ?? .distantPast, version.timestamp)
+                )
             }
         }
 
@@ -366,7 +416,13 @@ class ContactBackupManager: ObservableObject {
     /// Restore entire backup session (returns all contacts as they were)
     func restoreBackupSession(id: String) -> (google: [UnifiedContact], mac: [UnifiedContact])? {
         guard let session = getBackupSession(id: id) else { return nil }
+        return restoreBackupSession(session)
+    }
 
+    /// Same, for a session body the caller has already loaded — with lazy-loaded
+    /// sessions, a rollback that needs both the versions and the restored
+    /// contacts should not decode a potentially huge file twice.
+    func restoreBackupSession(_ session: BackupSession) -> (google: [UnifiedContact], mac: [UnifiedContact]) {
         var googleContacts: [UnifiedContact] = []
         var macContacts: [UnifiedContact] = []
 
@@ -475,10 +531,12 @@ class ContactBackupManager: ObservableObject {
             }
 
             // Per-contact version history lives inside each session's
-            // `contactVersions`, so clearing the sessions clears it too — there
-            // is no second store to forget about.
+            // `contactVersions`, so deleting the session files deletes it too;
+            // the version-number map is the one derived store to reset with it.
             self.backupSessions = []
+            self.contactVersionsIndex = [:]
             try? self.saveBackupIndex()
+            try? self.saveContactVersionsIndex()
 
             SyncHistory.shared.log(source: "BackupManager", action: "backups.deletedAll",
                                    details: "removed \(removed) session(s)")
@@ -502,6 +560,7 @@ class ContactBackupManager: ObservableObject {
                 var count = 0
                 for file in files where file.pathExtension == "json"
                     && file.lastPathComponent != "backup_index.json"
+                    && file.lastPathComponent != Self.contactVersionsIndexFileName
                     && !known.contains(file.lastPathComponent) {
                     try? FileManager.default.removeItem(at: file)
                     count += 1
@@ -535,7 +594,7 @@ class ContactBackupManager: ObservableObject {
             stats.totalBackups = backupSessions.count
             stats.oldestBackup = backupSessions.min { $0.timestamp < $1.timestamp }?.timestamp
             stats.newestBackup = backupSessions.max { $0.timestamp < $1.timestamp }?.timestamp
-            stats.totalContactVersions = backupSessions.reduce(0) { $0 + $1.contactVersions.count }
+            stats.totalContactVersions = backupSessions.reduce(0) { $0 + $1.versionCount }
             stats.estimatedSizeBytes = calculateEstimatedSize()
         }
         return stats
@@ -559,14 +618,23 @@ class ContactBackupManager: ObservableObject {
     ) async -> [ContactVersion] {
         var versions: [ContactVersion] = []
 
+        // #57: numbering used to call getNextVersionNumber per contact, which
+        // scanned every version of every retained session under a blocking
+        // queue hop — O(contacts × all stored versions), with 2×contacts hops
+        // per backup. One snapshot of the persisted max-version map replaces
+        // all of it: a single queue hop, then O(1) per contact, with local
+        // increments so a contact captured twice in one batch still steps.
+        var maxVersions = backupQueue.sync { contactVersionsIndex }
+
         // Capture Google contacts
         for contact in googleContacts {
             if let snapshot = createSnapshot(from: contact) {
+                let identifier = contact.googleResourceName ?? "unknown"
                 let version = ContactVersion(
                     id: UUID().uuidString,
-                    contactIdentifier: contact.googleResourceName ?? "unknown",
+                    contactIdentifier: identifier,
                     contactName: contact.displayName,
-                    versionNumber: getNextVersionNumber(for: contact.googleResourceName ?? ""),
+                    versionNumber: Self.nextVersionNumber(for: identifier, in: &maxVersions),
                     timestamp: Date(),
                     syncSessionId: syncSessionId ?? backupSessionId,
                     source: .google,
@@ -580,11 +648,12 @@ class ContactBackupManager: ObservableObject {
         // Capture Mac contacts
         for contact in macContacts {
             if let snapshot = createSnapshot(from: contact) {
+                let identifier = contact.macContactIdentifier ?? "unknown"
                 let version = ContactVersion(
                     id: UUID().uuidString,
-                    contactIdentifier: contact.macContactIdentifier ?? "unknown",
+                    contactIdentifier: identifier,
                     contactName: contact.displayName,
-                    versionNumber: getNextVersionNumber(for: contact.macContactIdentifier ?? ""),
+                    versionNumber: Self.nextVersionNumber(for: identifier, in: &maxVersions),
                     timestamp: Date(),
                     syncSessionId: syncSessionId ?? backupSessionId,
                     source: .mac,
@@ -596,6 +665,29 @@ class ContactBackupManager: ObservableObject {
         }
 
         return versions
+    }
+
+    /// Assign the next version number for `contactIdentifier`, stepping the map.
+    nonisolated static func nextVersionNumber(
+        for contactIdentifier: String,
+        in maxVersions: inout [String: Int]
+    ) -> Int {
+        let next = (maxVersions[contactIdentifier] ?? 0) + 1
+        maxVersions[contactIdentifier] = next
+        return next
+    }
+
+    /// One pass over full sessions → highest version number per contact.
+    /// Used by legacy-index migration and by the index rebuild.
+    nonisolated static func maxVersionNumbers(in sessions: [BackupSession]) -> [String: Int] {
+        var map: [String: Int] = [:]
+        for session in sessions {
+            for version in session.contactVersions {
+                map[version.contactIdentifier] = max(
+                    map[version.contactIdentifier] ?? 0, version.versionNumber)
+            }
+        }
+        return map
     }
 
     func createSnapshot(from contact: UnifiedContact) -> ContactSnapshot? { // internal for testing
@@ -696,11 +788,6 @@ class ContactBackupManager: ObservableObject {
         )
     }
 
-    private func getNextVersionNumber(for contactIdentifier: String) -> Int {
-        let versions = getVersionHistory(for: contactIdentifier)
-        return (versions.max { $0.versionNumber < $1.versionNumber }?.versionNumber ?? 0) + 1
-    }
-
     /// Total size of the backup files on disk.
     ///
     /// Reads the file sizes. The previous implementation re-encoded every
@@ -753,7 +840,11 @@ class ContactBackupManager: ObservableObject {
         guard !files.isEmpty else { return [] }
 
         return files
-            .filter { $0.pathExtension == "json" && $0.lastPathComponent != "backup_index.json" }
+            .filter {
+                $0.pathExtension == "json"
+                    && $0.lastPathComponent != "backup_index.json"
+                    && $0.lastPathComponent != Self.contactVersionsIndexFileName
+            }
             .compactMap { url in
                 let attrs = try? url.resourceValues(forKeys: [.fileSizeKey, .creationDateKey])
                 return (
@@ -807,18 +898,22 @@ class ContactBackupManager: ObservableObject {
 
             // Re-importing the same file must not create a second entry — the id
             // is the session's identity, and a duplicate would show as two
-            // restore targets holding identical data.
-            if getBackupSession(id: session.id) != nil {
+            // restore targets holding identical data. Membership in the index is
+            // the identity check; no need to decode the stored body for it.
+            let alreadyIndexed = backupQueue.sync {
+                backupSessions.contains { $0.id == session.id }
+            }
+            if alreadyIndexed {
                 SyncHistory.shared.log(source: "BackupManager", action: "import.alreadyPresent",
                                        details: session.id)
                 return .success(session)
             }
 
-            // No queue wrapper here: saveBackupSession serialises internally
+            // No queue wrapper here: saveBackupSessionSync serialises internally
             // with a sync barrier on this same queue, so wrapping the call in
             // another sync barrier re-entered the lock we would already be
             // holding — a guaranteed deadlock on every import.
-            try saveBackupSession(session)
+            try saveBackupSessionSync(session)
 
             SyncHistory.shared.log(
                 source: "BackupManager",
@@ -1008,41 +1103,101 @@ class ContactBackupManager: ObservableObject {
         backupDirectoryURL().appendingPathComponent("backup_index.json")
     }
 
-    /// Write a backup session and the updated index to disk.
+    private static let contactVersionsIndexFileName = "contact_versions_index.json"
+
+    /// Read and decode one session body from `<id>.json`.
+    ///
+    /// Falls back to the container directory when the primary read fails: the
+    /// pre-sync fallback (R-09) writes a session there when a custom folder is
+    /// not writable, and until #50 lands the index entry for it lives in memory
+    /// pointing at a file the custom folder does not have. Lazy loading must
+    /// still find that file within the same run, as the resident array did.
+    private func loadSessionFromDisk(id: String) -> BackupSession? {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let fileName = "\(id).json"
+
+        if let data = try? withBackupDirectory({ dir in
+            try Data(contentsOf: dir.appendingPathComponent(fileName))
+        }), let session = try? decoder.decode(BackupSession.self, from: data) {
+            return session
+        }
+
+        if let data = try? Data(contentsOf: containerBackupDirectory()
+            .appendingPathComponent(fileName)),
+           let session = try? decoder.decode(BackupSession.self, from: data) {
+            return session
+        }
+
+        return nil
+    }
+
+    /// Write a backup session and the updated indexes to disk, off the main
+    /// actor (#56): the only large encode — the session body itself — runs in a
+    /// barrier block on `backupQueue`, never on the caller's actor.
     ///
     /// With `allowContainerFallback`, a failed write to a user-chosen custom
     /// folder (full disk, revoked permissions, read-only volume) is retried in
-    /// the default container directory instead of thrown. Both files — the
-    /// session JSON and the index — go to the same directory either way, so a
+    /// the default container directory instead of thrown. All files — the
+    /// session JSON and the indexes — go to the same directory either way, so a
     /// restore that loads the index always finds the session file next to it.
     private func saveBackupSession(_ session: BackupSession,
-                                   allowContainerFallback: Bool = false) throws {
-        // Appending on the caller's thread was a data race.
-        //
-        // Every other access to `backupSessions` is serialised on `backupQueue`
-        // — reads under `sync`, writes under `async(flags: .barrier)`. This one
-        // appended from the main actor while `pruneOldBackups` (which this
-        // method itself schedules, below) barrier-assigns the whole array.
-        // Concurrent append and whole-array assignment on a Swift Array is
-        // undefined behaviour, in the component whose entire job is to be the
-        // undo for everything else.
+                                   allowContainerFallback: Bool = false) async throws {
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            backupQueue.async(flags: .barrier) { [weak self] in
+                guard let self else {
+                    cont.resume(throwing: CancellationError())
+                    return
+                }
+                do {
+                    try self.persistSessionLocked(session,
+                                                  allowContainerFallback: allowContainerFallback)
+                    cont.resume()
+                } catch {
+                    cont.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    /// Synchronous variant for `importBackupFromFile`, which is not async and
+    /// whose one-file, user-initiated write does not justify becoming so.
+    private func saveBackupSessionSync(_ session: BackupSession) throws {
+        try backupQueue.sync(flags: .barrier) {
+            try persistSessionLocked(session, allowContainerFallback: false)
+        }
+    }
+
+    /// The actual save. Must run inside a barrier block on `backupQueue`.
+    ///
+    /// The index write no longer "encodes the whole world": the previous code
+    /// re-encoded every retained session — every `ContactVersion` including
+    /// photo bytes — into `backup_index.json` inside a main-actor-blocking sync
+    /// barrier on every save. The index is now `[BackupSessionSummary]`, so
+    /// what remains beyond the single session body is two tiny metadata
+    /// encodes (summaries and the per-contact version map).
+    private func persistSessionLocked(_ session: BackupSession,
+                                      allowContainerFallback: Bool) throws {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        let data = try encoder.encode(session)
 
-        // One barrier block: append, snapshot the index, and take the count —
-        // a second blocking `sync` just to read the count doubled the
-        // main-thread wait for no benefit.
-        let (indexData, count) = try backupQueue.sync(flags: .barrier) { () throws -> (Data, Int) in
-            backupSessions.append(session)
-            return (try encoder.encode(backupSessions), backupSessions.count)
+        let sessionData = try encoder.encode(session) // the only large encode
+
+        backupSessions.append(session.summary)
+        for version in session.contactVersions {
+            contactVersionsIndex[version.contactIdentifier] = max(
+                contactVersionsIndex[version.contactIdentifier] ?? 0, version.versionNumber)
         }
+        let indexData = try encoder.encode(backupSessions)
+        let versionsData = try encoder.encode(contactVersionsIndex)
 
         func write(to dir: URL) throws {
-            try data.write(to: dir.appendingPathComponent("\(session.id).json"),
-                           options: [.atomic])
+            try sessionData.write(to: dir.appendingPathComponent("\(session.id).json"),
+                                  options: [.atomic])
             try indexData.write(to: dir.appendingPathComponent("backup_index.json"),
                                 options: [.atomic])
+            try versionsData.write(to: dir.appendingPathComponent(Self.contactVersionsIndexFileName),
+                                   options: [.atomic])
         }
 
         do {
@@ -1064,6 +1219,7 @@ class ContactBackupManager: ObservableObject {
 
         // Update published properties on main thread
         let size = calculateEstimatedSize()
+        let count = backupSessions.count
         let timestamp = session.timestamp
         DispatchQueue.main.async { [weak self] in
             self?.lastBackupDate = timestamp
@@ -1087,33 +1243,147 @@ class ContactBackupManager: ObservableObject {
         }
     }
 
-    private func loadBackupIndex() {
+    private func saveContactVersionsIndex() throws {
+        let indexData = try JSONEncoder().encode(contactVersionsIndex)
+        try withBackupDirectory { dir in
+            try indexData.write(to: dir.appendingPathComponent(Self.contactVersionsIndexFileName),
+                                options: [.atomic])
+        }
+    }
+
+    // MARK: - Index loading & migration
+
+    /// The two shapes `backup_index.json` can hold.
+    enum BackupIndexFormat {
+        /// Metadata-only index written by current builds.
+        case current([BackupSessionSummary])
+        /// Full-session index written before #56, migrated on load.
+        case legacy([BackupSession])
+    }
+
+    /// Decode the index, detecting which format it is in.
+    ///
+    /// The current format is tried first; a legacy index fails that decode
+    /// (its entries have no `versionCount` key) and is decoded in full instead.
+    nonisolated static func decodeBackupIndex(_ data: Data) throws -> BackupIndexFormat {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-
         do {
-            let data = try withBackupDirectory { dir in
-                try Data(contentsOf: dir.appendingPathComponent("backup_index.json"))
-            }
-            let loaded = try decoder.decode([BackupSession].self, from: data)
-            backupQueue.async(flags: .barrier) { [weak self] in
-                self?.backupSessions = loaded
-                DispatchQueue.main.async {
-                    self?.backupCount = loaded.count
-                    self?.lastBackupDate = loaded.max { $0.timestamp < $1.timestamp }?.timestamp
-                    self?.totalBackupSize = self?.calculateEstimatedSize() ?? 0
-                }
-            }
+            return .current(try decoder.decode([BackupSessionSummary].self, from: data))
         } catch {
-            // Initialize empty if load fails (first launch or corrupted index).
-            // Through the barrier queue like every other write: this path also
-            // runs when the user re-points the backup folder at runtime, where
-            // a direct assignment can race an in-flight pruneOldBackups
-            // barrier block mutating the same array.
-            print("ContactBackupManager: Could not load backup index: \(error.localizedDescription)")
-            backupQueue.async(flags: .barrier) { [weak self] in
-                self?.backupSessions = []
+            return .legacy(try decoder.decode([BackupSession].self, from: data))
+        }
+    }
+
+    private func loadBackupIndex() {
+        let indexData = try? withBackupDirectory { dir in
+            try Data(contentsOf: dir.appendingPathComponent("backup_index.json"))
+        }
+        let versionsData = try? withBackupDirectory { dir in
+            try Data(contentsOf: dir.appendingPathComponent(Self.contactVersionsIndexFileName))
+        }
+
+        // Decode through the barrier queue like every other mutation: this path
+        // also runs when the user re-points the backup folder at runtime, where
+        // a direct assignment can race an in-flight pruneOldBackups barrier
+        // block mutating the same array. It also keeps a legacy index — which
+        // decodes every retained session in full, photos included — off the
+        // main thread for the one launch that migrates it.
+        backupQueue.async(flags: .barrier) { [weak self] in
+            guard let self else { return }
+
+            guard let indexData else {
+                // First launch, or the chosen folder has no index yet.
+                self.backupSessions = []
+                self.contactVersionsIndex = [:]
+                return
+            }
+
+            do {
+                switch try Self.decodeBackupIndex(indexData) {
+                case .current(let summaries):
+                    self.backupSessions = summaries
+                    if let versionsData,
+                       let map = try? JSONDecoder().decode([String: Int].self, from: versionsData) {
+                        self.contactVersionsIndex = map
+                    } else {
+                        // Index present but the version map is missing or
+                        // unreadable — rebuild it with one scan of the bodies.
+                        self.rebuildContactVersionsIndexLocked()
+                    }
+
+                case .legacy(let sessions):
+                    self.migrateLegacyIndexLocked(sessions)
+                }
+
+                let count = self.backupSessions.count
+                let last = self.backupSessions.max { $0.timestamp < $1.timestamp }?.timestamp
+                let size = self.calculateEstimatedSize()
+                DispatchQueue.main.async { [weak self] in
+                    self?.backupCount = count
+                    self?.lastBackupDate = last
+                    self?.totalBackupSize = size
+                }
+            } catch {
+                // Initialize empty if load fails (corrupted index).
+                print("ContactBackupManager: Could not load backup index: \(error.localizedDescription)")
+                self.backupSessions = []
+                self.contactVersionsIndex = [:]
             }
         }
+    }
+
+    /// One-time migration from the pre-#56 full-session index. Runs inside a
+    /// barrier block.
+    ///
+    /// The per-session `<id>.json` files already exist for everything the
+    /// current save path wrote (it has always written both files), with one
+    /// known exception: a pre-sync fallback save landed the session file in the
+    /// container while the full index in the custom folder kept the body. Any
+    /// legacy entry whose file is missing is therefore written out from the
+    /// index's own copy before that copy is discarded — nothing is lost.
+    private func migrateLegacyIndexLocked(_ sessions: [BackupSession]) {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+
+        var rewritten = 0
+        withBackupDirectory { dir in
+            for session in sessions {
+                let file = dir.appendingPathComponent("\(session.id).json")
+                guard !FileManager.default.fileExists(atPath: file.path) else { continue }
+                if let data = try? encoder.encode(session) {
+                    try? data.write(to: file, options: [.atomic])
+                    rewritten += 1
+                }
+            }
+        }
+
+        backupSessions = sessions.map(\.summary)
+        contactVersionsIndex = Self.maxVersionNumbers(in: sessions)
+        try? saveBackupIndex()
+        try? saveContactVersionsIndex()
+
+        SyncHistory.shared.log(
+            source: "BackupManager",
+            action: "backupIndex.migrated",
+            details: "\(sessions.count) session(s) → metadata-only index"
+                + (rewritten > 0 ? ", \(rewritten) session file(s) recovered from the old index" : "")
+        )
+    }
+
+    /// Rebuild the per-contact version map from the session bodies — one scan,
+    /// only when `contact_versions_index.json` is missing. Runs inside a
+    /// barrier block.
+    private func rebuildContactVersionsIndexLocked() {
+        var map: [String: Int] = [:]
+        for summary in backupSessions {
+            guard let session = loadSessionFromDisk(id: summary.id) else { continue }
+            for version in session.contactVersions {
+                map[version.contactIdentifier] = max(
+                    map[version.contactIdentifier] ?? 0, version.versionNumber)
+            }
+        }
+        contactVersionsIndex = map
+        try? saveContactVersionsIndex()
     }
 }

@@ -10,7 +10,7 @@
 import SwiftUI
 
 struct RestoreBackupConfirmationView: View {
-    let backup: BackupSession
+    let backup: BackupSessionSummary
     @Binding var isPresented: Bool
     let onRestore: () -> Void
     @Binding var removeExtras: Bool
@@ -126,7 +126,7 @@ struct RestoreBackupConfirmationView: View {
 
                                 InfoRow(
                                     label: String(localized: "Total Contacts"),
-                                    value: "\(backup.contactVersions.count)"
+                                    value: "\(backup.versionCount)"
                                 )
 
                                 if let notes = backup.metadata.customNotes {
@@ -285,8 +285,13 @@ struct StepRow: View {
 // MARK: - Backup Details View
 
 struct BackupDetailsView: View {
-    let backup: BackupSession
+    let backup: BackupSessionSummary
     @Environment(\.dismiss) var dismiss
+
+    /// Contact names come from the session body, which the metadata-only index
+    /// (#56) no longer keeps in memory — it loads from disk when this sheet
+    /// opens, not before.
+    @State private var contactVersions: [ContactVersion]?
 
     var body: some View {
         NavigationView {
@@ -316,7 +321,7 @@ struct BackupDetailsView: View {
 
                             Spacer()
 
-                            Text("\(backup.contactVersions.count)")
+                            Text("\(backup.versionCount)")
                                 .font(.caption)
                                 .fontWeight(.semibold)
                                 .padding(4)
@@ -325,38 +330,44 @@ struct BackupDetailsView: View {
                                 .cornerRadius(4)
                         }
 
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(backup.contactVersions.prefix(10)) { version in
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(version.contactName)
-                                            .font(.caption)
-                                            .fontWeight(.semibold)
-                                            .lineLimit(1)
+                        if let contactVersions {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(contactVersions.prefix(10)) { version in
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(version.contactName)
+                                                .font(.caption)
+                                                .fontWeight(.semibold)
+                                                .lineLimit(1)
 
-                                        Text(version.source.localizedDisplayName)
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
+                                            Text(version.source.localizedDisplayName)
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        .padding(8)
+                                        .background(Color.appSurfaceTinted)
+                                        .cornerRadius(6)
                                     }
-                                    .padding(8)
-                                    .background(Color.appSurfaceTinted)
-                                    .cornerRadius(6)
-                                }
 
-                                if backup.contactVersions.count > 10 {
-                                    VStack(alignment: .center, spacing: 4) {
-                                        Text("+\(backup.contactVersions.count - 10)")
-                                            .font(.caption)
-                                            .fontWeight(.semibold)
+                                    if contactVersions.count > 10 {
+                                        VStack(alignment: .center, spacing: 4) {
+                                            Text("+\(contactVersions.count - 10)")
+                                                .font(.caption)
+                                                .fontWeight(.semibold)
 
-                                        Text("more")
-                                            .font(.caption2)
+                                            Text("more")
+                                                .font(.caption2)
+                                        }
+                                        .padding(8)
+                                        .background(Color.appAccent.opacity(0.10))
+                                        .cornerRadius(6)
                                     }
-                                    .padding(8)
-                                    .background(Color.appAccent.opacity(0.10))
-                                    .cornerRadius(6)
                                 }
                             }
+                        } else {
+                            ProgressView()
+                                .controlSize(.small)
+                                .frame(maxWidth: .infinity)
                         }
                     }
 
@@ -386,6 +397,13 @@ struct BackupDetailsView: View {
                     }
                 }
             }
+        }
+        .task {
+            // After the sheet renders, so a large session body does not delay
+            // its appearance. A vanished file shows an empty list rather than
+            // spinning forever.
+            contactVersions = ContactBackupManager.shared
+                .getBackupSession(id: backup.id)?.contactVersions ?? []
         }
     }
 }
@@ -443,14 +461,14 @@ extension ContactVersion.ContactSource {
 #if DEBUG
 struct RestoreBackupConfirmationView_Previews: PreviewProvider {
     static var previews: some View {
-        let sampleBackup = BackupSession(
+        let sampleBackup = BackupSessionSummary(
             id: UUID().uuidString,
             timestamp: Date(),
             syncSessionId: nil,
             type: .postSyncBackup,
             googleContactsCount: 150,
             macContactsCount: 120,
-            contactVersions: [],
+            versionCount: 0,
             metadata: BackupMetadata(
                 appVersion: "1.0.0",
                 syncDirection: "2-way",

@@ -68,7 +68,7 @@ class SyncHistoryViewModel: ObservableObject {
     /// had just lost data would be told the restore worked when nothing had
     /// happened. It now drives `SyncEngine.rollbackToBackup`, the real
     /// implementation, and reports what actually succeeded.
-    func restoreBackup(_ backup: BackupSession,
+    func restoreBackup(_ backup: BackupSessionSummary,
                        extras: SyncEngine.ExtraContactPolicy = .keep) {
         isRestoring = true
         restoreError = nil

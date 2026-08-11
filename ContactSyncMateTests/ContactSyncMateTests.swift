@@ -1103,3 +1103,165 @@ final class SyncFailureStoreTests: XCTestCase {
                        accuracy: 0.001)
     }
 }
+
+// MARK: ─────────────────────────────────────────────────────────
+// 14. Backup index: summaries, legacy migration, version numbering (#56/#57)
+// ─────────────────────────────────────────────────────────────
+
+/// Pure decode/derive tests — no manager instance and no files, so nothing
+/// here can touch (or prune) the user's real backups.
+final class BackupIndexFormatTests: XCTestCase {
+
+    // Whole seconds on purpose: the index uses ISO-8601 dates, which drop
+    // sub-second precision, and the round-trip asserts equality.
+    private let fixedDate = Date(timeIntervalSince1970: 1_700_000_000)
+
+    private func makeSnapshot(name: String) -> ContactSnapshot {
+        ContactSnapshot(
+            displayName: name, givenName: name, familyName: nil, middleName: nil,
+            phoneNumbers: [], emailAddresses: [], postalAddresses: [],
+            organization: nil, jobTitle: nil, notes: nil, imageData: nil, customFields: [:],
+            namePrefix: nil, nameSuffix: nil, nickname: nil,
+            phoneticGivenName: nil, phoneticMiddleName: nil, phoneticFamilyName: nil,
+            department: nil, urls: [], birthday: nil,
+            googleResourceName: nil, macContactIdentifier: nil)
+    }
+
+    private func makeVersion(identifier: String, number: Int,
+                             name: String = "Someone") -> ContactVersion {
+        ContactVersion(
+            id: UUID().uuidString,
+            contactIdentifier: identifier,
+            contactName: name,
+            versionNumber: number,
+            timestamp: fixedDate,
+            syncSessionId: "sync-1",
+            source: .google,
+            data: makeSnapshot(name: name),
+            changesSummary: [])
+    }
+
+    private func makeSession(id: String = UUID().uuidString,
+                             versions: [ContactVersion] = []) -> BackupSession {
+        BackupSession(
+            id: id,
+            timestamp: fixedDate,
+            syncSessionId: "sync-1",
+            type: .preSyncBackup,
+            googleContactsCount: 2,
+            macContactsCount: 3,
+            contactVersions: versions,
+            metadata: BackupMetadata(appVersion: "1.0.0", syncDirection: "2-way",
+                                     syncMode: "manual", autoResolution: nil,
+                                     customNotes: "index test"))
+    }
+
+    private var iso8601Encoder: JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }
+
+    // MARK: #56 — summary derivation and round-trip
+
+    func test_summary_carriesMetadataAndVersionCount() {
+        let session = makeSession(versions: [
+            makeVersion(identifier: "people/a", number: 1),
+            makeVersion(identifier: "mac/b", number: 4),
+        ])
+        let summary = session.summary
+
+        XCTAssertEqual(summary.id, session.id)
+        XCTAssertEqual(summary.timestamp, session.timestamp)
+        XCTAssertEqual(summary.syncSessionId, session.syncSessionId)
+        XCTAssertEqual(summary.type, session.type)
+        XCTAssertEqual(summary.googleContactsCount, session.googleContactsCount)
+        XCTAssertEqual(summary.macContactsCount, session.macContactsCount)
+        XCTAssertEqual(summary.versionCount, 2,
+                       "the summary keeps the count, not the versions themselves")
+        XCTAssertEqual(summary.metadata, session.metadata)
+    }
+
+    func test_summaryIndex_roundTrip() throws {
+        let summaries = [
+            makeSession(versions: [makeVersion(identifier: "people/a", number: 1)]).summary,
+            makeSession().summary,
+        ]
+        let data = try iso8601Encoder.encode(summaries)
+
+        guard case .current(let decoded) =
+                try ContactBackupManager.decodeBackupIndex(data) else {
+            return XCTFail("a metadata-only index must decode as the current format")
+        }
+        XCTAssertEqual(decoded, summaries, "every summary field survives the round-trip")
+    }
+
+    // MARK: #56 — legacy index migration
+
+    func test_legacyIndex_decodesAndPreservesSessions() throws {
+        let sessions = [
+            makeSession(id: "legacy-1", versions: [
+                makeVersion(identifier: "people/a", number: 1),
+                makeVersion(identifier: "people/a", number: 2),
+            ]),
+            makeSession(id: "legacy-2", versions: [
+                makeVersion(identifier: "mac/b", number: 1, name: "Bea"),
+            ]),
+        ]
+        // What pre-#56 builds wrote: full sessions, ISO-8601 dates.
+        let legacyData = try iso8601Encoder.encode(sessions)
+
+        guard case .legacy(let decoded) =
+                try ContactBackupManager.decodeBackupIndex(legacyData) else {
+            return XCTFail("an old full-session index must be detected as legacy, "
+                           + "not silently half-read as the current format")
+        }
+
+        XCTAssertEqual(decoded.map(\.id), ["legacy-1", "legacy-2"])
+        XCTAssertEqual(decoded[0].contactVersions.count, 2,
+                       "the full bodies survive so migration can write missing session files")
+        XCTAssertEqual(decoded[1].contactVersions.first?.contactName, "Bea")
+
+        // The summaries migration derives from them are complete.
+        let summaries = decoded.map(\.summary)
+        XCTAssertEqual(summaries.map(\.versionCount), [2, 1])
+        XCTAssertEqual(summaries[0].type, .preSyncBackup)
+        XCTAssertEqual(summaries[0].timestamp, fixedDate)
+    }
+
+    func test_corruptIndex_throws() {
+        let garbage = Data("not json at all".utf8)
+        XCTAssertThrowsError(try ContactBackupManager.decodeBackupIndex(garbage))
+    }
+
+    // MARK: #57 — version numbering in one pass
+
+    func test_maxVersionNumbers_singlePassOverAllSessions() {
+        let sessions = [
+            makeSession(versions: [
+                makeVersion(identifier: "people/a", number: 1),
+                makeVersion(identifier: "mac/x", number: 1),
+            ]),
+            makeSession(versions: [
+                makeVersion(identifier: "people/a", number: 3),
+                makeVersion(identifier: "people/a", number: 2),
+                makeVersion(identifier: "mac/x", number: 2),
+            ]),
+        ]
+        let map = ContactBackupManager.maxVersionNumbers(in: sessions)
+        XCTAssertEqual(map, ["people/a": 3, "mac/x": 2])
+    }
+
+    func test_nextVersionNumber_incrementsFromStoredMax() {
+        var map = ContactBackupManager.maxVersionNumbers(in: [
+            makeSession(versions: [makeVersion(identifier: "people/a", number: 2)]),
+        ])
+
+        XCTAssertEqual(ContactBackupManager.nextVersionNumber(for: "people/a", in: &map), 3)
+        XCTAssertEqual(ContactBackupManager.nextVersionNumber(for: "people/a", in: &map), 4,
+                       "a contact captured twice in one batch keeps stepping")
+        XCTAssertEqual(ContactBackupManager.nextVersionNumber(for: "mac/new", in: &map), 1,
+                       "an unseen contact starts at version 1")
+        XCTAssertEqual(map["people/a"], 4, "the map records what was handed out")
+    }
+}
