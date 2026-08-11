@@ -30,6 +30,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Select newest Xcode
+        run: |
+          # The project builds with SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor,
+          # which the image's default Xcode (16.x) ignores — compiling the
+          # unannotated classes nonisolated and rejecting their MainActor
+          # touches. Pick the newest installed Xcode, which honours it.
+          NEWEST=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "Selecting $NEWEST"
+          sudo xcode-select -s "$NEWEST"
+
       - name: Preflight
         run: |
           xcodebuild -version
