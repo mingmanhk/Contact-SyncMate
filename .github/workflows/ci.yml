@@ -49,17 +49,15 @@ jobs:
           # placeholder values, which tests never exercise.
           bash Scripts/bootstrap-config.sh
 
-      # Best-effort DerivedData cache: exact key on project + sources, prefix
-      # restore-keys so an incremental hit still saves module/PCM work. No
-      # SPM dependencies exist, so there is no package cache to manage.
+      # Exact-key DerivedData cache only — NO prefix restore-keys. A stale
+      # DerivedData from an earlier commit leaves an old xctestrun behind,
+      # and `test-without-building` will happily run that old (smaller) test
+      # list as "Selected tests" while reporting success.
       - name: Cache DerivedData
         uses: actions/cache@v4
         with:
           path: DerivedData
           key: dd-${{ runner.os }}-${{ hashFiles('**/project.pbxproj') }}-${{ hashFiles('Contact SyncMate/**/*.swift', 'ContactSyncMateTests/**/*.swift') }}
-          restore-keys: |
-            dd-${{ runner.os }}-${{ hashFiles('**/project.pbxproj') }}-
-            dd-${{ runner.os }}-
 
       - name: Build for testing (signing disabled)
         run: |
@@ -90,9 +88,10 @@ jobs:
 
           TEST_TIMEOUT=900
           for _ in $(seq 1 "$TEST_TIMEOUT"); do
-            # "All tests", not the per-suite "Executed" line — the per-suite
-            # line reports whichever suite finished first.
-            grep -q "Test Suite 'All tests' \(passed\|failed\)" test.log 2>/dev/null && break
+            # Top-level summary only, not the per-suite "Executed" lines.
+            # `xcodebuild test` labels it "All tests"; `test-without-building`
+            # labels the same summary "Selected tests".
+            grep -qE "Test Suite '(All tests|Selected tests)' (passed|failed)" test.log 2>/dev/null && break
             kill -0 "$XCB" 2>/dev/null || break
             sleep 1
           done
@@ -111,9 +110,16 @@ jobs:
             tail -60 test.log
             exit 1
           fi
-          if ! grep -q "Test Suite 'All tests' passed" test.log; then
+          if ! grep -qE "Test Suite '(All tests|Selected tests)' passed" test.log; then
             echo "::error::Test failures detected"
             grep -E ' error: | failed \(' test.log | head -30
+            exit 1
+          fi
+          # Guard against silently running a subset (stale xctestrun, dropped
+          # test classes): the suite is 214 tests and only grows.
+          TOTAL=$(echo "$RESULT" | grep -oE 'Executed [0-9]+' | grep -oE '[0-9]+')
+          if [ "${TOTAL:-0}" -lt 214 ]; then
+            echo "::error::Only ${TOTAL:-0} tests executed (expected >= 214) — a stale or partial test bundle ran"
             exit 1
           fi
 

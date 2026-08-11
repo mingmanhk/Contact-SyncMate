@@ -402,3 +402,11 @@ Severity totals: **0 Critical · 9 High (#42, #53, #56, #63, #67, #68, #78, #79,
 - **Test additions to land with fixes:** transient-error strike classification (#53), pre-v2 restore-mask fixture (#44), mapping-store temp-dir isolation (#45), coordinator single-run assertion (#42).
 
 *Second cycle completed 2026-08-10. Static analysis + test-suite execution; the app was not run interactively (O-09 explicitly flags the one finding needing a manual launch check).*
+
+---
+
+## Cycle-2 remediation complete (2026-08-11): verdict flips to **GO**
+
+All 43 cycle-2 findings (#42–#84) are fixed, committed with `Fixes #N`, and pushed — on top of cycle 1's 41, that is **84/84 issues resolved**. Test suite: **214 passing, 0 failures**, zero app-file compiler warnings. Highlights beyond the §blockers table: photo sync actually downloads photos now (#59), quitting mid-sync is safe (#62), crashes leave on-device MetricKit diagnostics (#76), Settings is a single native scene (#82), CI runs the full suite on every push (#78–#80, with the newest-Xcode selection the default-isolation setting requires), and the build number maps every build to a commit (#81).
+
+**Remaining before submission (not code):** one manual runtime pass — first-launch window behavior and the Settings-scene checks listed in #82's commit, plus sign-in → preview → sync → cancel → restore on real accounts; trim the App Store description below 4,000 characters (flagged in APP_STORE_LISTING.md); tag the submitted commit per the release checklist.
