@@ -59,18 +59,24 @@ jobs:
           path: DerivedData
           key: dd-${{ runner.os }}-${{ hashFiles('**/project.pbxproj') }}-${{ hashFiles('Contact SyncMate/**/*.swift', 'ContactSyncMateTests/**/*.swift') }}
 
-      - name: Build for testing (signing disabled)
+      - name: Build for testing (ad-hoc signed)
         run: |
           set -o pipefail
+          # Ad-hoc ("-"), not unsigned: an unsigned test host is broken on
+          # macOS — every system XPC registration fails at launch, and the
+          # host crash-looped through the suite on CI (locally it hangs
+          # before the first test). Ad-hoc needs no certificates and gives
+          # the host a valid code identity.
           xcodebuild build-for-testing \
             -project "$PROJECT" \
             -scheme "$SCHEME" \
             -configuration Debug \
             -destination 'platform=macOS' \
             -derivedDataPath "$DERIVED_DATA" \
-            CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
             2>&1 | tee build.log
         # Build failures DO surface through the exit code; only the test
         # phase needs log parsing.
@@ -82,7 +88,6 @@ jobs:
             -scheme "$SCHEME" \
             -destination 'platform=macOS' \
             -derivedDataPath "$DERIVED_DATA" \
-            CODE_SIGNING_ALLOWED=NO \
             > test.log 2>&1 &
           XCB=$!
 
