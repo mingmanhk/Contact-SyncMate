@@ -195,11 +195,39 @@ App Store Connect → App Privacy. Answer exactly as below.
 
 > **No — "Data Not Collected"**
 
-This is accurate and defensible: the app has no backend, no analytics SDK, and
-transmits contact data only between the user's Mac and the two providers the
-user already authorised. Apple's definition of *collect* is transmitting data
-off-device **to the developer or a third party acting on the developer's
-behalf** — neither happens here.
+This is a deliberate decision, not an oversight, and this section is the
+review-ready defence for it.
+
+Apple's App Privacy definition of *collect* has two parts: data must be
+transmitted **off-device**, *and* it must be retained **longer than necessary
+to service the request in real time**. Data that leaves the device but is used
+only to service the current request and not kept is explicitly excluded from
+the label. Both of the app's transmissions fall inside that exclusion:
+
+- **Google People API** — the sync itself. Contact records move between the
+  user's Mac and the user's *own* Google account, which the user signed into
+  and can revoke at any time. Each request is serviced in real time; nothing
+  is retained anywhere the developer controls, because the developer controls
+  nothing — there is no backend, no analytics SDK, no crash reporter.
+- **Anthropic API** — optional AI duplicate matching. Off by default, and
+  stays off until the user supplies their *own* API key **and** switches on a
+  separate explicit consent toggle. When active, only the fields of the two
+  records being compared are sent, solely for the real-time comparison; the
+  verdict comes back and the exchange is over. The relationship is between
+  the user and Anthropic under the user's key — the developer receives
+  nothing, retains nothing, and could not access the data if it wanted to.
+
+The binary says the same thing: the bundled privacy manifest
+(`PrivacyInfo.xcprivacy`) declares `NSPrivacyCollectedDataTypes` as an empty
+array and `NSPrivacyTracking = false`, so the label, the manifest, and the
+actual network behaviour are consistent — the combination App Review checks.
+
+**If App Review disagrees:** do not argue past one rejection. The prepared
+revision is to declare **Contacts** as collected, **Data Not Linked to You**,
+purpose **App Functionality**, marked **optional** — reflecting the AI tier's
+transmission to Anthropic under the most conservative reading. Everything else
+stays "Not Collected", and tracking stays "No" either way. Update only the
+label in App Store Connect; no build change is needed.
 
 ### If the questionnaire forces itemisation
 

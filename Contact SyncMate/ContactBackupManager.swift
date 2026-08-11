@@ -473,10 +473,20 @@ class ContactBackupManager: ObservableObject {
             self.backupSessions = keep
             try? self.saveBackupIndex()
 
-            // Delete the files too, inside the sandbox grant.
+            // Delete the files too, inside the sandbox grant. A fallback
+            // session's body lives in the container even when a custom folder
+            // is configured (#50), so sweep both locations — removing a path
+            // that does not exist is a harmless no-op.
             self.withBackupDirectory { dir in
                 for session in drop {
                     let file = dir.appendingPathComponent("\(session.id).json")
+                    try? FileManager.default.removeItem(at: file)
+                }
+            }
+            if self.hasCustomBackupFolder {
+                let containerDir = self.containerBackupDirectory()
+                for session in drop {
+                    let file = containerDir.appendingPathComponent("\(session.id).json")
                     try? FileManager.default.removeItem(at: file)
                 }
             }
@@ -528,6 +538,18 @@ class ContactBackupManager: ObservableObject {
             self.withBackupDirectory { dir in
                 let files = (try? FileManager.default.contentsOfDirectory(
                     at: dir, includingPropertiesForKeys: nil)) ?? []
+                for file in files where file.pathExtension == "json" {
+                    try? FileManager.default.removeItem(at: file)
+                }
+            }
+
+            // "Every backup" includes fallback sessions the container holds
+            // when a custom folder is configured (#50) — plaintext contact
+            // data must not outlive Reset Everything there either.
+            if self.hasCustomBackupFolder {
+                let containerDir = self.containerBackupDirectory()
+                let files = (try? FileManager.default.contentsOfDirectory(
+                    at: containerDir, includingPropertiesForKeys: nil)) ?? []
                 for file in files where file.pathExtension == "json" {
                     try? FileManager.default.removeItem(at: file)
                 }
@@ -1112,9 +1134,9 @@ class ContactBackupManager: ObservableObject {
     ///
     /// Falls back to the container directory when the primary read fails: the
     /// pre-sync fallback (R-09) writes a session there when a custom folder is
-    /// not writable, and until #50 lands the index entry for it lives in memory
-    /// pointing at a file the custom folder does not have. Lazy loading must
-    /// still find that file within the same run, as the resident array did.
+    /// not writable. The load-time index merge (#50) keeps such sessions listed
+    /// across relaunch; this read fallback is what keeps them restorable — the
+    /// body sits in the container, not in the folder the bookmark resolves to.
     private func loadSessionFromDisk(id: String) -> BackupSession? {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
@@ -1286,6 +1308,21 @@ class ContactBackupManager: ObservableObject {
             try Data(contentsOf: dir.appendingPathComponent(Self.contactVersionsIndexFileName))
         }
 
+        // #50: with a custom folder configured, the container may hold sessions
+        // the custom index never learned about. The pre-sync fallback writes the
+        // body *and* the updated indexes to the container precisely because the
+        // custom folder was not writable — so the custom index on disk still
+        // predates the fallback session, and resolving only the bookmark here
+        // made those backups vanish on relaunch. Read the container's copies too
+        // and merge them in below.
+        let containerDir = containerBackupDirectory()
+        let containerIndexData = hasCustomBackupFolder
+            ? try? Data(contentsOf: containerDir.appendingPathComponent("backup_index.json"))
+            : nil
+        let containerVersionsData = hasCustomBackupFolder
+            ? try? Data(contentsOf: containerDir.appendingPathComponent(Self.contactVersionsIndexFileName))
+            : nil
+
         // Decode through the barrier queue like every other mutation: this path
         // also runs when the user re-points the backup folder at runtime, where
         // a direct assignment can race an in-flight pruneOldBackups barrier
@@ -1295,45 +1332,116 @@ class ContactBackupManager: ObservableObject {
         backupQueue.async(flags: .barrier) { [weak self] in
             guard let self else { return }
 
-            guard let indexData else {
+            guard indexData != nil || containerIndexData != nil else {
                 // First launch, or the chosen folder has no index yet.
                 self.backupSessions = []
                 self.contactVersionsIndex = [:]
                 return
             }
 
-            do {
-                switch try Self.decodeBackupIndex(indexData) {
-                case .current(let summaries):
-                    self.backupSessions = summaries
-                    if let versionsData,
-                       let map = try? JSONDecoder().decode([String: Int].self, from: versionsData) {
-                        self.contactVersionsIndex = map
-                    } else {
-                        // Index present but the version map is missing or
-                        // unreadable — rebuild it with one scan of the bodies.
-                        self.rebuildContactVersionsIndexLocked()
+            if let indexData {
+                do {
+                    switch try Self.decodeBackupIndex(indexData) {
+                    case .current(let summaries):
+                        self.backupSessions = summaries
+                        if let versionsData,
+                           let map = try? JSONDecoder().decode([String: Int].self, from: versionsData) {
+                            self.contactVersionsIndex = map
+                        } else {
+                            // Index present but the version map is missing or
+                            // unreadable — rebuild it with one scan of the bodies.
+                            self.rebuildContactVersionsIndexLocked()
+                        }
+
+                    case .legacy(let sessions):
+                        self.migrateLegacyIndexLocked(sessions)
                     }
-
-                case .legacy(let sessions):
-                    self.migrateLegacyIndexLocked(sessions)
+                } catch {
+                    // Initialize empty if load fails (corrupted index). The
+                    // container merge below can still recover fallback sessions.
+                    print("ContactBackupManager: Could not load backup index: \(error.localizedDescription)")
+                    self.backupSessions = []
+                    self.contactVersionsIndex = [:]
                 }
-
-                let count = self.backupSessions.count
-                let last = self.backupSessions.max { $0.timestamp < $1.timestamp }?.timestamp
-                let size = self.calculateEstimatedSize()
-                DispatchQueue.main.async { [weak self] in
-                    self?.backupCount = count
-                    self?.lastBackupDate = last
-                    self?.totalBackupSize = size
-                }
-            } catch {
-                // Initialize empty if load fails (corrupted index).
-                print("ContactBackupManager: Could not load backup index: \(error.localizedDescription)")
+            } else {
+                // The chosen folder has no index, but the container does —
+                // fallback sessions are all there is to list; the merge below
+                // folds them in.
                 self.backupSessions = []
                 self.contactVersionsIndex = [:]
             }
+
+            self.mergeContainerIndexLocked(indexData: containerIndexData,
+                                           versionsData: containerVersionsData)
+
+            let count = self.backupSessions.count
+            let last = self.backupSessions.max { $0.timestamp < $1.timestamp }?.timestamp
+            let size = self.calculateEstimatedSize()
+            DispatchQueue.main.async { [weak self] in
+                self?.backupCount = count
+                self?.lastBackupDate = last
+                self?.totalBackupSize = size
+            }
         }
+    }
+
+    /// Fold the container directory's index into the one just loaded (#50).
+    /// Runs inside a barrier block; no-op unless a custom folder is configured
+    /// (`loadBackupIndex` only reads the container's copies then).
+    ///
+    /// Why a merge rather than one authoritative index: when the custom folder
+    /// is unwritable, the pre-sync fallback saves everything — session body and
+    /// indexes — to the container, and the custom folder's index cannot record
+    /// the session because that write is exactly what failed. Each directory's
+    /// index is therefore authoritative only for the sessions that landed in
+    /// it, and the truth is the union: by session id, newest timestamp winning
+    /// for duplicates. A container-only entry is kept only while its body file
+    /// still exists there, so a stale container index cannot resurrect a
+    /// session pruning already deleted.
+    private func mergeContainerIndexLocked(indexData: Data?, versionsData: Data?) {
+        guard let indexData else { return }
+
+        let containerSummaries: [BackupSessionSummary]
+        switch try? Self.decodeBackupIndex(indexData) {
+        case .current(let summaries):
+            containerSummaries = summaries
+        case .legacy(let sessions):
+            // A pre-#56 fallback wrote a full-session index; only the metadata
+            // is needed here (the bodies were always written alongside it).
+            containerSummaries = sessions.map(\.summary)
+        case nil:
+            return
+        }
+
+        let containerDir = containerBackupDirectory()
+        var merged = Dictionary(backupSessions.map { ($0.id, $0) },
+                                uniquingKeysWith: { $0.timestamp >= $1.timestamp ? $0 : $1 })
+        var recovered = 0
+        for summary in containerSummaries {
+            if let existing = merged[summary.id] {
+                if summary.timestamp > existing.timestamp { merged[summary.id] = summary }
+            } else {
+                let body = containerDir.appendingPathComponent("\(summary.id).json")
+                guard FileManager.default.fileExists(atPath: body.path) else { continue }
+                merged[summary.id] = summary
+                recovered += 1
+            }
+        }
+        backupSessions = merged.values.sorted { $0.timestamp < $1.timestamp }
+
+        // The fallback save also stepped the container's copy of the version
+        // map; taking the max per contact keeps numbering monotonic.
+        if let versionsData,
+           let map = try? JSONDecoder().decode([String: Int].self, from: versionsData) {
+            contactVersionsIndex.merge(map, uniquingKeysWith: max)
+        }
+
+        guard recovered > 0 else { return }
+        SyncHistory.shared.log(
+            source: "BackupManager",
+            action: "backupIndex.mergedContainer",
+            details: "\(recovered) fallback session(s) recovered from the default folder"
+        )
     }
 
     /// One-time migration from the pre-#56 full-session index. Runs inside a
