@@ -99,3 +99,13 @@ create-dmg "build/export/Contact SyncMate.app" build/   # brew install create-dm
       default, backups/history are unencrypted on disk, and only the two OAuth
       scopes are requested
 - [ ] TestFlight round before submission
+
+## Versioning & tagging (added by the 2026-08-10 audit, issue #81)
+
+Before every submission:
+
+1. Bump `MARKETING_VERSION` if the release warrants it.
+2. Set the build number to the commit count so any installed build maps to a
+   unique commit: `agvtool new-version -all "$(git rev-list --count HEAD)"`
+   (or edit `CURRENT_PROJECT_VERSION` in both configurations).
+3. Tag the exact submitted commit: `git tag -a "v$(MARKETING_VERSION)" -m "App Store submission" && git push origin --tags`.

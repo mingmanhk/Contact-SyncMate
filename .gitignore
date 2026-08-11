@@ -91,3 +91,6 @@ build/verify-logs/
 
 # Contains a test-account password once filled in — keep it out of the public repo.
 docs/oauth-verification-response.md
+
+# l10n scratch files (generated)
+.l10n_*
