@@ -32,9 +32,13 @@ struct DeduplicationConfirmationView: View {
             VStack(spacing: 0) {
                 // Header
                 headerView
-                
+
                 Divider()
-                
+
+                bulkActionBar
+
+                Divider()
+
                 // Groups list
                 if duplicateGroups.isEmpty {
                     emptyStateView
@@ -84,6 +88,86 @@ struct DeduplicationConfirmationView: View {
         .background(Color(NSColor.controlBackgroundColor))
     }
     
+    // MARK: - Bulk actions
+
+    /// Decide whole confidence tiers at once.
+    ///
+    /// Twenty-eight groups decided one card at a time is not review, it is
+    /// data entry — and the app already knows which of them are not in doubt.
+    /// So the two tiers it can answer for itself get a button each, and what
+    /// remains is the 50–79 band, where the evidence genuinely is ambiguous and
+    /// a person has to look.
+    ///
+    /// There is deliberately no "merge all 28". Merging is the one action here
+    /// that destroys information — two contacts become one and the app has no
+    /// unmerge — so a blanket grant over pairs the scorer itself is unsure
+    /// about is the wrong shape of button, however convenient. The tiered
+    /// versions give the same relief for everything that can be decided by
+    /// rule, and stop where rules stop.
+    private var bulkActionBar: some View {
+        HStack(spacing: 8) {
+            Button {
+                decideAll(.merge, in: highConfidenceGroups)
+            } label: {
+                Label("Merge \(highConfidenceGroups.count) high-confidence",
+                      systemImage: "arrow.triangle.merge")
+            }
+            .disabled(highConfidenceGroups.isEmpty)
+            .help("Applies to groups scoring 80 or above — a shared phone number or email, not a name guess")
+
+            Button {
+                decideAll(.keepSeparate, in: lowConfidenceGroups)
+            } label: {
+                Label("Keep \(lowConfidenceGroups.count) separate", systemImage: "arrow.triangle.branch")
+            }
+            .disabled(lowConfidenceGroups.isEmpty)
+            .help("Applies to groups scoring below 50 — too weak a match to merge on")
+
+            Spacer()
+
+            if needsAttentionCount > 0 {
+                Text("\(needsAttentionCount) need your decision")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Button("Reset") { decisions.removeAll() }
+                .disabled(decisions.isEmpty)
+                .help("Clear every decision made on this screen")
+        }
+        .controlSize(.small)
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(Color(NSColor.controlBackgroundColor))
+    }
+
+    /// Groups the app is confident about: a shared phone or email, not a name.
+    private var highConfidenceGroups: [DuplicateGroup] {
+        duplicateGroups.filter { $0.shouldAutoMerge }
+    }
+
+    /// Too weak to merge on.
+    private var lowConfidenceGroups: [DuplicateGroup] {
+        duplicateGroups.filter { $0.shouldKeepSeparate }
+    }
+
+    /// The middle band — the ones no rule can settle.
+    private var needsAttentionCount: Int {
+        duplicateGroups.filter { $0.shouldPromptUser && decisions[$0.id] == nil }.count
+    }
+
+    /// Fill in a decision for groups that have none yet.
+    ///
+    /// Only the undecided ones. A bulk button that overwrote choices already
+    /// made would silently undo careful work — someone who decided three cards
+    /// by hand and then reached for "merge the easy ones" would lose all three
+    /// without being told.
+    private func decideAll(_ decision: DuplicateDecision, in groups: [DuplicateGroup]) {
+        for group in groups where decisions[group.id] == nil {
+            decisions[group.id] = decision
+        }
+    }
+
     private var emptyStateView: some View {
         VStack(spacing: 16) {
             Image(systemName: "checkmark.circle.fill")

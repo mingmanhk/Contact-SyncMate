@@ -61,6 +61,9 @@ struct SyncPreviewView: View {
     @State private var activeFilter: ChangeFilter = .all
     @State private var skipped: Set<UUID> = []
     @State private var showingDiff: ContactChange? = nil
+    /// Collapsed by default. The whole point is that these do not need looking
+    /// at; opening expanded would just restore the wall.
+    @State private var routineExpanded = false
     /// Conflict decisions from the diff sheet, keyed by change id.
     /// `reviewedSession()` turns these into `userOverride`s — the engine
     /// honours only what is on the change itself.
@@ -135,6 +138,84 @@ struct SyncPreviewView: View {
             return c
         }
         return reviewed
+    }
+
+    /// A change that carries no decision: one-way, non-destructive, and either
+    /// already decided or never in doubt.
+    ///
+    /// Deletions are never routine even when they are unambiguous — an add or
+    /// an edit is recoverable from a backup, a deletion propagated to both
+    /// address books is the change people actually get hurt by, so it stays
+    /// where you can see it. Merges are routine only once something has decided
+    /// them (a shared email address, or a conflict-resolution setting).
+    static func isRoutine(_ change: ContactChange) -> Bool {
+        change.action != .delete && !needsReview(change)
+    }
+
+    /// Rows shown flat: the ones that want a person.
+    ///
+    /// Only grouped under the "All" filter. Picking "Edit" is an explicit
+    /// request to see the edits, and hiding them behind a disclosure at that
+    /// point would be the app second-guessing an instruction.
+    private var changesNeedingAttention: [ContactChange] {
+        guard activeFilter == .all else { return filteredChanges }
+        return filteredChanges.filter { !Self.isRoutine($0) }
+    }
+
+    private var routineChanges: [ContactChange] {
+        guard activeFilter == .all else { return [] }
+        return filteredChanges.filter { Self.isRoutine($0) }
+    }
+
+    /// The one-line stand-in for the collapsed group.
+    @ViewBuilder
+    private var routineGroupLabel: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "tray.full")
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(routineChanges.count) routine changes")
+                    .font(.body)
+                // Names what is inside rather than making you expand to find
+                // out — "86 routine changes" alone is just a number.
+                Text(verbatim: Self.routineSummary(routineChanges))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button("Skip All") {
+                for change in routineChanges { skipped.insert(change.id) }
+            }
+            .buttonStyle(.borderless)
+            .font(.caption)
+        }
+        .padding(.vertical, 2)
+    }
+
+    /// "72 photo updates · 14 field updates" — the composition of the group.
+    static func routineSummary(_ changes: [ContactChange]) -> String {
+        var counts: [String: Int] = [:]
+        for change in changes {
+            // The first listed field reason is the one the row would have
+            // shown — canonicalized through the same colon-truncating key the
+            // diff histogram uses, because the shared-email reason embeds the
+            // contact's name after its colon: raw, each person became their
+            // own bucket and the summary line printed names.
+            let reason = SyncEngine.histogramKey(
+                for: change.changes.first ?? "Update")
+            counts[reason, default: 0] += 1
+        }
+        return counts
+            // Biggest group first; ties broken by name so the line is stable
+            // between runs rather than following dictionary order.
+            .sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }
+            .prefix(3)
+            .map { "\($0.value) × \($0.key)" }
+            .joined(separator: " · ")
     }
 
     private func count(for filter: ChangeFilter) -> Int {
@@ -223,13 +304,39 @@ struct SyncPreviewView: View {
                 }
                 Spacer()
             } else {
-                List(filteredChanges) { change in
-                    ContactChangeRow(
-                        change: change,
-                        onSkip: { skipped.insert(change.id) },
-                        onViewDiff: { showingDiff = change }
-                    )
-                    .listRowSeparator(.visible)
+                List {
+                    ForEach(changesNeedingAttention) { change in
+                        ContactChangeRow(
+                            change: change,
+                            onSkip: { skipped.insert(change.id) },
+                            onViewDiff: { showingDiff = change }
+                        )
+                        .listRowSeparator(.visible)
+                    }
+
+                    // Routine changes, collapsed behind one row.
+                    //
+                    // A first sync produced 110 rows of which 86 read "Photo
+                    // changed, Google to Mac" — one-directional, non-destructive
+                    // and identical 86 times. Listing them as rows demanding
+                    // attention is what made the 24 that did need attention
+                    // unreadable. They are still here, still countable, still
+                    // skippable as a group; they are just no longer competing
+                    // with the decisions.
+                    if !routineChanges.isEmpty {
+                        DisclosureGroup(isExpanded: $routineExpanded) {
+                            ForEach(routineChanges) { change in
+                                ContactChangeRow(
+                                    change: change,
+                                    onSkip: { skipped.insert(change.id) },
+                                    onViewDiff: { showingDiff = change }
+                                )
+                                .listRowSeparator(.visible)
+                            }
+                        } label: {
+                            routineGroupLabel
+                        }
+                    }
                 }
                 .listStyle(.plain)
             }

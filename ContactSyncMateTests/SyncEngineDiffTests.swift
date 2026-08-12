@@ -925,6 +925,34 @@ final class SyncFailureKeyTests: SettingsPinnedTestCase {
             "a per-item batch rejection still strikes")
     }
 
+    func test_routineSummary_isNameFreeAndAggregated() {
+        // C4-02 regression (github issue #140): the collapsed routine-group
+        // label must not print contact names, and same-kind reasons must
+        // aggregate into one bucket instead of one per person.
+        let changes = [
+            ContactChange(contactName: "A", action: .merge, direction: .twoWay,
+                          changes: ["Matched on a shared email address: David Chan"],
+                          userOverride: .merge,
+                          sourceContact: .diffMake(givenName: "David"),
+                          targetContact: .diffMake(givenName: "David")),
+            ContactChange(contactName: "B", action: .merge, direction: .twoWay,
+                          changes: ["Matched on a shared email address: Elle Woods"],
+                          userOverride: .merge,
+                          sourceContact: .diffMake(givenName: "Elle"),
+                          targetContact: .diffMake(givenName: "Elle")),
+            ContactChange(contactName: "C", action: .update, direction: .googleToMac,
+                          changes: ["Photo changed"],
+                          sourceContact: .diffMake(givenName: "Pat"),
+                          targetContact: .diffMake(givenName: "Pat")),
+        ]
+        let summary = SyncPreviewView.routineSummary(changes)
+        XCTAssertFalse(summary.contains("David") || summary.contains("Elle"),
+                       "the summary is a count line, not a place for names")
+        XCTAssertTrue(summary.contains("2 × Matched on a shared email address"),
+                      "same-kind reasons aggregate into one bucket: \(summary)")
+        XCTAssertTrue(summary.contains("1 × Photo changed"))
+    }
+
     func test_setAsideContact_isExcludedFromBatch() {
         // N-01 regression (github issue #24): set aside means set aside — the
         // batch pre-pass must not submit what the per-contact loop would skip.
