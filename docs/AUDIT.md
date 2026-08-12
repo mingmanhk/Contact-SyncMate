@@ -410,3 +410,9 @@ Severity totals: **0 Critical · 9 High (#42, #53, #56, #63, #67, #68, #78, #79,
 All 43 cycle-2 findings (#42–#84) are fixed, committed with `Fixes #N`, and pushed — on top of cycle 1's 41, that is **84/84 issues resolved**. Test suite: **214 passing, 0 failures**, zero app-file compiler warnings. Highlights beyond the §blockers table: photo sync actually downloads photos now (#59), quitting mid-sync is safe (#62), crashes leave on-device MetricKit diagnostics (#76), Settings is a single native scene (#82), CI runs the full suite on every push (#78–#80, with the newest-Xcode selection the default-isolation setting requires), and the build number maps every build to a commit (#81).
 
 **Remaining before submission (not code):** one manual runtime pass — first-launch window behavior and the Settings-scene checks listed in #82's commit, plus sign-in → preview → sync → cancel → restore on real accounts; trim the App Store description below 4,000 characters (flagged in APP_STORE_LISTING.md); tag the submitted commit per the release checklist.
+
+---
+
+# Fourth entry: Third audit cycle (2026-08-11) — verdict **NO-GO**
+
+A third cycle with flow-level lenses found **54 new findings (issues #85–#138)**: 1 Critical, 12 High. Cycle-2 fixes held up under adversarial re-review (5 regressions, mostly Low), but the fresh lenses exposed pre-existing broken *flows* the unit-level cycles never saw — the conflict-review sheet discards decisions (#86-class, C3F-01), review sessions orphan on menu-bar/scheduled syncs (C3F-05), group filtering manufactures deletions (C3F-02), and Google timestamps fail to parse (C3F-10). Full report: `docs/AUDIT-CYCLE3.md`.
