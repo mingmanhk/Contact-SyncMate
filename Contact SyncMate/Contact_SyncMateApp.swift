@@ -183,7 +183,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     action: "timerFired",
                     details: "interval=\(AppSettings.shared.autoSyncInterval)s"
                 )
-                Task { await SyncCoordinator.shared.runSync() }
+                Task { await SyncCoordinator.shared.runSync(scheduled: true) }
             }
         }
         autoSyncScheduler = scheduler

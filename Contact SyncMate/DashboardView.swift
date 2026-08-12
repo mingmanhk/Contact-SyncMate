@@ -151,6 +151,14 @@ struct DashboardView: View {
             recentEvents = Self.interestingEvents(from: SyncHistory.shared.events())
             // Give the coordinator a handle to AppState so it can update isSyncing etc.
             sync.appState = appState
+            // A session published before this window existed: onChange never
+            // fires for it, so a menu-bar sync's review used to be orphaned
+            // until the next run replaced it. Pick it up on appearance.
+            if let session = sync.sessionAwaitingReview {
+                appState.currentSyncSession = session
+                showSyncPreview = true
+                sync.sessionAwaitingReview = nil
+            }
         }
         // Drive banners from the coordinator's phase
         // The engine reports progress per contact, which makes it the natural
@@ -681,15 +689,14 @@ struct DashboardView: View {
             syncErrorMessage = nil
         }
 
-        // Manual-with-preview mode: build the diff first and show the sheet.
-        // This path does NOT go through SyncCoordinator so the sheet can inspect
-        // the pending changes before they are applied.
-        if settings.selectedSyncType == .manual {
-            triggerManualSyncWithPreview()
-        } else {
-            // All other modes: delegate to the shared SyncCoordinator.
-            Task { await sync.runSync() }
-        }
+        // Through the coordinator for every mode — including manual review.
+        // The old private-engine preview path here diverged from the shared
+        // pipeline: phase stayed idle (menu-bar icon disagreed with this
+        // window), Cancel and the watchdog didn't apply, the dedup scan was
+        // skipped, and a scheduled run could start mid-preview. runSync's
+        // review path publishes sessionAwaitingReview, which this view
+        // presents via onChange/onAppear.
+        Task { await sync.runSync() }
     }
 
     /// Apply a session the user reviewed in the preview sheet.
@@ -706,42 +713,6 @@ struct DashboardView: View {
         // above builds it from the completed phase, the same as for every other
         // sync. This method no longer needs its own copy of that either.
         Task { await sync.applyReviewed(session) }
-    }
-
-    /// Manual mode: prepare a preview session, then show the SyncPreviewView sheet.
-    private func triggerManualSyncWithPreview() {
-        appState.isSyncing = true
-
-        Task {
-            do {
-                let engine = SyncEngine(
-                    googleConnector: GoogleContactsConnector(),
-                    macConnector: MacContactsConnector(),
-                    mappingStore: ContactMappingStore.shared
-                )
-
-                let session = try await engine.prepareManualSync(
-                    direction: settings.autoSyncDirection
-                )
-
-                await MainActor.run {
-                    appState.currentSyncSession = session
-                    appState.isSyncing = false
-                    showSyncPreview = true
-                }
-
-                SyncHistory.shared.log(
-                    source: "Dashboard",
-                    action: "sync.preview",
-                    details: "\(session.contactChanges.count) changes prepared for review"
-                )
-            } catch {
-                await MainActor.run {
-                    appState.isSyncing = false
-                    handleSyncError(error)
-                }
-            }
-        }
     }
 
     // MARK: - Error Handling (used only by the manual-preview path)

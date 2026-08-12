@@ -61,6 +61,10 @@ struct SyncPreviewView: View {
     @State private var activeFilter: ChangeFilter = .all
     @State private var skipped: Set<UUID> = []
     @State private var showingDiff: ContactChange? = nil
+    /// Conflict decisions from the diff sheet, keyed by change id.
+    /// `reviewedSession()` turns these into `userOverride`s — the engine
+    /// honours only what is on the change itself.
+    @State private var decisions: [UUID: ConflictResolution] = [:]
 
     private var filteredChanges: [ContactChange] {
         let base = session.contactChanges.filter { !skipped.contains($0.id) }
@@ -102,10 +106,33 @@ struct SyncPreviewView: View {
         var reviewed = session
         reviewed.userReviewed = true
         reviewed.contactChanges = session.contactChanges.map { change in
-            guard skipped.contains(change.id) else { return change }
-            var skippedChange = change
-            skippedChange.userOverride = .skip
-            return skippedChange
+            var c = change
+            if skipped.contains(c.id) {
+                c.userOverride = .skip
+                return c
+            }
+            // Conflict decisions from the diff sheet become overrides the
+            // engine can act on. Every merge producer emits (google, mac) as
+            // (source, target), which the direction mapping relies on. A merge
+            // left undecided keeps a nil override — the engine defers it
+            // rather than silently merging (see mergeIsHeldBack).
+            if let decision = decisions[c.id], Self.needsReview(change) {
+                switch decision {
+                case .keepBoth:
+                    c.userOverride = .merge
+                case .skip:
+                    c.userOverride = .skip
+                case .useGoogle:
+                    c.userOverride = .update
+                    c.direction = .googleToMac
+                case .useMac:
+                    c.userOverride = .update
+                    c.direction = .macToGoogle
+                    // performUpdate reads the winner from sourceContact.
+                    swap(&c.sourceContact, &c.targetContact)
+                }
+            }
+            return c
         }
         return reviewed
     }
@@ -264,7 +291,8 @@ struct SyncPreviewView: View {
                 isPresented: Binding(
                     get: { showingDiff != nil },
                     set: { if !$0 { showingDiff = nil } }
-                )
+                ),
+                onResolve: { id, resolution in decisions[id] = resolution }
             )
         }
     }

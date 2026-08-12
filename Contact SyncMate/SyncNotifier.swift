@@ -54,6 +54,17 @@ enum SyncNotifier {
         post(title: "Sync failed", body: message)
     }
 
+    /// Notify that a scheduled run prepared changes that need the user's
+    /// review. Without this, a review-gated background sync fetched, diffed,
+    /// and silently dropped its work with nobody the wiser.
+    static func notifyChangesAwaitingReview(count: Int) {
+        guard count > 0 else { return }
+        post(
+            title: "Changes await your review",
+            body: "\(count) change\(count == 1 ? "" : "s") are ready — open Contact SyncMate to review and apply."
+        )
+    }
+
     /// Notify that duplicate conflicts are waiting for review.
     static func notifyConflictsNeedReview(count: Int) {
         guard AppSettings.shared.notifyOnConflicts, count > 0 else { return }

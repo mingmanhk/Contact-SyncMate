@@ -807,35 +807,32 @@ final class SyncFailureKeyTests: XCTestCase {
             action: .delete, session: session(reviewed: false), settings: AppSettings.shared))
     }
 
-    func test_unreviewedMerge_isDeferred() {
-        // D-01 regression (github issue #1): a `.merge` nobody confirmed is a
-        // proposal, not a decision — an unreviewed run defers it to the sync
-        // preview instead of rewriting both address books.
+    func test_undecidedMerge_isDeferred_reviewedOrNot() {
+        // #1 and #85 regressions: a `.merge` nobody explicitly confirmed is a
+        // proposal on reviewed and unreviewed runs alike. "Reviewed" used to
+        // release every unconfirmed merge, so pressing Apply without opening
+        // each conflict silently fused same-name strangers (issue #85 — the
+        // review sheet was discarding decisions AND the gate trusted it).
         let proposal = ContactChange(
             contactName: "David Chan", action: .merge, direction: .twoWay,
             changes: ["Possible match: same name only"],
             sourceContact: .diffMake(givenName: "David"),
             targetContact: .diffMake(givenName: "David"))
-        XCTAssertTrue(SyncEngine.mergeIsHeldBack(
-            change: proposal, session: session(reviewed: false)),
-            "an unreviewed merge rewrites both sides and must wait for review")
-        XCTAssertFalse(SyncEngine.mergeIsHeldBack(
-            change: proposal, session: session(reviewed: true)),
-            "a reviewed session's merges were seen and applied by the user")
+        XCTAssertTrue(SyncEngine.mergeIsHeldBack(change: proposal),
+            "an undecided merge rewrites both sides and must wait for an explicit decision")
     }
 
     func test_confirmedMerge_isNotDeferred() {
-        // The auto-apply set is deliberate: a shared-email match or an explicit
-        // "merge both sides" preference carries userOverride == .merge and
-        // still applies on a scheduled run.
+        // The auto-apply set is deliberate: a shared-email match, an explicit
+        // "merge both sides" preference, or a diff-sheet decision carries
+        // userOverride == .merge and applies on any run.
         let confirmed = ContactChange(
             contactName: "David Chan", action: .merge, direction: .twoWay,
             changes: ["Matched on a shared email address"],
             userOverride: .merge,
             sourceContact: .diffMake(givenName: "David"),
             targetContact: .diffMake(givenName: "David"))
-        XCTAssertFalse(SyncEngine.mergeIsHeldBack(
-            change: confirmed, session: session(reviewed: false)))
+        XCTAssertFalse(SyncEngine.mergeIsHeldBack(change: confirmed))
     }
 
     func test_transientErrors_doNotCountTowardSetAside() {

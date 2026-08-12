@@ -117,6 +117,11 @@ final class SyncCoordinator: ObservableObject {
     /// finishing run is still the one holding the handle.
     private var runGeneration = 0
 
+    /// Whether the run being started came from the background timer.
+    /// Set synchronously in `runSync` before the body task is spawned, read
+    /// by the review-publish path to choose notification vs opening a window.
+    private var pendingRunIsScheduled = false
+
     /// Stop the running sync at the next safe boundary.
     ///
     /// The engine checks for cancellation between contacts, so nothing is
@@ -131,7 +136,13 @@ final class SyncCoordinator: ObservableObject {
 
     /// Start a sync using the current AppSettings configuration.
     /// Safe to call from any async context — always runs on MainActor.
-    func runSync() async {
+    ///
+    /// `scheduled` says whether a human is watching: a user-initiated run
+    /// that ends in "changes await review" opens the Dashboard to present
+    /// them, while a background timer run only posts a notification — a
+    /// window appearing out of nowhere on a schedule is not acceptable.
+    func runSync(scheduled: Bool = false) async {
+        pendingRunIsScheduled = scheduled
         // Both gates, and the phase claimed *synchronously* before any
         // suspension. The body only marks the phase active once its task gets
         // a main-actor slot — after this method has already suspended — so a
@@ -261,6 +272,19 @@ final class SyncCoordinator: ObservableObject {
                     source: "SyncCoordinator", action: "sync.awaitingReview",
                     details: "\(session.contactChanges.count) changes prepared for review"
                 )
+                // A published session needs a presenter. Only the Dashboard
+                // consumes it, so a menu-bar or scheduled run used to fetch,
+                // diff — and silently drop the whole thing. User-initiated
+                // runs open the Dashboard (whose onChange/onAppear present
+                // the sheet); scheduled runs notify instead of surprising
+                // the user with a window.
+                if pendingRunIsScheduled {
+                    SyncNotifier.notifyChangesAwaitingReview(
+                        count: session.contactChanges.count)
+                } else {
+                    NotificationCenter.default.post(
+                        name: .openDashboardWindow, object: nil)
+                }
                 return
             }
 

@@ -67,13 +67,21 @@ struct ContactDiffView: View {
     let conflict: ContactConflict
     @Binding var isPresented: Bool
 
+    /// Delivers each decision to the presenter. Without this, choices lived
+    /// and died in this sheet's local @State — the review UI looked like a
+    /// safety gate while every unconfirmed merge still applied unchanged.
+    var onResolve: ((UUID, ConflictResolution) -> Void)?
+
     @State private var resolution: ConflictResolution
     @State private var conflicts: [ContactConflict]
     @State private var currentIndex: Int = 0
 
-    init(conflict: ContactConflict, isPresented: Binding<Bool>) {
+    init(conflict: ContactConflict,
+         isPresented: Binding<Bool>,
+         onResolve: ((UUID, ConflictResolution) -> Void)? = nil) {
         self.conflict = conflict
         self._isPresented = isPresented
+        self.onResolve = onResolve
         self._resolution = State(initialValue: conflict.resolution)
         self._conflicts = State(initialValue: [conflict])
     }
@@ -214,6 +222,10 @@ struct ContactDiffView: View {
 
                 Button("Apply Decision") {
                     conflicts[currentIndex].resolution = resolution
+                    // The decision must leave this sheet: the presenter turns
+                    // it into the change's userOverride, which is the only
+                    // thing the engine reads.
+                    onResolve?(current.id, resolution)
                     if currentIndex < conflicts.count - 1 {
                         currentIndex += 1
                         resolution = conflicts[currentIndex].resolution

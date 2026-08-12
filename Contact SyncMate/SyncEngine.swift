@@ -308,7 +308,7 @@ class SyncEngine: ObservableObject {
             // A merge nobody confirmed is deferred, not applied. The reviewed
             // preview gates these with needsReview; this is the same gate for
             // runs that never see a preview.
-            if Self.mergeIsHeldBack(change: change, session: session) {
+            if Self.mergeIsHeldBack(change: change) {
                 skipped += 1
                 deferredMerges += 1
                 SyncHistory.shared.log(
@@ -1382,9 +1382,14 @@ class SyncEngine: ObservableObject {
     /// (`userOverride == .merge` — a shared-email match, an explicit
     /// "merge both sides" preference, or the user's own choice in review)
     /// still apply.
-    static func mergeIsHeldBack(change: ContactChange,
-                                session: SyncSession) -> Bool {
-        change.action == .merge && change.userOverride == nil && !session.userReviewed
+    static func mergeIsHeldBack(change: ContactChange) -> Bool {
+        // No `userReviewed` clause, deliberately: "reviewed" used to release
+        // every unconfirmed merge, so pressing Apply without opening each
+        // conflict silently fused same-name strangers into both address
+        // books. A merge with no explicit decision is a proposal on reviewed
+        // and unreviewed runs alike; the review sheet records decisions as
+        // overrides, and only those apply.
+        change.action == .merge && change.userOverride == nil
     }
 
     /// Whether a change writes to Google, resolving `.twoWay` the way the
