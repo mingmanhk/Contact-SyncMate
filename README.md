@@ -10,7 +10,7 @@
 [![Swift](https://img.shields.io/badge/Swift-5.9-F05138?logo=swift&logoColor=white)](https://swift.org)
 [![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0071e3)](https://developer.apple.com/xcode/swiftui/)
 [![CI](https://github.com/mingmanhk/Contact-SyncMate/actions/workflows/ci.yml/badge.svg)](https://github.com/mingmanhk/Contact-SyncMate/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-214%20passing-2ea44f)](#testing)
+[![Tests](https://img.shields.io/badge/tests-237%20passing-2ea44f)](#testing)
 [![Privacy](https://img.shields.io/badge/telemetry-none-2ea44f)](#privacy-architecture)
 [![Backend](https://img.shields.io/badge/backend-none-2ea44f)](#privacy-architecture)
 
@@ -823,11 +823,14 @@ Full signing, notarisation, and submission steps are in
 
 ## Testing
 
-**214 tests across 24 suites, 0 failures.**
+**237 tests across 29 suites, 0 failures.**
 
 | Suite | Covers |
 |---|---|
 | `SyncEngineDiffTests` | Change classification across all three directions, conflict → merge, fuzzy match dedup |
+| `SyncEngineExecuteIntegrationTests` | `executeSync` end-to-end against recording connector fakes: hold-back gates, set-aside exclusion, batch failure accounting |
+| `GroupFilterAndTargetGoneTests` | Group filtering never manufactures deletions; 1-way re-add when a mapped target vanishes |
+| `GoogleUpdateTimeParsingTests` | Google timestamps with and without fractional seconds; CONTACT-source preference |
 | `ConflictAutoResolutionTests` | Prefer Google / Prefer Mac auto-resolution of two-sided edits |
 | `SyncEngineMergeHelperTests` | Field-level merge helpers |
 | `SyncFailureKeyTests` | Stable identity keys for failed changes |
@@ -841,10 +844,12 @@ Full signing, notarisation, and submission steps are in
 | `DeduplicationTests` | Scoring and grouping |
 | `ContactDeduplicatorScoreTests` | Individual scoring signal weights |
 | `DeduplicationMergeIntoTests` | Merge-into-primary field selection |
+| `DeduplicationDecisionStoreTests` | Remembered dedup decisions: save, delete, statistics, cross-instance persistence |
 | `DedupBlockingTests` | Blocking keys, candidate generation, exhaustive-vs-blocked switchover |
 | `GooglePhotoSyncTests` | Photo sync Google → Mac |
 | `GooglePhotoDiffTests` | Photo change detection in the diff |
 | `BackupSnapshotRoundTripTests` | Snapshot encode/decode round-trip |
+| `LegacySnapshotRestoreTests` | Restoring pre-v2 backups never blanks fields the snapshot never captured |
 | `BackupIndexFormatTests` | `backup_index.json` format |
 | `SyncFailureStoreTests` | Persisted per-contact failure records |
 | `SyncHistoryTests` | Event log |
