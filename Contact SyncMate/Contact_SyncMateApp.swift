@@ -146,7 +146,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Show onboarding on first launch (via dashboard/content window)
         if !AppSettings.shared.hasCompletedOnboarding {
             openDashboard()
+        } else if !Self.wasLaunchedAsLoginItem {
+            // A user-initiated launch (Finder double-click, Xcode run) expects
+            // a window. Until the Settings-scene cleanup, a stray launch
+            // window accidentally provided one; without it, "attach to menu
+            // bar" flipped the app to .accessory at launch and it appeared to
+            // close the moment it opened. Login-item launches stay silent —
+            // that is the one case where vanishing into the menu bar is the
+            // whole point.
+            openDashboard()
         }
+    }
+
+    /// Whether this process was started by the login-items mechanism rather
+    /// than by the user. Only readable during launch, which is where it is
+    /// used.
+    private static var wasLaunchedAsLoginItem: Bool {
+        guard let event = NSAppleEventManager.shared().currentAppleEvent else { return false }
+        return event.eventID == kAEOpenApplication
+            && event.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem
+    }
+
+    /// Clicking the Dock icon (or reopening from Finder) with no window open
+    /// brings the Dashboard back instead of doing nothing.
+    func applicationShouldHandleReopen(_ sender: NSApplication,
+                                       hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { openDashboard() }
+        return true
     }
 
     // MARK: - Auto-Sync Scheduler
