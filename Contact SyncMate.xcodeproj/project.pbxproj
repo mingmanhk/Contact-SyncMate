@@ -11,6 +11,7 @@
 		59235F6DAB6951FB60576085 /* ContactSyncMateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCDE55A132E2B58183C73CCD /* ContactSyncMateTests.swift */; };
 		7A11FEED0000000000000A01 /* NameFormattingEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11FEED0000000000000A02 /* NameFormattingEngineTests.swift */; };
 		7A11FEED0000000000000B01 /* GooglePhotoSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11FEED0000000000000B02 /* GooglePhotoSyncTests.swift */; };
+		7A11FEED0000000000000C01 /* SyncEngineIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11FEED0000000000000C02 /* SyncEngineIntegrationTests.swift */; };
 		E11F2AABB59A0DB789A69822 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3C8A6A5187D68D00E5642E92 /* Cocoa.framework */; };
 /* End PBXBuildFile section */
 
@@ -28,6 +29,7 @@
 		3C8A6A5187D68D00E5642E92 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
 		7A11FEED0000000000000A02 /* NameFormattingEngineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NameFormattingEngineTests.swift; sourceTree = "<group>"; };
 		7A11FEED0000000000000B02 /* GooglePhotoSyncTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GooglePhotoSyncTests.swift; sourceTree = "<group>"; };
+		7A11FEED0000000000000C02 /* SyncEngineIntegrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncEngineIntegrationTests.swift; sourceTree = "<group>"; };
 		992B71C62EBFDF2A00F9355F /* Contact SyncMate.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Contact SyncMate.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		99F2E1402EC3CE960072FEBA /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 		CCDE55A132E2B58183C73CCD /* ContactSyncMateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContactSyncMateTests.swift; sourceTree = "<group>"; };
@@ -124,6 +126,7 @@
 				ED900472F5BD3D97B7521F5C /* SyncEngineDiffTests.swift */,
 				7A11FEED0000000000000A02 /* NameFormattingEngineTests.swift */,
 				7A11FEED0000000000000B02 /* GooglePhotoSyncTests.swift */,
+				7A11FEED0000000000000C02 /* SyncEngineIntegrationTests.swift */,
 			);
 			path = ContactSyncMateTests;
 			sourceTree = "<group>";
@@ -232,6 +235,7 @@
 				17613B48D3B1EEDC02B492F6 /* SyncEngineDiffTests.swift in Sources */,
 				7A11FEED0000000000000A01 /* NameFormattingEngineTests.swift in Sources */,
 				7A11FEED0000000000000B01 /* GooglePhotoSyncTests.swift in Sources */,
+				7A11FEED0000000000000C01 /* SyncEngineIntegrationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

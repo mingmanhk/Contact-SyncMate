@@ -71,7 +71,22 @@ nonisolated final class SyncFailureStore: @unchecked Sendable {
     /// One fault per launch about the temp-directory fallback, not one per save.
     private var warnedTemporaryFallback = false
 
-    private init() { load() }
+    /// Set only by the test seam; `nil` means the default container path.
+    private let customFileURL: URL?
+
+    private init() {
+        customFileURL = nil
+        load()
+    }
+
+    /// Testability seam (issue #105): a store over a private file, so tests
+    /// never write the user's real `sync_failures.json` — a crash mid-test
+    /// used to leave `test:` keys visible in the app's Sync Failures UI.
+    /// Production always uses `shared` with the default path.
+    init(fileURL: URL) {
+        customFileURL = fileURL
+        load()
+    }
 
     // MARK: - Recording
 
@@ -142,6 +157,7 @@ nonisolated final class SyncFailureStore: @unchecked Sendable {
     // MARK: - Persistence
 
     private var fileURL: URL {
+        if let customFileURL { return customFileURL }
         let fm = FileManager.default
         let base: URL
         if let appSupport = try? fm.url(for: .applicationSupportDirectory, in: .userDomainMask,

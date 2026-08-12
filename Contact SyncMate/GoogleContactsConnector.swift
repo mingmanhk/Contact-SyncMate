@@ -8,8 +8,28 @@
 import Foundation
 import Combine
 
+/// The Google-side surface `SyncEngine` actually calls — and nothing more.
+///
+/// Testability seam (issue #94): `executeSync` / `applyGoogleBatches` and the
+/// per-change apply paths were untestable because the engine took the concrete
+/// connector, so every hold-back gate's *call site* had zero coverage. The
+/// protocol covers exactly the members those paths use; tests substitute a
+/// recording fake, production passes `GoogleContactsConnector` unchanged.
+protocol GoogleContactsProviding: AnyObject {
+    func fetchAllContacts() async throws -> [GoogleContact]
+    func fetchContact(resourceName: String) async throws -> GoogleContact
+    func createContact(_ contact: GoogleContact) async throws -> GoogleContact
+    func updateContact(_ contact: GoogleContact) async throws -> GoogleContact
+    func deleteContact(resourceName: String) async throws
+    func batchCreateContacts(_ contacts: [GoogleContact]) async throws -> [GoogleContact?]
+    func batchUpdateContacts(_ contacts: [GoogleContact]) async throws -> [String: GoogleContact]
+    func batchDeleteContacts(resourceNames: [String]) async throws
+    func cacheETags(from contacts: [GoogleContact])
+    func knownETag(for resourceName: String) -> String?
+}
+
 /// Connector for Google People API
-class GoogleContactsConnector: ObservableObject {
+class GoogleContactsConnector: ObservableObject, GoogleContactsProviding {
     @Published var isAuthenticated = false
     @Published var currentAccountEmail: String?
     

@@ -112,40 +112,9 @@ final class UnifiedContactTests: XCTestCase {
         XCTAssertTrue(UnifiedContact.make(emails: ["a@b.com"]).hasSyncableContent)
     }
 
-    func test_phoneNumber_stored() {
-        let c = UnifiedContact.make(phones: ["+1 555 0101"])
-        XCTAssertEqual(c.phoneNumbers.first?.value, "+1 555 0101")
-        XCTAssertEqual(c.phoneNumbers.first?.label, "mobile")
-    }
-
-    func test_emailAddress_stored() {
-        let c = UnifiedContact.make(emails: ["a@b.com"])
-        XCTAssertEqual(c.emailAddresses.first?.value, "a@b.com")
-    }
-
-    func test_defaultCollections_empty() {
-        let c = UnifiedContact(id: UUID())
-        XCTAssertTrue(c.phoneNumbers.isEmpty)
-        XCTAssertTrue(c.emailAddresses.isEmpty)
-        XCTAssertTrue(c.postalAddresses.isEmpty)
-    }
-
-    func test_identifiable_byID() {
-        let id = UUID()
-        let c1 = UnifiedContact.make(id: id, givenName: "A")
-        let c2 = UnifiedContact.make(id: id, givenName: "B")
-        XCTAssertEqual(c1.id, c2.id)
-    }
-
-    func test_organizationName_stored() {
-        let c = UnifiedContact.make(organizationName: "Acme Corp")
-        XCTAssertEqual(c.organizationName, "Acme Corp")
-    }
-
-    func test_multiplePhones_allStored() {
-        let c = UnifiedContact.make(phones: ["111", "222", "333"])
-        XCTAssertEqual(c.phoneNumbers.count, 3)
-    }
+    // Issue #128: the construct-and-read tests that used to live here
+    // (test_phoneNumber_stored and friends) asserted memberwise semantics the
+    // compiler already guarantees, and were deleted rather than kept as padding.
 }
 
 // MARK: ─────────────────────────────────────────────────────────
@@ -184,11 +153,14 @@ final class ContactNormalizerTests: XCTestCase {
         XCTAssertEqual(result, "")
     }
 
+    /// Issue #131: the exact normalized output, not an OR over literals that
+    /// accepted both stripped and unstripped results.
     func test_normalizePhone_stripsFormatting() {
-        let result = ContactNormalizer.normalizePhone("(555) 123-4567")
-        // Should contain digits
-        XCTAssertFalse(result.isEmpty)
-        XCTAssertTrue(result.contains("5551234567") || result.contains("555-123-4567") || result.contains("5551234567"))
+        XCTAssertEqual(ContactNormalizer.normalizePhone("(555) 123-4567"), "5551234567")
+        XCTAssertEqual(ContactNormalizer.normalizePhone("+1 (555) 123-4567"), "+15551234567",
+                       "a leading + survives; every other non-digit is stripped")
+        XCTAssertEqual(ContactNormalizer.normalizePhone("ext."), "",
+                       "no digits means no key — not a stray '+' or punctuation")
     }
 
     func test_normalizePhone_nil() {
@@ -223,49 +195,10 @@ final class ContactNormalizerTests: XCTestCase {
 
 final class SyncEngineModelTests: XCTestCase {
 
-    func test_syncAction_allCases() {
-        let cases = SyncAction.allCases
-        XCTAssertTrue(cases.contains(.add))
-        XCTAssertTrue(cases.contains(.update))
-        XCTAssertTrue(cases.contains(.delete))
-        XCTAssertTrue(cases.contains(.merge))
-        XCTAssertTrue(cases.contains(.skip))
-    }
-
-    func test_syncDirection_cases() {
-        let directions: [SyncDirection] = [.twoWay, .googleToMac, .macToGoogle]
-        XCTAssertEqual(directions.count, 3)
-    }
-
-    func test_syncMode_cases() {
-        let modes: [SyncMode] = [.manual, .automatic]
-        XCTAssertEqual(modes.count, 2)
-    }
-
-    func test_contactChange_properties() {
-        let change = ContactChange(
-            contactName: "John Smith",
-            action: .add,
-            direction: .googleToMac,
-            changes: ["Added phone: 555-1234"]
-        )
-        XCTAssertEqual(change.contactName, "John Smith")
-        XCTAssertEqual(change.action, .add)
-        XCTAssertEqual(change.direction, .googleToMac)
-        XCTAssertEqual(change.changes.count, 1)
-        XCTAssertNil(change.userOverride)
-    }
-
-    func test_contactChange_userOverride() {
-        var change = ContactChange(
-            contactName: "Jane",
-            action: .delete,
-            direction: .twoWay,
-            changes: []
-        )
-        change.userOverride = .skip
-        XCTAssertEqual(change.userOverride, .skip)
-    }
+    // Issues #128/#129: the construct-and-read tests (contactChange
+    // properties, session/error IDs) and the self-asserting case-count tests
+    // (test_syncDirection_cases / test_syncMode_cases, which measured a
+    // literal array's own length) were deleted — they could never fail.
 
     func test_syncResult_duration() {
         let start = Date()
@@ -300,29 +233,35 @@ final class SyncEngineModelTests: XCTestCase {
         XCTAssertFalse(result.successful)
     }
 
-    func test_syncResult_summary_containsCounts() {
+    /// Issue #132: the full formatted line, not `contains("3")` — which
+    /// passed for any 3 anywhere in any count.
+    func test_syncResult_summary_isTheFullFormattedLine() {
         let result = SyncResult(
             mode: .manual, direction: .twoWay,
             startTime: Date(), endTime: Date(),
             added: 3, updated: 2, deleted: 1, merged: 0, skipped: 0,
             errors: []
         )
-        XCTAssertTrue(result.summary.contains("3"))
-        XCTAssertTrue(result.summary.contains("2"))
+        XCTAssertEqual(result.summary,
+                       "Added: 3, Updated: 2, Deleted: 1, Merged: 0, Skipped: 0")
     }
 
-    func test_syncSession_hasID() {
-        let session = SyncSession(
+    func test_syncResult_summary_appendsFailureAndHoldBackLines() {
+        let err = SyncError(contactName: "Bob", message: "boom", timestamp: Date())
+        let result = SyncResult(
             mode: .manual, direction: .twoWay,
-            startTime: Date(), contactChanges: []
+            startTime: Date(), endTime: Date(),
+            added: 0, updated: 0, deleted: 0, merged: 0, skipped: 3,
+            errors: [err],
+            deferredDeletions: 1, deferredMerges: 2, setAside: 1
         )
-        XCTAssertNotNil(session.id)
-    }
-
-    func test_syncError_hasID() {
-        let e1 = SyncError(contactName: "Alice", message: "Test", timestamp: Date())
-        let e2 = SyncError(contactName: "Alice", message: "Test", timestamp: Date())
-        XCTAssertNotEqual(e1.id, e2.id, "Each SyncError should have a unique ID")
+        XCTAssertEqual(result.summary, """
+            Added: 0, Updated: 0, Deleted: 0, Merged: 0, Skipped: 3
+            Failed: 1
+            Set aside after repeated failures: 1
+            Held back for review: 1 deletion
+            Held back for review: 2 unconfirmed merges
+            """)
     }
 }
 
@@ -338,10 +277,11 @@ final class ContactMappingStoreTests: XCTestCase {
         store = ContactMappingStore.testStore()
     }
 
+    /// Issue #108: the store is a fresh temp file, so empty *is* the
+    /// contract — not "NotNil" on a non-optional return.
     func test_getAllMappings_initiallyEmpty() {
-        let all = store.getAllMappings()
-        // Fresh store — may be empty or have persisted data
-        XCTAssertNotNil(all)
+        XCTAssertTrue(store.getAllMappings().isEmpty,
+                      "a store over a fresh temp file must start with no mappings")
     }
 
     func test_saveAndRetrieveMapping_byGoogleID() {
@@ -381,29 +321,8 @@ final class ContactMappingStoreTests: XCTestCase {
         XCTAssertNil(found, "Deleted mapping should not be retrievable")
     }
 
-    func test_contactMapping_properties() {
-        let date = Date()
-        let m = ContactMapping(
-            googleResourceName: "people/prop",
-            macContactIdentifier: "mac-prop",
-            lastSyncedAt: date
-        )
-        XCTAssertEqual(m.googleResourceName, "people/prop")
-        XCTAssertEqual(m.macContactIdentifier, "mac-prop")
-        XCTAssertEqual(m.lastSyncedAt.timeIntervalSince1970,
-                       date.timeIntervalSince1970, accuracy: 0.01)
-    }
-
-    func test_contactMapping_optionalEtag() {
-        var m = ContactMapping(
-            googleResourceName: "people/etag",
-            macContactIdentifier: "mac-etag",
-            lastSyncedAt: Date()
-        )
-        XCTAssertNil(m.googleEtag)
-        m.googleEtag = "abc123"
-        XCTAssertEqual(m.googleEtag, "abc123")
-    }
+    // Issue #128: test_contactMapping_properties / test_contactMapping_optionalEtag
+    // (construct-and-read on a plain struct) were deleted.
 }
 
 // MARK: ─────────────────────────────────────────────────────────
@@ -416,40 +335,53 @@ final class ContactMappingStoreTests: XCTestCase {
 // 6. SyncHistory (Event Log)
 // ─────────────────────────────────────────────────────────────
 
-final class SyncHistoryTests: XCTestCase {
+extension SyncHistory {
+    /// A hermetic history over a unique temp file (issue #92) — mirror of
+    /// `ContactMappingStore.testStore()`. Tests must never log to or clear
+    /// `SyncHistory.shared`, whose file lives in the app's real container.
+    static func testHistory(
+        url: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-history-\(UUID().uuidString).json")
+    ) -> SyncHistory {
+        SyncHistory(persistenceURL: url)
+    }
+}
+
+final class SyncHistoryTests: SettingsPinnedTestCase {
+
+    override func setUp() {
+        super.setUp()
+        // `log` prunes with the user-configurable retention window — pin it
+        // so a "0 days" (or tiny) user setting cannot change test behaviour.
+        pin(\.historyRetentionDays, to: 30)
+    }
 
     func test_log_recordsEvent() {
-        let history = SyncHistory.shared
-        history.clear()
+        let history = SyncHistory.testHistory()
         let event = history.log(source: "TestSuite", action: "unit-test", details: "hello")
         XCTAssertEqual(event.source, "TestSuite")
         XCTAssertEqual(event.action, "unit-test")
         XCTAssertEqual(event.details, "hello")
     }
 
-    func test_events_returnsLoggedEvents() {
-        let history = SyncHistory.shared
-        history.clear()
+    func test_events_returnsExactlyTheLoggedEvents() {
+        let history = SyncHistory.testHistory()
         history.log(source: "A", action: "sync.start")
         history.log(source: "B", action: "sync.end")
-        // Allow async writes to settle
-        Thread.sleep(forTimeInterval: 0.1)
-        let events = history.events()
-        XCTAssertGreaterThanOrEqual(events.count, 2)
+        // events() syncs on the same queue as the log barriers — no sleeps.
+        XCTAssertEqual(history.events().map(\.action), ["sync.start", "sync.end"],
+                       "a hermetic instance holds exactly what this test logged")
     }
 
     func test_clear_removesAllEvents() {
-        let history = SyncHistory.shared
+        let history = SyncHistory.testHistory()
         history.log(source: "Test", action: "pre-clear")
-        Thread.sleep(forTimeInterval: 0.1)
         history.clear()
-        Thread.sleep(forTimeInterval: 0.1)
-        let events = history.events()
-        XCTAssertEqual(events.count, 0)
+        XCTAssertEqual(history.events().count, 0)
     }
 
     func test_event_hasUniqueID() {
-        let history = SyncHistory.shared
+        let history = SyncHistory.testHistory()
         let e1 = history.log(source: "X", action: "a")
         let e2 = history.log(source: "X", action: "b")
         XCTAssertNotEqual(e1.id, e2.id)
@@ -457,10 +389,50 @@ final class SyncHistoryTests: XCTestCase {
 
     func test_event_timestampIsRecent() {
         let before = Date()
-        let event  = SyncHistory.shared.log(source: "Timer", action: "now")
+        let event  = SyncHistory.testHistory().log(source: "Timer", action: "now")
         let after  = Date()
         XCTAssertGreaterThanOrEqual(event.timestamp, before)
         XCTAssertLessThanOrEqual(event.timestamp, after)
+    }
+
+    func test_persistence_roundTripsThroughInjectedURL() {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-history-roundtrip-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let history = SyncHistory.testHistory(url: url)
+        history.log(source: "Persist", action: "event", details: "survives")
+        history.flush()
+
+        let reloaded = SyncHistory(persistenceURL: url)
+        XCTAssertEqual(reloaded.events().map(\.action), ["event"],
+                       "a second instance over the same file sees the flushed event")
+        XCTAssertEqual(reloaded.events().first?.details, "survives")
+    }
+
+    func test_clear_writesThroughToDisk() {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-history-clear-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let history = SyncHistory.testHistory(url: url)
+        history.log(source: "Clear", action: "doomed")
+        history.flush()
+        history.clear()
+        // clear() is write-through; events() syncs past its barrier.
+        XCTAssertEqual(history.events().count, 0)
+
+        let reloaded = SyncHistory(persistenceURL: url)
+        XCTAssertTrue(reloaded.events().isEmpty,
+                      "a crash after clear must not resurrect the cleared events")
+    }
+
+    func test_instances_areIsolated() {
+        let a = SyncHistory.testHistory()
+        let b = SyncHistory.testHistory()
+        a.log(source: "A", action: "only-in-a")
+        XCTAssertTrue(b.events().isEmpty,
+                      "separate temp files means separate histories — and neither is the real one")
     }
 
     func test_formatters_contactSummary_bothPresent() {
@@ -484,6 +456,20 @@ final class SyncHistoryTests: XCTestCase {
 // 7. Deduplication Engine
 // ─────────────────────────────────────────────────────────────
 
+extension DeduplicationDecisionStore {
+    /// A hermetic decision store over a unique temp directory (issue #106),
+    /// with pattern-memory logging pointed at a temp-file history — so dedup
+    /// tests neither read the user's real `dedup_decisions.json` nor write
+    /// events into the real sync history.
+    static func testStore(
+        directoryURL: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-dedup-\(UUID().uuidString)", isDirectory: true)
+    ) -> DeduplicationDecisionStore {
+        DeduplicationDecisionStore(directoryURL: directoryURL,
+                                   history: SyncHistory.testHistory())
+    }
+}
+
 final class DeduplicationTests: XCTestCase {
 
     var deduplicator: ContactDeduplicator!
@@ -492,7 +478,7 @@ final class DeduplicationTests: XCTestCase {
         let config = ContactDeduplicator.Configuration()
         deduplicator = ContactDeduplicator(
             config: config,
-            decisionStore: DeduplicationDecisionStore.shared
+            decisionStore: DeduplicationDecisionStore.testStore()
         )
     }
 
@@ -590,32 +576,122 @@ final class DeduplicationTests: XCTestCase {
 }
 
 // MARK: ─────────────────────────────────────────────────────────
+// 7b. DeduplicationDecisionStore (issue #106 — via the directory seam)
+// ─────────────────────────────────────────────────────────────
+
+final class DeduplicationDecisionStoreTests: XCTestCase {
+
+    func test_savePattern_isRetrievable() {
+        let store = DeduplicationDecisionStore.testStore()
+        store.savePattern(pattern: "john smith|john smith", decision: .merge)
+        // getDecision syncs on the store's queue, past the save barrier.
+        XCTAssertEqual(store.getDecision(for: "john smith|john smith"), .merge)
+        XCTAssertNil(store.getDecision(for: "unknown|pattern"))
+    }
+
+    func test_deletePattern_removesOnlyThatPattern() {
+        let store = DeduplicationDecisionStore.testStore()
+        store.savePattern(pattern: "a|b", decision: .keepSeparate)
+        store.savePattern(pattern: "c|d", decision: .skip)
+        store.deletePattern("a|b")
+        XCTAssertNil(store.getDecision(for: "a|b"))
+        XCTAssertEqual(store.getDecision(for: "c|d"), .skip)
+    }
+
+    func test_clearAll_emptiesStore_andStatisticsAgree() {
+        let store = DeduplicationDecisionStore.testStore()
+        store.savePattern(pattern: "a|b", decision: .merge)
+        store.savePattern(pattern: "c|d", decision: .keepSeparate)
+
+        var stats = store.getStatistics()
+        XCTAssertEqual(stats.totalPatterns, 2)
+        XCTAssertEqual(stats.mergePatterns, 1)
+        XCTAssertEqual(stats.keepSeparatePatterns, 1)
+
+        store.clearAll()
+        stats = store.getStatistics()
+        XCTAssertEqual(stats.totalPatterns, 0)
+        XCTAssertTrue(store.getAllPatterns().isEmpty)
+    }
+
+    func test_persistence_roundTripsAcrossInstancesInSameDirectory() {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-dedup-rt-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let first = DeduplicationDecisionStore.testStore(directoryURL: dir)
+        first.savePattern(pattern: "pat lee|pat lee", decision: .merge)
+        // Barrier sync via a read: saveToDisk ran inside the save barrier.
+        XCTAssertEqual(first.getDecision(for: "pat lee|pat lee"), .merge)
+
+        let second = DeduplicationDecisionStore.testStore(directoryURL: dir)
+        XCTAssertEqual(second.getDecision(for: "pat lee|pat lee"), .merge,
+                       "a second instance over the same directory reloads the decision")
+    }
+
+    func test_testStores_areIsolatedFromEachOther() {
+        let a = DeduplicationDecisionStore.testStore()
+        let b = DeduplicationDecisionStore.testStore()
+        a.savePattern(pattern: "only|in-a", decision: .merge)
+        XCTAssertEqual(a.getDecision(for: "only|in-a"), .merge)
+        XCTAssertNil(b.getDecision(for: "only|in-a"),
+                     "separate temp directories — and neither is the user's real store")
+    }
+}
+
+// MARK: ─────────────────────────────────────────────────────────
 // 8. AppSettings
 // ─────────────────────────────────────────────────────────────
 
-final class AppSettingsTests: XCTestCase {
+/// Issue #130: the previous five tests asserted non-optionals and no-throw on
+/// non-throwing reads — no-ops, one of them reading the user's live defaults.
+///
+/// `AppSettings` hard-codes `UserDefaults.standard`, and AppSettings.swift is
+/// not open for a suite-scoping seam in this change — so these are genuine
+/// round-trip tests through the singleton's `didSet` persistence instead,
+/// with every touched key pinned and restored by `SettingsPinnedTestCase` so
+/// the user's real values survive the run.
+final class AppSettingsTests: SettingsPinnedTestCase {
 
-    func test_shared_isNotNil() {
-        XCTAssertNotNil(AppSettings.shared)
+    func test_boolSetting_roundTripsThroughDefaults() {
+        pin(\.syncPhotos, to: true)
+        AppSettings.shared.syncPhotos = false
+        XCTAssertEqual(UserDefaults.standard.object(forKey: "syncPhotos") as? Bool, false,
+                       "didSet must persist the new value under its key")
+        XCTAssertFalse(AppSettings.shared.syncPhotos)
+        AppSettings.shared.syncPhotos = true
+        XCTAssertEqual(UserDefaults.standard.object(forKey: "syncPhotos") as? Bool, true)
     }
 
-    func test_selectedSyncType_defaultsToKnownValue() {
-        let settings = AppSettings.shared
-        let validTypes: [SyncType] = SyncType.allCases
-        XCTAssertTrue(validTypes.contains(settings.selectedSyncType))
+    func test_autoSyncInterval_roundTripsThroughDefaults() {
+        pin(\.autoSyncInterval, to: 14400)
+        AppSettings.shared.autoSyncInterval = 3600
+        XCTAssertEqual(UserDefaults.standard.object(forKey: "autoSyncInterval") as? TimeInterval,
+                       3600)
+        XCTAssertEqual(AppSettings.shared.autoSyncInterval, 3600)
     }
 
-    func test_autoSyncInterval_isPositive() {
-        XCTAssertGreaterThan(AppSettings.shared.autoSyncInterval, 0)
+    func test_historyRetentionDays_roundTripsThroughDefaults() {
+        pin(\.historyRetentionDays, to: 30)
+        AppSettings.shared.historyRetentionDays = 7
+        XCTAssertEqual(UserDefaults.standard.object(forKey: "historyRetentionDays") as? Int, 7)
+        XCTAssertEqual(SyncHistory.retentionDays(), 7,
+                       "SyncHistory reads the same key the setting writes — the two must agree")
     }
 
-    func test_syncPhotos_isBool() {
-        let _ = AppSettings.shared.syncPhotos // Should not crash
-        XCTAssertNoThrow({ let _ = AppSettings.shared.syncPhotos }())
+    func test_conflictResolution_roundTripsAsRawValue() {
+        pin(\.defaultConflictResolution, to: .alwaysAsk)
+        AppSettings.shared.defaultConflictResolution = .preferMac
+        XCTAssertEqual(UserDefaults.standard.string(forKey: "defaultConflictResolution"),
+                       ConflictResolutionDefault.preferMac.rawValue)
+        XCTAssertEqual(AppSettings.shared.defaultConflictResolution, .preferMac)
     }
 
-    func test_hasCompletedOnboarding_isBool() {
-        XCTAssertNoThrow({ let _ = AppSettings.shared.hasCompletedOnboarding }())
+    func test_syncDeletedContacts_roundTripsThroughDefaults() {
+        pin(\.syncDeletedContacts, to: false)
+        AppSettings.shared.syncDeletedContacts = true
+        XCTAssertEqual(UserDefaults.standard.object(forKey: "syncDeletedContacts") as? Bool, true)
+        XCTAssertTrue(AppSettings.shared.syncDeletedContacts)
     }
 }
 
@@ -623,7 +699,7 @@ final class AppSettingsTests: XCTestCase {
 // 9. Performance & Safety Gates
 // ─────────────────────────────────────────────────────────────
 
-final class PerformanceTests: XCTestCase {
+final class PerformanceTests: SettingsPinnedTestCase {
 
     func test_buildLookupMap_1000Contacts_under1Second() {
         let contacts = (0..<1000).map { i in
@@ -658,16 +734,24 @@ final class PerformanceTests: XCTestCase {
         XCTAssertEqual(p.percentage, 1.0, accuracy: 0.001)
     }
 
+    /// Issue #92: against a hermetic temp-file history, never `shared` —
+    /// the old version cleared the user's real diagnostic ledger to run.
     func test_syncHistory_maxEvents_doesNotGrowUnbounded() {
-        let history = SyncHistory.shared
-        history.clear()
-        // Log 50 events rapidly
-        for i in 0..<50 {
+        pin(\.historyRetentionDays, to: 30)
+        let history = SyncHistory.testHistory()
+        // Log past the 1000-event cap; the prune on each append must hold
+        // the line rather than letting the ledger grow without bound.
+        for i in 0..<1005 {
             history.log(source: "Perf", action: "event-\(i)")
         }
-        Thread.sleep(forTimeInterval: 0.2)
-        let count = history.events().count
-        XCTAssertLessThanOrEqual(count, 1000, "History should respect max events limit")
+        let survivors = history.events()
+        XCTAssertEqual(survivors.count, 1000,
+                       "the cap keeps exactly the most recent 1000 events")
+        // Set comparison, not positional: rapid logging can produce equal
+        // timestamps, and events() sorts by timestamp.
+        XCTAssertEqual(Set(survivors.map(\.action)),
+                       Set((5..<1005).map { "event-\($0)" }),
+                       "the oldest five events are the ones pruned")
     }
 }
 
@@ -682,7 +766,7 @@ final class ContactDeduplicatorScoreTests: XCTestCase {
     override func setUp() {
         super.setUp()
         deduplicator = ContactDeduplicator(config: ContactDeduplicator.Configuration(),
-                                           decisionStore: DeduplicationDecisionStore.shared)
+                                           decisionStore: DeduplicationDecisionStore.testStore())
     }
 
     /// The signed sum of every rule contribution — what `totalScore` clamps.
@@ -1017,30 +1101,30 @@ final class BackupSnapshotRoundTripTests: XCTestCase {
 // 13. SyncFailureStore (AUDIT §3, row 6)
 // ─────────────────────────────────────────────────────────────
 
+extension SyncFailureStore {
+    /// A hermetic store over a unique temp file (issue #105) — tests never
+    /// touch the user's real `sync_failures.json`, so a crash mid-test can no
+    /// longer leave `test:` entries visible in the app's Sync Failures UI.
+    static func testStore(
+        fileURL: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-failures-\(UUID().uuidString).json")
+    ) -> SyncFailureStore {
+        SyncFailureStore(fileURL: fileURL)
+    }
+}
+
 final class SyncFailureStoreTests: XCTestCase {
 
-    /// The store is a singleton persisting to the app container, so every test
-    /// uses unique keys and removes them again — pre-existing entries (and the
-    /// user's real data) are left untouched.
-    private var usedKeys: [String] = []
+    /// Fresh temp-file store per test — no shared singleton, no cleanup debt.
+    private var store: SyncFailureStore!
 
-    private func uniqueKey() -> String {
-        let key = "test:" + UUID().uuidString
-        usedKeys.append(key)
-        return key
-    }
-
-    override func tearDown() {
-        for key in usedKeys {
-            SyncFailureStore.shared.clearFailure(key: key)
-        }
-        usedKeys = []
-        super.tearDown()
+    override func setUp() {
+        super.setUp()
+        store = SyncFailureStore.testStore()
     }
 
     func test_threeStrikes_skipStartsOnFourthAttempt() {
-        let store = SyncFailureStore.shared
-        let key = uniqueKey()
+        let key = "strikes-1"
 
         XCTAssertFalse(store.shouldSkip(key: key), "an unknown contact is never skipped")
 
@@ -1056,8 +1140,7 @@ final class SyncFailureStoreTests: XCTestCase {
     }
 
     func test_clearFailure_forgetsHistory() {
-        let store = SyncFailureStore.shared
-        let key = uniqueKey()
+        let key = "recovers-1"
         for _ in 0..<3 { store.recordFailure(key: key, name: "Recovers", reason: "x") }
         XCTAssertTrue(store.shouldSkip(key: key))
 
@@ -1069,8 +1152,7 @@ final class SyncFailureStoreTests: XCTestCase {
     }
 
     func test_ignore_skipsRegardlessOfCount() {
-        let store = SyncFailureStore.shared
-        let key = uniqueKey()
+        let key = "ignored-1"
         store.recordFailure(key: key, name: "Ignored", reason: "x")
         XCTAssertFalse(store.shouldSkip(key: key))
 
@@ -1080,11 +1162,41 @@ final class SyncFailureStoreTests: XCTestCase {
     }
 
     func test_retry_isClear() {
-        let store = SyncFailureStore.shared
-        let key = uniqueKey()
+        let key = "retry-1"
         for _ in 0..<3 { store.recordFailure(key: key, name: "Retry", reason: "x") }
         store.retry(key: key)
         XCTAssertFalse(store.shouldSkip(key: key))
+    }
+
+    func test_clearAll_removesEverything() {
+        store.recordFailure(key: "a", name: "A", reason: "x")
+        store.recordFailure(key: "b", name: "B", reason: "y")
+        store.ignore(key: "b")
+        store.clearAll()
+        XCTAssertTrue(store.allFailures().isEmpty)
+        XCTAssertFalse(store.shouldSkip(key: "b"),
+                       "clearing everything also forgets ignores")
+    }
+
+    func test_persistence_roundTripsThroughInjectedFileURL() {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-failures-roundtrip-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let first = SyncFailureStore.testStore(fileURL: url)
+        first.recordFailure(key: "mac:persist-1", name: "Persisted", reason: "134092")
+        first.recordFailure(key: "mac:persist-1", name: "Persisted", reason: "134092")
+        first.recordFailure(key: "mac:persist-2-ignored", name: "Quiet", reason: "x")
+        first.ignore(key: "mac:persist-2-ignored")
+
+        // recordFailure/ignore save synchronously under the barrier, so a
+        // second instance over the same file must see the same ledger.
+        let second = SyncFailureStore.testStore(fileURL: url)
+        let reloaded = second.allFailures().first { $0.id == "mac:persist-1" }
+        XCTAssertEqual(reloaded?.failureCount, 2)
+        XCTAssertEqual(reloaded?.contactName, "Persisted")
+        XCTAssertTrue(second.shouldSkip(key: "mac:persist-2-ignored"),
+                      "the ignore flag survives a relaunch")
     }
 
     func test_syncFailure_codableRoundTrip() throws {

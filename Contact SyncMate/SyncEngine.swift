@@ -38,17 +38,20 @@ private nonisolated func cnLabelFromString(_ label: String?) -> String? {
 
 /// Core sync engine that orchestrates the sync process
 class SyncEngine: ObservableObject {
-    let googleConnector: GoogleContactsConnector
-    let macConnector: MacContactsConnector
+    // Protocol types, not the concrete connectors (issue #94): the seam is
+    // what lets integration tests drive executeSync/applyGoogleBatches with
+    // recording fakes. Production call sites still pass the concrete classes.
+    let googleConnector: any GoogleContactsProviding
+    let macConnector: any MacContactsProviding
     let mappingStore: ContactMappingStore
     let settings = AppSettings.shared
-    
+
     @Published var isRunning = false
     @Published var progress: SyncProgress?
     @Published var lastError: Error?
-    
-    init(googleConnector: GoogleContactsConnector,
-         macConnector: MacContactsConnector,
+
+    init(googleConnector: any GoogleContactsProviding,
+         macConnector: any MacContactsProviding,
          mappingStore: ContactMappingStore) {
         self.googleConnector = googleConnector
         self.macConnector = macConnector

@@ -38,39 +38,15 @@ extension UnifiedContact {
     }
 }
 
-final class SyncEngineDiffTests: XCTestCase {
+final class SyncEngineDiffTests: SettingsPinnedTestCase {
 
     // Diff behaviour depends on user-configurable settings, and unit tests
-    // share the app's UserDefaults domain. Pin every setting the diff logic
-    // reads so tests stay hermetic regardless of what the user changed in
-    // the running app.
-    private var savedConflict: ConflictResolutionDefault!
-    private var savedForceUpdate: Bool!
-    private var savedPostalCodes: Bool!
-    private var savedFilterByGroups: Bool!
-
+    // share the app's UserDefaults domain (issue #107): the shared pinner
+    // pins every setting computeChanges reads — including syncDeletedContacts,
+    // which this class used to leave floating.
     override func setUp() {
         super.setUp()
-        let s = AppSettings.shared
-        savedConflict       = s.defaultConflictResolution
-        savedForceUpdate    = s.forceUpdateAll
-        savedPostalCodes    = s.syncPostalCountryCodes
-        savedFilterByGroups = s.filterByGroups
-        // `mergeContacts2Way` was pinned here too. It is now the `.mergeBoth`
-        // case of defaultConflictResolution, which this already pins.
-        s.defaultConflictResolution = .alwaysAsk
-        s.forceUpdateAll = false
-        s.syncPostalCountryCodes = true
-        s.filterByGroups = false
-    }
-
-    override func tearDown() {
-        let s = AppSettings.shared
-        s.defaultConflictResolution = savedConflict
-        s.forceUpdateAll = savedForceUpdate
-        s.syncPostalCountryCodes = savedPostalCodes
-        s.filterByGroups = savedFilterByGroups
-        super.tearDown()
+        pinDiffDefaults()
     }
 
     private func makeEngine() -> SyncEngine {
@@ -93,7 +69,7 @@ final class SyncEngineDiffTests: XCTestCase {
         store.saveMapping(ContactMapping(
             googleResourceName: gID, macContactIdentifier: mID,
             lastSyncedAt: Date(timeIntervalSince1970: 0)))
-        Thread.sleep(forTimeInterval: 0.05)
+        store.flush()
 
         var google = UnifiedContact.diffMake(givenName: "Pat", googleResourceName: gID)
         google.lastModified = Date()
@@ -121,7 +97,7 @@ final class SyncEngineDiffTests: XCTestCase {
         store.saveMapping(ContactMapping(
             googleResourceName: gID, macContactIdentifier: mID,
             lastSyncedAt: Date(timeIntervalSince1970: 0)))
-        Thread.sleep(forTimeInterval: 0.05)
+        store.flush()
 
         var google = UnifiedContact.diffMake(givenName: "Pat", googleResourceName: gID)
         google.photoData = Data([0x01, 0x02])
@@ -152,7 +128,9 @@ final class SyncEngineDiffTests: XCTestCase {
         store.saveMapping(ContactMapping(
             googleResourceName: gID, macContactIdentifier: mID,
             lastSyncedAt: Date(timeIntervalSince1970: 0)))
-        Thread.sleep(forTimeInterval: 0.05)
+        // Issue #110: wait for the disk write deterministically instead of
+        // sleeping a guessed interval.
+        store.flush()
         return store
     }
 
@@ -321,6 +299,11 @@ final class SyncEngineDiffTests: XCTestCase {
         let adds = changes.filter { $0.action == .add }
         XCTAssertEqual(adds.count, 2, "Two new Google contacts → 2 adds")
         XCTAssertTrue(adds.allSatisfy { $0.direction == .googleToMac })
+        // Issue #109: *which* contacts, not just how many.
+        XCTAssertEqual(Set(adds.map(\.contactName)), ["Alice", "Bob"])
+        XCTAssertEqual(Set(adds.compactMap { $0.sourceContact?.googleResourceName }),
+                       ["people/a", "people/b"],
+                       "each add carries the Google record it will copy from")
     }
 
     func test_googleToMac_alreadyMapped_noAdd() {
@@ -330,7 +313,7 @@ final class SyncEngineDiffTests: XCTestCase {
         store.saveMapping(ContactMapping(
             googleResourceName: gID, macContactIdentifier: mID, lastSyncedAt: Date()))
         // Allow async barrier write to flush
-        Thread.sleep(forTimeInterval: 0.05)
+        store.flush()
 
         let google = [UnifiedContact.diffMake(givenName: "Mapped", googleResourceName: gID)]
         let mac    = [UnifiedContact.diffMake(givenName: "Mapped", macContactIdentifier: mID)]
@@ -353,7 +336,7 @@ final class SyncEngineDiffTests: XCTestCase {
         let store = ContactMappingStore.testStore()
         store.saveMapping(ContactMapping(
             googleResourceName: gID, macContactIdentifier: mID, lastSyncedAt: past))
-        Thread.sleep(forTimeInterval: 0.05)
+        store.flush()
 
         // Google contact updated after last sync
         var gContact = UnifiedContact.diffMake(givenName: "Updated", googleResourceName: gID)
@@ -371,6 +354,10 @@ final class SyncEngineDiffTests: XCTestCase {
         let updates = changes.filter { $0.action == .update }
         XCTAssertGreaterThanOrEqual(updates.count, 1, "Changed contact should produce update")
         XCTAssertEqual(updates.first?.direction, .googleToMac)
+        // Issue #109: the update targets the mapped Mac twin, reads from the
+        // changed Google record — not merely "some update happened".
+        XCTAssertEqual(updates.first?.sourceContact?.googleResourceName, gID)
+        XCTAssertEqual(updates.first?.targetContact?.macContactIdentifier, mID)
     }
 
     // MARK: - 1-Way: Mac → Google
@@ -385,6 +372,10 @@ final class SyncEngineDiffTests: XCTestCase {
         let adds = changes.filter { $0.action == .add }
         XCTAssertEqual(adds.count, 2)
         XCTAssertTrue(adds.allSatisfy { $0.direction == .macToGoogle })
+        // Issue #109: which contacts were scheduled.
+        XCTAssertEqual(Set(adds.map(\.contactName)), ["Carol", "Dave"])
+        XCTAssertEqual(Set(adds.compactMap { $0.sourceContact?.macContactIdentifier }),
+                       ["mac/c", "mac/d"])
     }
 
     // MARK: - 2-Way
@@ -398,6 +389,11 @@ final class SyncEngineDiffTests: XCTestCase {
         let macToGoogle = changes.filter { $0.action == .add && $0.direction == .macToGoogle }
         XCTAssertEqual(googleToMac.count, 1)
         XCTAssertEqual(macToGoogle.count, 1)
+        // Issue #109: each add travels away from the side that has it.
+        XCTAssertEqual(googleToMac.first?.contactName, "GoogleOnly")
+        XCTAssertEqual(googleToMac.first?.sourceContact?.googleResourceName, "people/go")
+        XCTAssertEqual(macToGoogle.first?.contactName, "MacOnly")
+        XCTAssertEqual(macToGoogle.first?.sourceContact?.macContactIdentifier, "mac/mo")
     }
 
     func test_twoWay_conflict_markedAsMerge() {
@@ -409,7 +405,7 @@ final class SyncEngineDiffTests: XCTestCase {
         let store = ContactMappingStore.testStore()
         store.saveMapping(ContactMapping(
             googleResourceName: gID, macContactIdentifier: mID, lastSyncedAt: past))
-        Thread.sleep(forTimeInterval: 0.05)
+        store.flush()
 
         // Both changed after last sync
         var g = UnifiedContact.diffMake(givenName: "GoogleVersion", googleResourceName: gID)
@@ -443,6 +439,54 @@ final class SyncEngineDiffTests: XCTestCase {
         let merges = changes.filter { $0.action == .merge }
         XCTAssertEqual(adds.count, 0,   "Fuzzy-matched contacts should not produce two adds")
         XCTAssertEqual(merges.count, 1, "Fuzzy-matched contacts should produce one merge suggestion")
+        // Issue #109: the merge pairs exactly these two records.
+        let merge = merges.first
+        let pairedIDs = [merge?.sourceContact, merge?.targetContact].compactMap {
+            $0?.googleResourceName ?? $0?.macContactIdentifier
+        }
+        XCTAssertEqual(Set(pairedIDs), ["people/fz", "mac/fz"],
+                       "the suggestion must name the matched pair, not two arbitrary records")
+    }
+
+    /// Issue #109's core complaint, directly: with two fuzzy candidates on
+    /// each side, a matcher pairing Alice with Bob would still have passed
+    /// the count-only assertions. Pin who pairs with whom.
+    func test_twoWay_fuzzyMatch_pairsTheRightPeople() {
+        var gAlice = UnifiedContact.diffMake(givenName: "Alice", familyName: "Ng",
+                                             googleResourceName: "people/alice")
+        gAlice.emailAddresses = [.init(value: "alice@test.com", label: "work")]
+        var gBob = UnifiedContact.diffMake(givenName: "Bob", familyName: "Ng",
+                                           googleResourceName: "people/bob")
+        gBob.emailAddresses = [.init(value: "bob@test.com", label: "work")]
+
+        var mAlice = UnifiedContact.diffMake(givenName: "Alice", familyName: "Ng",
+                                             macContactIdentifier: "mac/alice")
+        mAlice.emailAddresses = [.init(value: "alice@test.com", label: "home")]
+        var mBob = UnifiedContact.diffMake(givenName: "Bob", familyName: "Ng",
+                                           macContactIdentifier: "mac/bob")
+        mBob.emailAddresses = [.init(value: "bob@test.com", label: "home")]
+
+        let changes = makeEngine().computeChanges(
+            googleContacts: [gAlice, gBob], macContacts: [mAlice, mBob],
+            direction: .twoWay)
+
+        let merges = changes.filter { $0.action == .merge }
+        XCTAssertEqual(merges.count, 2)
+        XCTAssertTrue(changes.allSatisfy { $0.action != .add },
+                      "everyone matched — nothing should be re-added")
+
+        func pairedMacID(forGoogleID gID: String) -> String? {
+            let merge = merges.first {
+                $0.sourceContact?.googleResourceName == gID
+                    || $0.targetContact?.googleResourceName == gID
+            }
+            return merge?.sourceContact?.macContactIdentifier
+                ?? merge?.targetContact?.macContactIdentifier
+        }
+        XCTAssertEqual(pairedMacID(forGoogleID: "people/alice"), "mac/alice",
+                       "Alice pairs with Alice")
+        XCTAssertEqual(pairedMacID(forGoogleID: "people/bob"), "mac/bob",
+                       "Bob pairs with Bob — not with Alice")
     }
 
     // MARK: - ContactMapper round-trips
@@ -509,37 +553,13 @@ final class SyncEngineDiffTests: XCTestCase {
 /// One test per `defaultConflictResolution` mode, for both conflict branches:
 /// "both timestamps moved" and "neither timestamp moved" (unknown-vs-unknown,
 /// the CNContact-has-no-modification-date case).
-final class ConflictAutoResolutionTests: XCTestCase {
-
-    private var savedConflict: ConflictResolutionDefault!
-    private var savedForceUpdate: Bool!
-    private var savedPostalCodes: Bool!
-    private var savedFilterByGroups: Bool!
-    private var savedSyncDeleted: Bool!
+final class ConflictAutoResolutionTests: SettingsPinnedTestCase {
 
     override func setUp() {
         super.setUp()
-        let s = AppSettings.shared
-        savedConflict       = s.defaultConflictResolution
-        savedForceUpdate    = s.forceUpdateAll
-        savedPostalCodes    = s.syncPostalCountryCodes
-        savedFilterByGroups = s.filterByGroups
-        savedSyncDeleted    = s.syncDeletedContacts
-        s.defaultConflictResolution = .alwaysAsk
-        s.forceUpdateAll = false
-        s.syncPostalCountryCodes = true
-        s.filterByGroups = false
-        s.syncDeletedContacts = false
-    }
-
-    override func tearDown() {
-        let s = AppSettings.shared
-        s.defaultConflictResolution = savedConflict
-        s.forceUpdateAll = savedForceUpdate
-        s.syncPostalCountryCodes = savedPostalCodes
-        s.filterByGroups = savedFilterByGroups
-        s.syncDeletedContacts = savedSyncDeleted
-        super.tearDown()
+        // Issue #107: the shared pinner covers everything this class used to
+        // pin by hand — including syncDeletedContacts.
+        pinDiffDefaults()
     }
 
     /// A mapped pair whose given names differ, with the given modification
@@ -554,7 +574,7 @@ final class ConflictAutoResolutionTests: XCTestCase {
         let store = ContactMappingStore.testStore()
         store.saveMapping(ContactMapping(
             googleResourceName: gID, macContactIdentifier: mID, lastSyncedAt: lastSynced))
-        Thread.sleep(forTimeInterval: 0.05)
+        store.flush()
 
         var g = UnifiedContact.diffMake(givenName: "GoogleName", googleResourceName: gID)
         g.lastModified = googleModified
@@ -755,19 +775,11 @@ final class SyncEngineMergeHelperTests: XCTestCase {
 
 // MARK: - Failure key + deletion hold-back (AUDIT §3 rows 6-7; D-01)
 
-final class SyncFailureKeyTests: XCTestCase {
-
-    private var savedConfirmDeletions: Bool!
+final class SyncFailureKeyTests: SettingsPinnedTestCase {
 
     override func setUp() {
         super.setUp()
-        savedConfirmDeletions = AppSettings.shared.confirmPendingDeletions
-        AppSettings.shared.confirmPendingDeletions = true
-    }
-
-    override func tearDown() {
-        AppSettings.shared.confirmPendingDeletions = savedConfirmDeletions
-        super.tearDown()
+        pin(\.confirmPendingDeletions, to: true)
     }
 
     private func change(action: SyncAction = .update,
@@ -1065,39 +1077,16 @@ final class GoogleErrorMessageTests: XCTestCase {
 // MARK: - Group filter vs deletion, both-deleted cleanup, 1-way target-gone
 // (issues #87, #124, #101)
 
-final class GroupFilterAndTargetGoneTests: XCTestCase {
-
-    private var savedConflict: ConflictResolutionDefault!
-    private var savedForceUpdate: Bool!
-    private var savedFilterByGroups: Bool!
-    private var savedSyncDeleted: Bool!
-    private var savedMerge1Way: Bool!
+final class GroupFilterAndTargetGoneTests: SettingsPinnedTestCase {
 
     override func setUp() {
         super.setUp()
-        let s = AppSettings.shared
-        savedConflict       = s.defaultConflictResolution
-        savedForceUpdate    = s.forceUpdateAll
-        savedFilterByGroups = s.filterByGroups
-        savedSyncDeleted    = s.syncDeletedContacts
-        savedMerge1Way      = s.mergeContacts1Way
-        s.defaultConflictResolution = .alwaysAsk
-        s.forceUpdateAll = false
-        s.filterByGroups = false
-        // Pinned *on*: these tests prove that filtered-out contacts are not
-        // deleted even when deletion sync is active.
-        s.syncDeletedContacts = true
-        s.mergeContacts1Way = false
-    }
-
-    override func tearDown() {
-        let s = AppSettings.shared
-        s.defaultConflictResolution = savedConflict
-        s.forceUpdateAll = savedForceUpdate
-        s.filterByGroups = savedFilterByGroups
-        s.syncDeletedContacts = savedSyncDeleted
-        s.mergeContacts1Way = savedMerge1Way
-        super.tearDown()
+        pinDiffDefaults()
+        // Pinned *on*, overriding the default pin: these tests prove that
+        // filtered-out contacts are not deleted even when deletion sync is
+        // active. The pinner unwinds pins in reverse, so both restore cleanly.
+        pin(\.syncDeletedContacts, to: true)
+        pin(\.mergeContacts1Way, to: false)
     }
 
     private func engineWithMapping(gID: String, mID: String)

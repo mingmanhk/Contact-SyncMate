@@ -56,7 +56,13 @@ public final class SyncHistory: @unchecked Sendable {
         queue.sync { _persistenceDegraded }
     }
 
-    private init() {
+    /// `persistenceURL` exists for tests (issue #92): the shared instance
+    /// persists into the app container, and hosted tests share that container —
+    /// so tests running against `shared` write through to the user's real
+    /// history file. Mirrors `ContactMappingStore.init(persistenceURL:)`.
+    /// Production always uses `shared` with the default path.
+    init(persistenceURL: URL? = nil) {
+        self.customFileURL = persistenceURL
         loadFromDisk()
         // Apply the retention window on startup so stale events from a
         // previous run are pruned even if the user never logs a new event.
@@ -219,7 +225,11 @@ public final class SyncHistory: @unchecked Sendable {
         NSClassFromString("XCTestCase") != nil
     }
 
+    /// Set only by the test seam; `nil` means the default container path.
+    nonisolated private let customFileURL: URL?
+
     nonisolated private var historyFileURL: URL {
+        if let customFileURL { return customFileURL }
         let name = Self.isRunningTests ? "sync_history.tests.json" : "sync_history.json"
         return appSupportURL().appendingPathComponent(name)
     }

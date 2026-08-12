@@ -23,10 +23,14 @@ class DeduplicationDecisionStore: ObservableObject {
         category: "persistence")
     
     private let fileURL: URL
+    /// Where pattern-memory events are logged. `.shared` in production; tests
+    /// point it at a temp-file history so dedup runs never write the user's
+    /// real ledger (issue #106).
+    private let history: SyncHistory
 @Published private(set) var lastUpdated: Date = Date()
     private var patterns: [String: DuplicatePattern] = [:]
     private let queue = DispatchQueue(label: "DeduplicationDecisionStore.queue", attributes: .concurrent)
-    
+
     private init() {
         // Set up storage location
         let fm = FileManager.default
@@ -36,17 +40,32 @@ class DeduplicationDecisionStore: ObservableObject {
             appropriateFor: nil,
             create: true
         )
-        
+
         let bundleID = Bundle.main.bundleIdentifier ?? "ContactSync"
         let directory = (appSupport ?? fm.temporaryDirectory)
             .appendingPathComponent(bundleID, isDirectory: true)
-        
+
         if (try? directory.checkResourceIsReachable()) != true {
             try? fm.createDirectory(at: directory, withIntermediateDirectories: true)
         }
-        
+
         self.fileURL = directory.appendingPathComponent("dedup_decisions.json")
-        
+        self.history = SyncHistory.shared
+
+        loadFromDisk()
+    }
+
+    /// Testability seam (issue #106): a store over a private directory, so
+    /// tests never load or rewrite the user's real `dedup_decisions.json`, and
+    /// pattern-memory logging lands in the injected (temp-file) history rather
+    /// than the real one. Production always uses `shared`.
+    init(directoryURL: URL, history: SyncHistory = .shared) {
+        let fm = FileManager.default
+        if (try? directoryURL.checkResourceIsReachable()) != true {
+            try? fm.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        }
+        self.fileURL = directoryURL.appendingPathComponent("dedup_decisions.json")
+        self.history = history
         loadFromDisk()
     }
     
@@ -65,7 +84,7 @@ class DeduplicationDecisionStore: ObservableObject {
             self.patterns[pattern] = patternRecord
             self.saveToDisk()
             
-            SyncHistory.shared.log(
+            self.history.log(
                 source: "DeduplicationStore",
                 action: "savePattern",
                 details: "pattern=\(pattern), decision=\(decision.rawValue)"
@@ -98,7 +117,7 @@ class DeduplicationDecisionStore: ObservableObject {
             self.patterns.removeValue(forKey: pattern)
             self.saveToDisk()
             
-            SyncHistory.shared.log(
+            self.history.log(
                 source: "DeduplicationStore",
                 action: "deletePattern",
                 details: "pattern=\(pattern)"
@@ -113,7 +132,7 @@ class DeduplicationDecisionStore: ObservableObject {
             self.patterns.removeAll()
             self.saveToDisk()
             
-            SyncHistory.shared.log(
+            self.history.log(
                 source: "DeduplicationStore",
                 action: "clearAll",
                 details: nil
@@ -147,7 +166,7 @@ class DeduplicationDecisionStore: ObservableObject {
             // and the history event are what stop the loss from being
             // invisible.
             Self.logger.fault("Could not persist deduplication decisions: \(error.localizedDescription, privacy: .public)")
-            SyncHistory.shared.log(
+            self.history.log(
                 source: "DeduplicationStore",
                 action: "persistence.failed",
                 details: "Duplicate decisions could not be saved and will not survive a relaunch: \(error.localizedDescription)")
@@ -164,7 +183,7 @@ class DeduplicationDecisionStore: ObservableObject {
             
             patterns = Dictionary(uniqueKeysWithValues: loadedPatterns.map { ($0.pattern, $0) })
             
-            SyncHistory.shared.log(
+            self.history.log(
                 source: "DeduplicationStore",
                 action: "loadFromDisk",
                 details: "loaded \(patterns.count) patterns"

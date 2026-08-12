@@ -187,12 +187,21 @@ final class SyncHistoryRetentionTests: XCTestCase {
         XCTAssertEqual(pruned.count, 2)
     }
 
+    /// Issue #104: chronological input asserting on *timestamps*, so this
+    /// pins the recency contract itself. The previous version fed newest-first
+    /// input and asserted `events[15...]` survived — documenting positional
+    /// `removeFirst`, i.e. keep-oldest, under a keeps-most-recent name.
     func test_prune_countCap_keepsMostRecent() {
-        let events = (0..<20).map { event(daysAgo: $0) }  // index 0 = newest... appended oldest last
+        // Chronological, as the log appends them: index 0 oldest, 19 newest.
+        let events = (0..<20).map { event(daysAgo: 19 - $0) }
         let pruned = SyncHistory.prune(events, retentionDays: 0, maxCount: 5)
+
         XCTAssertEqual(pruned.count, 5)
-        // removeFirst drops the head — the survivors are the LAST 5 elements.
-        XCTAssertEqual(pruned.first?.timestamp, events[15].timestamp)
+        XCTAssertEqual(pruned.map(\.timestamp), events.suffix(5).map(\.timestamp),
+                       "the survivors are the five *newest* events, in order")
+        let newestDropped = events[14].timestamp
+        XCTAssertTrue(pruned.allSatisfy { $0.timestamp > newestDropped },
+                      "every survivor is more recent than every dropped event")
     }
 
     func test_prune_bothLimits() {

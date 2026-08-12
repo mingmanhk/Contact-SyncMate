@@ -10,6 +10,30 @@ import Foundation
 import Combine
 import os.log
 
+/// The Mac-side surface `SyncEngine` actually calls — and nothing more.
+///
+/// Testability seam (issue #94), mirror of `GoogleContactsProviding`. The
+/// requirements are `nonisolated` because the engine invokes them from the
+/// Contacts write queue (via `performWriteOffMain`), and the protocol is
+/// `Sendable` because the connector reference is captured into those
+/// `@Sendable` write blocks. `MacContactsConnector` (a main-actor class, hence
+/// implicitly Sendable) conforms as-is; test fakes record instead of writing.
+protocol MacContactsProviding: AnyObject, Sendable {
+    nonisolated func fetchAllContactsOffMainActor() async throws -> [CNContact]
+    nonisolated func fetchContactSync(withIdentifier identifier: String) throws -> CNContact?
+    nonisolated func updateContactSync(_ contact: CNMutableContact) throws
+    nonisolated func saveContactSync(_ contact: CNMutableContact, to container: CNContainer?) throws
+    nonisolated func deleteContactSync(withIdentifier identifier: String) throws
+}
+
+extension MacContactsConnector: MacContactsProviding {
+    /// Protocol requirements cannot carry default arguments; this trampoline
+    /// lets the seam keep the exact call shape `SyncEngine` already uses.
+    nonisolated func fetchAllContactsOffMainActor() async throws -> [CNContact] {
+        try await fetchAllContactsOffMainActor(in: nil)
+    }
+}
+
 /// Connector for macOS Contacts framework
 ///
 /// This connector integrates with the deduplication system by:

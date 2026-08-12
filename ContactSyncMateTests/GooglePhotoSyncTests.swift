@@ -186,33 +186,13 @@ final class GooglePhotoSyncTests: XCTestCase {
 /// The diff path end to end: photoUrl must make "Photo changed" fire, and
 /// stop firing once the Mac side has an image. Mirrors the photoData tests in
 /// SyncEngineDiffTests, with the settings the photo rule reads pinned.
-final class GooglePhotoDiffTests: XCTestCase {
-
-    private var savedSyncPhotos: Bool!
-    private var savedConflict: ConflictResolutionDefault!
-    private var savedForceUpdate: Bool!
-    private var savedFilterByGroups: Bool!
+final class GooglePhotoDiffTests: SettingsPinnedTestCase {
 
     override func setUp() {
         super.setUp()
-        let s = AppSettings.shared
-        savedSyncPhotos     = s.syncPhotos
-        savedConflict       = s.defaultConflictResolution
-        savedForceUpdate    = s.forceUpdateAll
-        savedFilterByGroups = s.filterByGroups
-        s.syncPhotos = true
-        s.defaultConflictResolution = .alwaysAsk
-        s.forceUpdateAll = false
-        s.filterByGroups = false
-    }
-
-    override func tearDown() {
-        let s = AppSettings.shared
-        s.syncPhotos = savedSyncPhotos
-        s.defaultConflictResolution = savedConflict
-        s.forceUpdateAll = savedForceUpdate
-        s.filterByGroups = savedFilterByGroups
-        super.tearDown()
+        // Issue #107: shared pinner instead of hand-rolled save/restore.
+        pinDiffDefaults()
+        pin(\.syncPhotos, to: true)
     }
 
     private func changes(google: UnifiedContact, mac: UnifiedContact,
@@ -221,7 +201,7 @@ final class GooglePhotoDiffTests: XCTestCase {
         store.saveMapping(ContactMapping(
             googleResourceName: gID, macContactIdentifier: mID,
             lastSyncedAt: Date(timeIntervalSince1970: 0)))
-        Thread.sleep(forTimeInterval: 0.05)
+        store.flush()
 
         return SyncEngine(
             googleConnector: GoogleContactsConnector(),
