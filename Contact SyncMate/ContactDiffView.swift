@@ -101,7 +101,7 @@ struct ContactDiffView: View {
                     Text(current.contactName)
                         .font(.title2)
                         .fontWeight(.semibold)
-                    Text("\(currentIndex + 1) of \(conflicts.count) conflict\(conflicts.count == 1 ? "" : "s")")
+                    Text("\(currentIndex + 1) of \(conflicts.count) conflicts")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }

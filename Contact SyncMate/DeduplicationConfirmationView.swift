@@ -72,7 +72,7 @@ struct DeduplicationConfirmationView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Review Possible Duplicates")
                         .font(.headline)
-                    Text("\(duplicateGroups.count) group\(duplicateGroups.count == 1 ? "" : "s") found")
+                    Text("\(duplicateGroups.count) groups found")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -230,7 +230,11 @@ struct DeduplicationConfirmationView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             
-            Button("Apply Decisions") {
+            // Each literal wrapped individually: a bare ternary of string
+            // literals types as String, which selects Button(String) — the
+            // verbatim initializer — and both labels silently stop localizing.
+            Button(actionableCount == 0 ? String(localized: "Done")
+                                        : String(localized: "Apply Decisions")) {
                 onDecisionsMade(decisions, rememberPatterns)
                 dismiss()
             }
@@ -242,7 +246,21 @@ struct DeduplicationConfirmationView: View {
         .background(Color(NSColor.controlBackgroundColor))
     }
     
-    private var decisionsMadeCount: Int {
+    /// Every group you have answered — including "Ignore for now".
+    ///
+    /// This used to exclude `.skip`, so the counter read "0 of 62 decided"
+    /// after you had gone through and ignored things, and Apply stayed greyed
+    /// out. Ignoring is a decision: it says leave this pair alone. Not counting
+    /// it meant the screen disagreed with what you had just done, and left no
+    /// way to finish a review where ignoring was the right answer everywhere.
+    private var decisionsMadeCount: Int { decisions.count }
+
+    /// Whether anything will actually be written.
+    ///
+    /// Separate from the count above, because Apply should stay available for
+    /// an all-ignore review — the user still wants to record and dismiss it —
+    /// while the button text should not promise changes that are not coming.
+    private var actionableCount: Int {
         decisions.values.filter { $0 != .skip }.count
     }
 }
@@ -595,7 +613,7 @@ struct MergePreviewSheet: View {
                                     .font(.headline)
                                 
                                 if preview.hasConflicts {
-                                    Label("\(preview.conflictCount) conflict\(preview.conflictCount == 1 ? "" : "s")",
+                                    Label("\(preview.conflictCount) conflicts",
                                           systemImage: "exclamationmark.triangle.fill")
                                         .font(.caption)
                                         .foregroundStyle(Color.appWarning)

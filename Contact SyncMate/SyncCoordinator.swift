@@ -58,13 +58,21 @@ struct SyncPhaseResult: Equatable {
 
     var successful: Bool { errorCount == 0 }
 
+    /// Words, not diff notation.
+    ///
+    /// This read `+3, ~21, -1`. A run that updated 21 contacts displayed as
+    /// "~21" under the heading "Sync Completed with Errors", and the user
+    /// reasonably read it as an error code — asking what "sync error -21"
+    /// meant. It meant twenty-one contacts were updated. Nothing in the UI
+    /// said so, and the one place the notation appeared was the place a person
+    /// looks when something has gone wrong.
+    ///
+    /// Failures are named too. The banner's title was the only thing reporting
+    /// that anything failed, and the line underneath it — the line with the
+    /// numbers — stayed silent about how many.
     var summary: String {
-        var parts: [String] = []
-        if added   > 0 { parts.append("+\(added)") }
-        if updated > 0 { parts.append("~\(updated)") }
-        if deleted > 0 { parts.append("-\(deleted)") }
-        if merged  > 0 { parts.append("merged \(merged)") }
-        return parts.isEmpty ? "Everything in sync" : parts.joined(separator: ", ")
+        SyncOutcomeText.phrase(added: added, updated: updated, deleted: deleted,
+                               merged: merged, failed: errorCount)
     }
 
     init(from result: SyncResult) {
@@ -284,7 +292,7 @@ final class SyncCoordinator: ObservableObject {
                         dedupAwaitingConfirmation = coordinator
                         SyncHistory.shared.log(
                             source: "SyncCoordinator", action: "dedup.awaitingConfirmation",
-                            details: "\(n) duplicate group\(n == 1 ? "" : "s") prepared for review")
+                            details: "\(n) duplicate groups prepared for review")
                         // Same presenter split as sessionAwaitingReview below:
                         // a scheduled run notifies instead of surprising the
                         // user with a window; a user-initiated run opens the

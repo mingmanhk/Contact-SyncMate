@@ -233,8 +233,9 @@ final class SyncEngineModelTests: XCTestCase {
         XCTAssertFalse(result.successful)
     }
 
-    /// Issue #132: the full formatted line, not `contains("3")` — which
-    /// passed for any 3 anywhere in any count.
+    /// Issue #132 lineage, updated for the unified SyncOutcomeText: the full
+    /// formatted line, not `contains("3")` — which passed for any 3 anywhere.
+    /// Zero counts are omitted by design.
     func test_syncResult_summary_isTheFullFormattedLine() {
         let result = SyncResult(
             mode: .manual, direction: .twoWay,
@@ -242,11 +243,13 @@ final class SyncEngineModelTests: XCTestCase {
             added: 3, updated: 2, deleted: 1, merged: 0, skipped: 0,
             errors: []
         )
-        XCTAssertEqual(result.summary,
-                       "Added: 3, Updated: 2, Deleted: 1, Merged: 0, Skipped: 0")
+        XCTAssertEqual(result.summary, "3 added · 2 updated · 1 deleted")
     }
 
-    func test_syncResult_summary_appendsFailureAndHoldBackLines() {
+    func test_syncResult_summary_namesEverySafetyOutcome() {
+        // Failures, set-asides, and BOTH hold-back gates must be visible in
+        // the one-line record — the deferred-merge gate especially, since it
+        // is the safety feature the engine goes out of its way to enforce.
         let err = SyncError(contactName: "Bob", message: "boom", timestamp: Date())
         let result = SyncResult(
             mode: .manual, direction: .twoWay,
@@ -255,13 +258,13 @@ final class SyncEngineModelTests: XCTestCase {
             errors: [err],
             deferredDeletions: 1, deferredMerges: 2, setAside: 1
         )
-        XCTAssertEqual(result.summary, """
-            Added: 0, Updated: 0, Deleted: 0, Merged: 0, Skipped: 3
-            Failed: 1
-            Set aside after repeated failures: 1
-            Held back for review: 1 deletion
-            Held back for review: 2 unconfirmed merges
-            """)
+        XCTAssertEqual(result.summary,
+            "3 skipped · 1 failed · 1 set aside · "
+          + "1 deletions held for review · 2 merges awaiting decision")
+    }
+
+    func test_syncOutcomeText_emptyRun_saysNoChanges() {
+        XCTAssertEqual(SyncOutcomeText.phrase(), "No changes")
     }
 }
 

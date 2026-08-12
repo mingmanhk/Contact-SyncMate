@@ -123,32 +123,68 @@ struct SyncResult {
         errors.isEmpty
     }
 
+    /// What this run did, in one line.
+    ///
+    /// See `SyncOutcomeText` for why there is only one of these now.
     var summary: String {
-        var text = """
-        Added: \(added), Updated: \(updated), Deleted: \(deleted), Merged: \(merged), Skipped: \(skipped)
-        """
-        // Failures were missing from this line entirely.
-        //
-        // A run where every merge failed read "Added: 0, Updated: 0, Deleted: 0,
-        // Merged: 0, Skipped: 0" — indistinguishable from a clean no-op, while
-        // six contacts had just failed to write. The counters only count
-        // successes, so silence about `errors` is silence about the only thing
-        // that went wrong.
-        if !errors.isEmpty {
-            text += "\nFailed: \(errors.count)"
+        SyncOutcomeText.phrase(
+            added: added, updated: updated, deleted: deleted, merged: merged,
+            skipped: skipped, failed: errors.count, setAside: setAside,
+            deletionsHeld: deferredDeletions, mergesHeld: deferredMerges)
+    }
+}
+
+/// The single place sync counts become words.
+///
+/// There were three of these, and they disagreed. `SyncResult.summary` was
+/// multi-line ("Added: 0, Updated: 21…\nFailed: 21"), `SyncResult.compactSummary`
+/// was one line, and `SyncPhaseResult.summary` used diff notation (`+3, ~21,
+/// -1`). Which one you saw depended on which object the view happened to hold —
+/// and since `SyncPhaseResult` is what the dashboard banner gets, the notation
+/// version is the one that shipped to the place people look when a sync fails.
+/// A user asked what "sync error -21" meant. It meant twenty-one contacts were
+/// updated.
+///
+/// Three formatters is how that happens: each was written for one call site,
+/// none knew about the others, and no single one was ever wrong on its own
+/// terms. So there is now one, every caller goes through it, and adding a new
+/// counter means adding it here once.
+///
+/// Zero counts are omitted rather than printed. "Added: 0, Updated: 0,
+/// Deleted: 0, Merged: 0, Skipped: 0" is five facts to read before learning
+/// that nothing happened.
+nonisolated enum SyncOutcomeText {
+    static func phrase(added: Int = 0,
+                       updated: Int = 0,
+                       deleted: Int = 0,
+                       merged: Int = 0,
+                       skipped: Int = 0,
+                       failed: Int = 0,
+                       setAside: Int = 0,
+                       deletionsHeld: Int = 0,
+                       mergesHeld: Int = 0) -> String {
+        // `String(localized:)` per fragment: this line shows in the dashboard
+        // banner, the menu bar and the history log, and raw literals would pin
+        // all three to English.
+        var parts: [String] = []
+        if added    > 0 { parts.append(String(localized: "\(added) added")) }
+        if updated  > 0 { parts.append(String(localized: "\(updated) updated")) }
+        if deleted  > 0 { parts.append(String(localized: "\(deleted) deleted")) }
+        if merged   > 0 { parts.append(String(localized: "\(merged) merged")) }
+        if skipped  > 0 { parts.append(String(localized: "\(skipped) skipped")) }
+        if failed   > 0 { parts.append(String(localized: "\(failed) failed")) }
+        if setAside > 0 { parts.append(String(localized: "\(setAside) set aside")) }
+        if deletionsHeld > 0 {
+            parts.append(String(localized: "\(deletionsHeld) deletions held for review"))
         }
-        if setAside > 0 {
-            text += "\nSet aside after repeated failures: \(setAside)"
+        // The unconfirmed-merge gate is the safety feature most worth seeing
+        // in a one-line record — omitting it hid exactly the deferrals the
+        // engine went out of its way to make.
+        if mergesHeld > 0 {
+            parts.append(String(localized: "\(mergesHeld) merges awaiting decision"))
         }
-        if deferredDeletions > 0 {
-            text += "\nHeld back for review: \(deferredDeletions) deletion"
-                 + (deferredDeletions == 1 ? "" : "s")
-        }
-        if deferredMerges > 0 {
-            text += "\nHeld back for review: \(deferredMerges) unconfirmed merge"
-                 + (deferredMerges == 1 ? "" : "s")
-        }
-        return text
+        return parts.isEmpty ? String(localized: "No changes")
+                             : parts.joined(separator: " · ")
     }
 }
 

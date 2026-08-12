@@ -408,7 +408,7 @@ extension DeduplicationCoordinator {
     private func sendNotification(duplicateCount: Int) {
         let content = UNMutableNotificationContent()
         content.title = "Contact SyncMate"
-        content.body = "\(duplicateCount) potential duplicate\(duplicateCount == 1 ? "" : "s") found. Open the app to review."
+        content.body = String(localized: "\(duplicateCount) potential duplicates found. Open the app to review.")
         content.sound = .default
 
         let request = UNNotificationRequest(

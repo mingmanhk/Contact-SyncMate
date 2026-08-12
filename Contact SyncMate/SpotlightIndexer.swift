@@ -28,7 +28,7 @@ enum SpotlightIndexer {
         let attributes = CSSearchableItemAttributeSet(contentType: UTType.text)
         attributes.title = errorCount == 0
             ? "Contact sync — success"
-            : "Contact sync — \(errorCount) error\(errorCount == 1 ? "" : "s")"
+            : String(localized: "Contact sync — \(errorCount) errors")
         attributes.contentDescription =
             "Added \(added), updated \(updated), deleted \(deleted). " +
             date.formatted(date: .abbreviated, time: .shortened)

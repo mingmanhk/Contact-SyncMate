@@ -62,6 +62,22 @@
         }
       }
     },
+    "%@. Open Sync History for details.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@。打开同步历史查看详情。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@。開啟同步歷史查看詳情。"
+          }
+        }
+      }
+    },
     "%@: %@": {
       "localizations": {
         "en": {
@@ -178,6 +194,28 @@
         }
       }
     },
+    "%lld added": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld added"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新增 %lld 个"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新增 %lld 個"
+          }
+        }
+      }
+    },
     "%lld backups": {
       "localizations": {
         "zh-Hans": {
@@ -213,6 +251,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$lld 項待處理變更%2$@"
+          }
+        }
+      }
+    },
+    "%lld changes are ready — open Contact SyncMate to review and apply.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 项更改已就绪——打开 Contact SyncMate 审核并应用。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 項變更已就緒——開啟 Contact SyncMate 審核並套用。"
           }
         }
       }
@@ -368,6 +422,44 @@
         }
       }
     },
+    "%lld deleted": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld deleted"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除 %lld 个"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刪除 %lld 個"
+          }
+        }
+      }
+    },
+    "%lld deletions held for review": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 项删除已暂缓待审核"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 項刪除已暫緩待審核"
+          }
+        }
+      }
+    },
     "%lld duplicate groups need review": {
       "extractionState": "stale",
       "localizations": {
@@ -438,6 +530,60 @@
           "stringUnit": {
             "state": "translated",
             "value": "找到 %1$lld 個群組%2$@"
+          }
+        }
+      }
+    },
+    "%lld groups found": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找到 %lld 组"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找到 %lld 組"
+          }
+        }
+      }
+    },
+    "%lld merged": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld merged"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "合并 %lld 个"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "合併 %lld 個"
+          }
+        }
+      }
+    },
+    "%lld merges awaiting decision": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 项合并等待您决定"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 項合併等待您決定"
           }
         }
       }
@@ -541,6 +687,22 @@
         }
       }
     },
+    "%lld potential duplicate groups await your decision.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 组疑似重复项等待您决定。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 組疑似重複項目等待您決定。"
+          }
+        }
+      }
+    },
     "%lld routine changes": {
       "localizations": {
         "zh-Hans": {
@@ -573,6 +735,22 @@
         }
       }
     },
+    "%lld set aside": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搁置 %lld 个"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "擱置 %lld 個"
+          }
+        }
+      }
+    },
     "%lld skipped": {
       "localizations": {
         "zh-Hans": {
@@ -585,6 +763,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "已略過 %lld 項"
+          }
+        }
+      }
+    },
+    "%lld updated": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld updated"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新 %lld 个"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新 %lld 個"
           }
         }
       }
@@ -3848,6 +4048,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "超過此期限的事件會自動移除"
+          }
+        }
+      }
+    },
+    "Everything already in sync.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一切均已同步。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一切均已同步。"
+          }
+        }
+      }
+    },
+    "Everything in sync": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一切均已同步"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一切均已同步"
           }
         }
       }

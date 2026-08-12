@@ -1326,7 +1326,7 @@ struct AccountsSettingsView: View {
 
                     if appState.isMacContactsAuthorized {
                         if let count = macContactCount {
-                            Text("\(count) contact\(count == 1 ? "" : "s")")
+                            Text("\(count) contacts")
                                 .font(.caption)
                                 .foregroundStyle(Palette.secondaryText)
                         } else if isLoadingMacContactCount {
@@ -1755,7 +1755,7 @@ struct MacAccountPickerView: View {
             Divider()
 
             HStack {
-                Text("\(containers.count) account\(containers.count == 1 ? "" : "s") available")
+                Text("\(containers.count) accounts available")
                     .font(.caption).foregroundStyle(Palette.secondaryText)
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
@@ -1846,7 +1846,7 @@ struct AccountRowView: View {
                             .foregroundStyle(Palette.secondaryText)
                         if let count = contactCount {
                             Text("·").foregroundStyle(Palette.secondaryText)
-                            Text("\(count) contact\(count == 1 ? "" : "s")")
+                            Text("\(count) contacts")
                                 .font(.caption)
                                 .foregroundStyle(Palette.secondaryText)
                         }

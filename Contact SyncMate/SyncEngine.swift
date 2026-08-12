@@ -527,7 +527,14 @@ class SyncEngine: ObservableObject {
         }
 
         // Save to history
-        try? await saveToHistory(result: result)
+        // `sync.complete` is logged by SyncCoordinator, not here.
+        //
+        // Both used to log it, with identical text and the same timestamp, so
+        // every finished run produced two identical rows in Recent Changes —
+        // and you cannot tell a double-logged sync from a sync that genuinely
+        // ran twice. The coordinator owns run outcomes (it logs `sync.failed`
+        // and `sync.aborted` too), so keeping the pair in one place is what
+        // makes the log readable.
 
         return result
     }
@@ -2240,13 +2247,8 @@ class SyncEngine: ObservableObject {
 
     // checkAutoSyncConditions went with runAutoSync, its only caller.
 
-    private func saveToHistory(result: SyncResult) async throws {
-        SyncHistory.shared.log(
-            source: "SyncEngine",
-            action: "sync.complete",
-            details: result.summary
-        )
-    }
+    // saveToHistory removed — it only logged `sync.complete`, which
+    // SyncCoordinator already logs. See the note at its former call site.
 }
 
 // MARK: - Contact Mapper

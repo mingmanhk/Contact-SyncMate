@@ -210,6 +210,10 @@ struct DashboardView: View {
                             : "exclamationmark.triangle.fill",
                         color: r.successful ? .appSuccess : .appWarning,
                         title: r.successful ? "Sync Completed" : "Sync Completed with Errors",
+                        // One line, because the banner is one line. The
+                        // multi-line `summary` was truncated to "…21" here,
+                        // which told the user nothing except that a number
+                        // ending in 21 existed.
                         detail: r.summary
                     )
                 }

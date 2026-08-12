@@ -34,7 +34,12 @@ enum SyncNotifier {
             guard settings.notifyOnErrors else { return }
             post(
                 title: "Sync completed with errors",
-                body: "Added \(added), updated \(updated), deleted \(deleted) — \(errorCount) error\(errorCount == 1 ? "" : "s"). Open Sync History for details."
+                // Same phrasing as the dashboard banner and the history log,
+                // because it is the same fact. This line used to be a fourth
+                // hand-written summary — "Added 0, updated 21, deleted 0" —
+                // which printed zeros the other three had learned to omit and
+                // would have drifted again the next time a counter was added.
+                body: String(localized: "\(SyncOutcomeText.phrase(added: added, updated: updated, deleted: deleted, failed: errorCount)). Open Sync History for details.")
             )
         } else {
             guard settings.notifyOnSyncComplete else { return }
@@ -61,7 +66,7 @@ enum SyncNotifier {
         guard count > 0 else { return }
         post(
             title: "Changes await your review",
-            body: "\(count) change\(count == 1 ? "" : "s") are ready — open Contact SyncMate to review and apply."
+            body: String(localized: "\(count) changes are ready — open Contact SyncMate to review and apply.")
         )
     }
 
@@ -70,7 +75,7 @@ enum SyncNotifier {
         guard AppSettings.shared.notifyOnConflicts, count > 0 else { return }
         post(
             title: "Duplicates need review",
-            body: "\(count) potential duplicate group\(count == 1 ? "" : "s") await your decision."
+            body: String(localized: "\(count) potential duplicate groups await your decision.")
         )
     }
 
