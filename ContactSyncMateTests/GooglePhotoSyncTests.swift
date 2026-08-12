@@ -122,6 +122,29 @@ final class GooglePhotoSyncTests: XCTestCase {
         XCTAssertFalse(SyncEngine.googlePhotoNeedsCopy(google: google, mac: mac))
     }
 
+    func test_googlePhotoNeedsCopy_suppressedAfterFailedDownload() {
+        // Issue #125: a persistently failing photo URL re-armed "Photo
+        // changed" — and the full update plus pre/post backup pair it
+        // triggers — on every scheduled sync. Once a download has failed this
+        // launch, the rule goes quiet for that contact.
+        var google = UnifiedContact(id: UUID())
+        google.googleResourceName = "people/failing"
+        google.photoUrl = "https://example.com/broken.jpg"
+        var mac = UnifiedContact(id: UUID())
+        mac.macContactIdentifier = "mac-1"
+
+        XCTAssertTrue(SyncEngine.googlePhotoNeedsCopy(google: google, mac: mac),
+                      "with no failure recorded the rule still fires")
+        XCTAssertFalse(SyncEngine.googlePhotoNeedsCopy(google: google, mac: mac,
+                                                       failedDownloads: ["people/failing"]),
+                       "a URL that failed this launch must stop re-arming the diff")
+
+        google.photoData = Data([0x01])
+        XCTAssertTrue(SyncEngine.googlePhotoNeedsCopy(google: google, mac: mac,
+                                                      failedDownloads: ["people/failing"]),
+                      "bytes already in hand always copy — suppression is only about the URL")
+    }
+
     // MARK: - photoUrl propagation
 
     func test_toUnified_carriesPhotoUrl() {
@@ -236,5 +259,45 @@ final class GooglePhotoDiffTests: XCTestCase {
                              gID: "people/photo-done", mID: "mac/photo-done")
         XCTAssertFalse(result.flatMap(\.changes).contains { $0.contains("Photo") },
                        "After one sync copies the photo, the diff must go quiet — that is convergence")
+    }
+
+    func test_photoOnlyDiff_isDirectUpdate_notAConflictMerge() {
+        // Issue #86: photos travel one way, so "photo differs" is not a
+        // conflict. With no timestamps on either side (the CNContact-has-no-
+        // modification-date normality) a photo-only diff used to fall into
+        // the unknown-vs-unknown conflict switch — deferring a merge forever
+        // under .alwaysAsk, which this class pins.
+        var google = UnifiedContact.diffMake(givenName: "Pat",
+                                             googleResourceName: "people/photo-only")
+        google.photoUrl = "https://example.com/pat.jpg"
+        let mac = UnifiedContact.diffMake(givenName: "Pat",
+                                          macContactIdentifier: "mac/photo-only")
+
+        let result = changes(google: google, mac: mac,
+                             gID: "people/photo-only", mID: "mac/photo-only")
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result.first?.action, .update,
+                       "a photo-only diff has exactly one applicable action")
+        XCTAssertEqual(result.first?.direction, .googleToMac,
+                       "Google → Mac is the only direction a photo can travel")
+        XCTAssertNil(result.first?.userOverride)
+    }
+
+    func test_photoAlongsideOtherDiffs_keepsConflictRouting() {
+        // When the photo change rides along with real field differences the
+        // normal conflict routing stands — under .alwaysAsk with no
+        // timestamps that is an unresolved merge carrying both reasons.
+        var google = UnifiedContact.diffMake(givenName: "Patricia",
+                                             googleResourceName: "people/photo-mixed")
+        google.photoUrl = "https://example.com/pat.jpg"
+        let mac = UnifiedContact.diffMake(givenName: "Pat",
+                                          macContactIdentifier: "mac/photo-mixed")
+
+        let result = changes(google: google, mac: mac,
+                             gID: "people/photo-mixed", mID: "mac/photo-mixed")
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result.first?.action, .merge)
+        XCTAssertTrue(result.first?.changes.contains("Photo changed") ?? false,
+                      "the photo component still rides along with the other diffs")
     }
 }

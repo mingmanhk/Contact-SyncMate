@@ -216,6 +216,36 @@ final class SyncEngineDiffTests: XCTestCase {
         XCTAssertEqual(SyncEngine.birthdayKey(apple), SyncEngine.birthdayKey(google))
     }
 
+    /// Issue #100: nickname / prefix / suffix / department are written
+    /// unconditionally by applyToMac, so the diff must track them too —
+    /// undiffed, a Mac-only edit to one of them never propagated and was
+    /// erased by the next inbound update.
+    func test_extendedNameAndOrgFields_areDiffed() {
+        let store = mappedPair(gID: "people/ext", mID: "mac/ext")
+        var google = UnifiedContact.diffMake(givenName: "Sam",
+                                             googleResourceName: "people/ext")
+        google.nickname = "Ace"
+        google.namePrefix = "Dr."
+        google.nameSuffix = "Jr."
+        google.department = "R&D"
+        google.lastModified = Date()
+        var mac = UnifiedContact.diffMake(givenName: "Sam",
+                                          macContactIdentifier: "mac/ext")
+        mac.lastModified = Date(timeIntervalSince1970: 0)
+
+        let changes = SyncEngine(
+            googleConnector: GoogleContactsConnector(),
+            macConnector: MacContactsConnector(),
+            mappingStore: store
+        ).computeChanges(googleContacts: [google], macContacts: [mac], direction: .twoWay)
+
+        let diffs = changes.flatMap(\.changes)
+        XCTAssertTrue(diffs.contains("Nickname changed"))
+        XCTAssertTrue(diffs.contains("Name prefix changed"))
+        XCTAssertTrue(diffs.contains("Name suffix changed"))
+        XCTAssertTrue(diffs.contains("Department changed"))
+    }
+
     func test_url_trailingSlashAndSchemeIgnored() {
         XCTAssertEqual(SyncEngine.normalizedURL("https://Example.com/"),
                        SyncEngine.normalizedURL("http://www.example.com"))
@@ -851,10 +881,36 @@ final class SyncFailureKeyTests: XCTestCase {
     func test_contactSpecificErrors_doCountTowardSetAside() {
         XCTAssertTrue(SyncEngine.failureCountsTowardSetAside(
             GoogleContactsError.apiError(statusCode: 400, message: "invalid field")),
-            "a 4xx judges this contact's payload and should strike")
+            "a 400 judges this contact's payload and should strike")
         XCTAssertTrue(SyncEngine.failureCountsTowardSetAside(
             NSError(domain: CNErrorDomain, code: 134092)),
             "a Contacts validation rejection is exactly what set-aside exists for")
+    }
+
+    func test_authAndPermissionStatuses_doNotCountTowardSetAside() {
+        // Issue #102: 401 and 403 judge the session and its permissions —
+        // they hit every contact alike, so striking individuals inverts the
+        // store's purpose.
+        XCTAssertFalse(SyncEngine.failureCountsTowardSetAside(
+            GoogleContactsError.apiError(statusCode: 401, message: "unauthorized")),
+            "401 judges the session, not the contact")
+        XCTAssertFalse(SyncEngine.failureCountsTowardSetAside(
+            GoogleContactsError.apiError(statusCode: 403, message: "forbidden")),
+            "403 judges permissions, not the contact")
+    }
+
+    func test_chunkLevelBatchFailure_neverStrikes_itemRejectionDoes() {
+        // Issue #102: one stale etag fails a whole ~200-contact chunk with a
+        // single HTTP error. Chunk-level failures say nothing about any
+        // member; only the per-item rejection is Google's judgement on a
+        // specific contact.
+        XCTAssertFalse(SyncEngine.failureCountsTowardSetAside(
+            SyncEngineError.batchChunkFailed(
+                underlying: GoogleContactsError.apiError(statusCode: 400, message: "stale etag"))),
+            "a chunk-level 4xx must not strike ~200 innocent contacts at once")
+        XCTAssertTrue(SyncEngine.failureCountsTowardSetAside(
+            SyncEngineError.batchItemRejected("Test Contact")),
+            "a per-item batch rejection still strikes")
     }
 
     func test_setAsideContact_isExcludedFromBatch() {
@@ -1003,5 +1059,228 @@ final class GoogleErrorMessageTests: XCTestCase {
     func test_invalidToken_promptsSignIn() {
         let msg = SyncCoordinator.friendlyMessage(for: GoogleContactsError.invalidToken)
         XCTAssertTrue(msg.contains("Sign in again"))
+    }
+}
+
+// MARK: - Group filter vs deletion, both-deleted cleanup, 1-way target-gone
+// (issues #87, #124, #101)
+
+final class GroupFilterAndTargetGoneTests: XCTestCase {
+
+    private var savedConflict: ConflictResolutionDefault!
+    private var savedForceUpdate: Bool!
+    private var savedFilterByGroups: Bool!
+    private var savedSyncDeleted: Bool!
+    private var savedMerge1Way: Bool!
+
+    override func setUp() {
+        super.setUp()
+        let s = AppSettings.shared
+        savedConflict       = s.defaultConflictResolution
+        savedForceUpdate    = s.forceUpdateAll
+        savedFilterByGroups = s.filterByGroups
+        savedSyncDeleted    = s.syncDeletedContacts
+        savedMerge1Way      = s.mergeContacts1Way
+        s.defaultConflictResolution = .alwaysAsk
+        s.forceUpdateAll = false
+        s.filterByGroups = false
+        // Pinned *on*: these tests prove that filtered-out contacts are not
+        // deleted even when deletion sync is active.
+        s.syncDeletedContacts = true
+        s.mergeContacts1Way = false
+    }
+
+    override func tearDown() {
+        let s = AppSettings.shared
+        s.defaultConflictResolution = savedConflict
+        s.forceUpdateAll = savedForceUpdate
+        s.filterByGroups = savedFilterByGroups
+        s.syncDeletedContacts = savedSyncDeleted
+        s.mergeContacts1Way = savedMerge1Way
+        super.tearDown()
+    }
+
+    private func engineWithMapping(gID: String, mID: String)
+        -> (SyncEngine, ContactMappingStore) {
+        let store = ContactMappingStore.testStore()
+        store.saveMapping(ContactMapping(
+            googleResourceName: gID, macContactIdentifier: mID,
+            lastSyncedAt: Date(timeIntervalSince1970: 0)))
+        let engine = SyncEngine(
+            googleConnector: GoogleContactsConnector(),
+            macConnector: MacContactsConnector(),
+            mappingStore: store)
+        return (engine, store)
+    }
+
+    // MARK: #87 — out-of-group is not deleted
+
+    func test_mappedPair_outsideGroupFilter_isNotClassifiedAsDeleted() {
+        let gID = "people/out-of-group"
+        let mID = "mac/out-of-group"
+        let (engine, store) = engineWithMapping(gID: gID, mID: mID)
+
+        let google = UnifiedContact.diffMake(givenName: "Out", googleResourceName: gID)
+        // The Mac twin is absent from the *filtered* input but present in the
+        // unfiltered fetch: it exists, it is merely outside the selected groups.
+        let changes = engine.computeChanges(
+            googleContacts: [google], macContacts: [], direction: .twoWay,
+            unfilteredGoogleIDs: [gID], unfilteredMacIDs: [mID])
+
+        XCTAssertTrue(changes.isEmpty,
+                      "an out-of-group contact must be skipped — not deleted, not re-added")
+        XCTAssertNotNil(store.getMapping(googleResourceName: gID),
+                        "the pair still exists, so the mapping must survive")
+    }
+
+    func test_mappedPair_trulyGoneOnMac_isStillADeletion() {
+        let gID = "people/really-gone"
+        let mID = "mac/really-gone"
+        let (engine, _) = engineWithMapping(gID: gID, mID: mID)
+
+        let google = UnifiedContact.diffMake(givenName: "Gone", googleResourceName: gID)
+        // Present in neither the filtered list nor the unfiltered fetch:
+        // genuinely deleted, and deletion sync is pinned on.
+        let changes = engine.computeChanges(
+            googleContacts: [google], macContacts: [], direction: .twoWay,
+            unfilteredGoogleIDs: [gID], unfilteredMacIDs: [])
+
+        XCTAssertEqual(changes.count, 1)
+        XCTAssertEqual(changes.first?.action, .delete)
+        XCTAssertEqual(changes.first?.direction, .macToGoogle)
+    }
+
+    // MARK: #124 — both-deleted mappings actually get removed
+
+    func test_bothDeletedMapping_isRemovedAfterTheWalk() {
+        let gID = "people/dead"
+        let mID = "mac/dead"
+        let (engine, store) = engineWithMapping(gID: gID, mID: mID)
+
+        let changes = engine.computeChanges(
+            googleContacts: [], macContacts: [], direction: .twoWay)
+
+        XCTAssertTrue(changes.isEmpty, "both sides gone — nothing to sync")
+        XCTAssertNil(store.getMapping(googleResourceName: gID),
+                     "a (nil, nil) mapping is dead and must be removed, not kept forever")
+    }
+
+    func test_pairOutsideFilterOnBothSides_keepsItsMapping() {
+        let gID = "people/filtered-both"
+        let mID = "mac/filtered-both"
+        let (engine, store) = engineWithMapping(gID: gID, mID: mID)
+
+        let changes = engine.computeChanges(
+            googleContacts: [], macContacts: [], direction: .twoWay,
+            unfilteredGoogleIDs: [gID], unfilteredMacIDs: [mID])
+
+        XCTAssertTrue(changes.isEmpty)
+        XCTAssertNotNil(store.getMapping(googleResourceName: gID),
+                        "out-of-group on both sides is not deleted-on-both-sides")
+    }
+
+    // MARK: #101 — 1-way "deleted on target" re-creates from source
+
+    func test_oneWay_targetGone_reAddsFromSource_andClearsStaleMapping() {
+        let gID = "people/oneway-src"
+        let mID = "mac/oneway-gone"
+        let (engine, store) = engineWithMapping(gID: gID, mID: mID)
+
+        let google = UnifiedContact.diffMake(givenName: "Mirror", googleResourceName: gID)
+        let changes = engine.computeChanges(
+            googleContacts: [google], macContacts: [], direction: .googleToMac)
+
+        XCTAssertEqual(changes.count, 1)
+        XCTAssertEqual(changes.first?.action, .add,
+                       "a 1-way sync mirrors the source: the target copy is re-created, "
+                       + "not phantom-deleted")
+        XCTAssertEqual(changes.first?.direction, .googleToMac)
+        XCTAssertEqual(changes.first?.sourceContact?.googleResourceName, gID)
+        XCTAssertFalse(changes.contains { $0.action == .delete },
+                       "the old phantom delete must be gone")
+        XCTAssertNil(store.getMapping(googleResourceName: gID),
+                     "the stale mapping must be removed so the add re-links the pair")
+    }
+
+    func test_oneWay_targetMerelyOutsideFilter_isSkipped() {
+        let gID = "people/oneway-filtered"
+        let mID = "mac/oneway-filtered"
+        let (engine, store) = engineWithMapping(gID: gID, mID: mID)
+
+        let google = UnifiedContact.diffMake(givenName: "Filtered", googleResourceName: gID)
+        let changes = engine.computeChanges(
+            googleContacts: [google], macContacts: [], direction: .googleToMac,
+            unfilteredGoogleIDs: [gID], unfilteredMacIDs: [mID])
+
+        XCTAssertTrue(changes.isEmpty,
+                      "an out-of-group target is not deleted — nothing to re-create")
+        XCTAssertNotNil(store.getMapping(googleResourceName: gID))
+    }
+}
+
+// MARK: - Google updateTime parsing + phonetic round-trip (issues #91, #88)
+
+final class GoogleUpdateTimeParsingTests: XCTestCase {
+
+    func test_fractionalSeconds_parse() {
+        // What the People API actually sends.
+        XCTAssertNotNil(GoogleContactsConnector.parseUpdateTime("2026-08-11T09:41:30.123456Z"),
+                        "a nil parse here demoted every Google edit to the conflict branch")
+    }
+
+    func test_wholeSeconds_parse() {
+        XCTAssertNotNil(GoogleContactsConnector.parseUpdateTime("2026-08-11T09:41:30Z"))
+    }
+
+    func test_bothFormsAgreeOnTheSecond() {
+        let fractional = GoogleContactsConnector.parseUpdateTime("2026-08-11T09:41:30.500Z")
+        let whole = GoogleContactsConnector.parseUpdateTime("2026-08-11T09:41:30Z")
+        guard let fractional, let whole else { return XCTFail("both forms must parse") }
+        XCTAssertEqual(fractional.timeIntervalSince(whole), 0.5, accuracy: 0.001)
+    }
+
+    func test_garbage_returnsNil() {
+        XCTAssertNil(GoogleContactsConnector.parseUpdateTime("not a date"))
+    }
+
+    func test_decodePage_prefersContactSource_andReadsPhonetics() throws {
+        // One payload covers both fixes: metadata carries a PROFILE source
+        // first (whose updateTime describes a different record) and the
+        // CONTACT source second with fractional seconds; the name block
+        // carries the phonetic fields that never used to round-trip.
+        let json = Data("""
+        {
+          "connections": [
+            {
+              "resourceName": "people/c7",
+              "names": [{
+                "givenName": "Tai",
+                "familyName": "Lam",
+                "phoneticGivenName": "タイ",
+                "phoneticMiddleName": "チュン",
+                "phoneticFamilyName": "ラム"
+              }],
+              "metadata": {
+                "sources": [
+                  {"type": "PROFILE", "updateTime": "2020-01-01T00:00:00Z"},
+                  {"type": "CONTACT", "updateTime": "2026-08-11T09:41:30.250Z"}
+                ]
+              }
+            }
+          ]
+        }
+        """.utf8)
+
+        let page = try GoogleContactsConnector.decodePage(json)
+        let contact = try XCTUnwrap(page.contacts.first)
+
+        XCTAssertEqual(contact.phoneticGivenName, "タイ")
+        XCTAssertEqual(contact.phoneticMiddleName, "チュン")
+        XCTAssertEqual(contact.phoneticFamilyName, "ラム")
+
+        let expected = try XCTUnwrap(
+            GoogleContactsConnector.parseUpdateTime("2026-08-11T09:41:30.250Z"))
+        XCTAssertEqual(contact.updateTime, expected,
+                       "the CONTACT source's updateTime wins over PROFILE's")
     }
 }

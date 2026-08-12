@@ -97,6 +97,15 @@ class SyncEngine: ObservableObject {
             var unifiedGoogleContacts = googleContacts.map { ContactMapper.toUnified(from: $0) }
             var unifiedMacContacts = macContacts.map { ContactMapper.toUnified(from: $0) }
 
+            // Identifier sets from the *unfiltered* fetches, captured before the
+            // group filter narrows the lists. The diff needs these to tell
+            // "deleted" apart from "merely outside the selected groups": a
+            // mapped contact absent from the filtered list but present here
+            // still exists, and classifying it as deleted proposed deleting its
+            // twin — for every previously synced out-of-group contact at once.
+            let unfilteredGoogleIDs = Set(unifiedGoogleContacts.compactMap(\.googleResourceName))
+            let unfilteredMacIDs = Set(unifiedMacContacts.compactMap(\.macContactIdentifier))
+
             // Restrict to the selected groups / labels, if the user asked for that.
             if settings.filterByGroups {
                 (unifiedGoogleContacts, unifiedMacContacts) = await applyGroupFilter(
@@ -121,7 +130,9 @@ class SyncEngine: ObservableObject {
             let changes = computeChanges(
                 googleContacts: unifiedGoogleContacts,
                 macContacts: unifiedMacContacts,
-                direction: direction
+                direction: direction,
+                unfilteredGoogleIDs: unfilteredGoogleIDs,
+                unfilteredMacIDs: unfilteredMacIDs
             )
 
             // Which fields are driving the changes, counted.
@@ -173,6 +184,11 @@ class SyncEngine: ObservableObject {
     /// field, a stale identifier) says nothing about the next contact, so those
     /// must not abort the run.
     private static func isUnrecoverableForRemainingChanges(_ error: Error) -> Bool {
+        // A chunk-level batch failure wraps the real error — unwrap it so an
+        // authentication death inside a batch still aborts the run.
+        if case SyncEngineError.batchChunkFailed(let underlying) = error {
+            return isUnrecoverableForRemainingChanges(underlying)
+        }
         switch error {
         case GoogleOAuthError.noRefreshToken,
              GoogleOAuthError.notAuthenticated,
@@ -214,6 +230,9 @@ class SyncEngine: ObservableObject {
         }
         
         let startTime = Date()
+        // Fresh circuit breaker per run — the whole point is "stop for the
+        // rest of *this* run", not "never try again".
+        consecutivePhotoFailures = 0
         var added = 0
         var updated = 0
         var deleted = 0
@@ -367,8 +386,11 @@ class SyncEngine: ObservableObject {
                 }
 
                 // It worked — forget any past failures, so a contact that
-                // recovers is not held against its history.
-                if let failureKey { SyncFailureStore.shared.clearFailure(key: failureKey) }
+                // recovers is not held against its history. Not on a dry run:
+                // nothing was written, so nothing was proven recoverable, and
+                // clearing here would wipe real strike history for contacts
+                // that were never retried.
+                if !isDryRun, let failureKey { SyncFailureStore.shared.clearFailure(key: failureKey) }
 
                 // Per-change audit trail: every applied change is recorded
                 // with contact, action, direction, field summary, and the
@@ -455,8 +477,14 @@ class SyncEngine: ObservableObject {
         // *both* address books in full, so running it after a no-op sync was the
         // single most expensive thing an idle scheduled sync did — two complete
         // fetches to snapshot a state identical to the one already on disk.
+        // Dry runs are excluded even though their counters advance: the
+        // counters describe what *would* have happened, nothing was written,
+        // and a "post-sync" snapshot would record two full fetches of a state
+        // the sync never touched. The counters and history stay as they are so
+        // the dry-run report reads identically to a real one.
         let wroteSomething = added + updated + deleted + merged > 0
         if wroteSomething,
+           !settings.dryRunMode,
            AppSettings.shared.autoBackupEnabled,
            let syncSessionId = session.syncSessionId {
             if Task.isCancelled {
@@ -506,16 +534,24 @@ class SyncEngine: ObservableObject {
     
     // MARK: - Private Helpers
     
+    /// `unfilteredGoogleIDs` / `unfilteredMacIDs` are the identifier sets from
+    /// the fetches *before* the group filter narrowed them. A mapped contact
+    /// absent from the (filtered) input lists but present in its unfiltered
+    /// set is merely outside the selected groups — it must be skipped, not
+    /// treated as a deletion or a fresh add. `nil` (tests, no-filter callers)
+    /// means "the input lists are the whole fetch".
     func computeChanges(
         googleContacts: [UnifiedContact],
         macContacts: [UnifiedContact],
-        direction: SyncDirection
+        direction: SyncDirection,
+        unfilteredGoogleIDs: Set<String>? = nil,
+        unfilteredMacIDs: Set<String>? = nil
     ) -> [ContactChange] {
         var changes: [ContactChange] = []
-        
+
         // Get existing mappings
         let mappings = mappingStore.getAllMappings()
-        
+
         // Create lookup dictionaries
         var googleByResourceName: [String: UnifiedContact] = [:]
         for contact in googleContacts {
@@ -523,39 +559,43 @@ class SyncEngine: ObservableObject {
                 googleByResourceName[resourceName] = contact
             }
         }
-        
+
         var macByIdentifier: [String: UnifiedContact] = [:]
         for contact in macContacts {
             if let identifier = contact.macContactIdentifier {
                 macByIdentifier[identifier] = contact
             }
         }
-        
+
         switch direction {
         case .twoWay:
             changes = compute2WayChanges(
                 googleByResourceName: googleByResourceName,
                 macByIdentifier: macByIdentifier,
-                mappings: mappings
+                mappings: mappings,
+                unfilteredGoogleIDs: unfilteredGoogleIDs,
+                unfilteredMacIDs: unfilteredMacIDs
             )
-            
+
         case .googleToMac:
             changes = compute1WayChanges(
                 source: googleByResourceName,
                 target: macByIdentifier,
                 mappings: mappings,
-                sourceToTarget: true
+                sourceToTarget: true,
+                unfilteredTargetIDs: unfilteredMacIDs
             )
-            
+
         case .macToGoogle:
             changes = compute1WayChanges(
                 source: macByIdentifier,
                 target: googleByResourceName,
                 mappings: mappings,
-                sourceToTarget: false
+                sourceToTarget: false,
+                unfilteredTargetIDs: unfilteredGoogleIDs
             )
         }
-        
+
         return changes
     }
     
@@ -564,13 +604,21 @@ class SyncEngine: ObservableObject {
     private func compute2WayChanges(
         googleByResourceName: [String: UnifiedContact],
         macByIdentifier: [String: UnifiedContact],
-        mappings: [ContactMapping]
+        mappings: [ContactMapping],
+        unfilteredGoogleIDs: Set<String>? = nil,
+        unfilteredMacIDs: Set<String>? = nil
     ) -> [ContactChange] {
         var changes: [ContactChange] = []
 
         // Build lookup maps from mappings
         var processedGoogle = Set<String>()
         var processedMac    = Set<String>()
+
+        // Mappings whose contacts are gone on *both* sides, removed after the
+        // walk. "Handled after loop" was a comment with no code behind it, so
+        // dead (nil, nil) mappings accumulated in contact_mappings.json forever
+        // and every getMapping(macIdentifier:) scanned past them.
+        var deadMappingIDs: [String] = []
 
         // --- Step 1: Walk all existing mappings ---
         for mapping in mappings {
@@ -582,12 +630,28 @@ class SyncEngine: ObservableObject {
             processedGoogle.insert(gID)
             processedMac.insert(mID)
 
+            // Absent from the filtered input but present in the unfiltered
+            // fetch means "outside the selected groups", not "deleted". The
+            // group filter runs before this diff, so without the check a
+            // mapped pair merely out of the filter read as a real deletion —
+            // and enabling or narrowing the filter with deletion sync on
+            // proposed deleting every previously synced out-of-group contact.
+            let gExistsOutsideFilter = gContact == nil
+                && (unfilteredGoogleIDs?.contains(gID) ?? false)
+            let mExistsOutsideFilter = mContact == nil
+                && (unfilteredMacIDs?.contains(mID) ?? false)
+
             switch (gContact, mContact) {
             case (nil, nil):
-                // Both deleted — clean up mapping (handled after loop)
+                // Out of the filter on either side: the pair still exists,
+                // just not in the selected groups — the mapping stays.
+                if gExistsOutsideFilter || mExistsOutsideFilter { continue }
+                // Both truly deleted — collect the mapping for removal below.
+                deadMappingIDs.append(gID)
                 continue
 
             case (.some(let g), nil):
+                if mExistsOutsideFilter { continue }
                 if settings.syncDeletedContacts {
                     changes.append(ContactChange(
                         contactName: g.displayName, action: .delete,
@@ -596,6 +660,7 @@ class SyncEngine: ObservableObject {
                 }
 
             case (nil, .some(let m)):
+                if gExistsOutsideFilter { continue }
                 if settings.syncDeletedContacts {
                     changes.append(ContactChange(
                         contactName: m.displayName, action: .delete,
@@ -606,6 +671,26 @@ class SyncEngine: ObservableObject {
             case (.some(let g), .some(let m)):
                 let fieldDiffs = diffFields(g, m)
                 if fieldDiffs.isEmpty { continue }
+
+                // A photo-only difference is not a conflict. Photos travel one
+                // way — Google → Mac; the People API rejects `photos` in an
+                // update mask — so there is nothing to arbitrate, and routing
+                // it through the timestamp/conflict logic below either
+                // deferred a merge forever (.alwaysAsk), emitted a Google
+                // PATCH that cannot carry a photo (.preferMac), or full-merged
+                // both sides (.mergeBoth). Emit the one applicable action
+                // directly. When a photo change rides along with other diffs
+                // the normal routing stands: its googleToMac update path
+                // downloads the photo just in time (resolvingGooglePhoto), and
+                // any other outcome leaves a photo-only diff to converge here
+                // on the next run.
+                if fieldDiffs == ["Photo changed"] {
+                    changes.append(ContactChange(
+                        contactName: g.displayName, action: .update,
+                        direction: .googleToMac, changes: fieldDiffs,
+                        sourceContact: g, targetContact: m))
+                    continue
+                }
 
                 let gModified = g.lastModified ?? .distantPast
                 let mModified = m.lastModified ?? .distantPast
@@ -697,6 +782,19 @@ class SyncEngine: ObservableObject {
                     }
                 }
             }
+        }
+
+        // Remove the both-deleted mappings collected above. Only pairs proven
+        // absent from the *unfiltered* fetches land here, so an out-of-group
+        // pair never loses its link.
+        if !deadMappingIDs.isEmpty {
+            for gID in deadMappingIDs {
+                mappingStore.deleteMapping(googleResourceName: gID)
+            }
+            SyncHistory.shared.log(
+                source: "SyncEngine", action: "mapping.bothDeletedCleanup",
+                details: "Removed \(deadMappingIDs.count) mapping(s) whose contacts are gone on both sides"
+            )
         }
 
         // --- Step 2: New on Google, not yet mapped ---
@@ -835,11 +933,14 @@ class SyncEngine: ObservableObject {
 
     // MARK: - 1-Way Diff
 
+    /// `unfilteredTargetIDs`: the target side's identifiers before the group
+    /// filter, so an out-of-group target is not mistaken for a deleted one.
     private func compute1WayChanges(
         source: [String: UnifiedContact],
         target: [String: UnifiedContact],
         mappings: [ContactMapping],
-        sourceToTarget: Bool
+        sourceToTarget: Bool,
+        unfilteredTargetIDs: Set<String>? = nil
     ) -> [ContactChange] {
         var changes: [ContactChange] = []
 
@@ -889,11 +990,34 @@ class SyncEngine: ObservableObject {
                             action: .update, direction: direction, changes: diffs,
                             sourceContact: payload, targetContact: targetContact))
                     }
-                } else if settings.syncDeletedContacts {
+                } else if unfilteredTargetIDs?.contains(targetID) ?? false {
+                    // The target exists in the unfiltered fetch — it is merely
+                    // outside the selected groups, not deleted. Nothing to do.
+                    continue
+                } else {
+                    // Deleted on the target. A 1-way sync mirrors the source,
+                    // so the source is the truth: re-create the contact on the
+                    // target. The old behaviour emitted a `.delete` that
+                    // `performDelete` could never execute — it needs the
+                    // target-side identifier, which a source-side contact does
+                    // not carry — so the change was a silent no-op counted as
+                    // deleted and re-reported every run.
+                    //
+                    // The stale mapping goes first so the add re-links the
+                    // pair under the new target identifier. Left in place, a
+                    // Mac → Google mapping whose Google half is gone would
+                    // read on a later two-way diff as "deleted on Google" and
+                    // delete the living Mac twin.
+                    let googleKey = sourceToTarget ? sourceID : targetID
+                    mappingStore.deleteMapping(googleResourceName: googleKey)
+                    SyncHistory.shared.log(
+                        source: "SyncEngine", action: "mapping.targetGone",
+                        details: "1-way target contact is gone — re-creating it from the source and re-linking"
+                    )
                     changes.append(ContactChange(
                         contactName: sourceContact.displayName,
-                        action: .delete, direction: direction,
-                        changes: ["Deleted on target side"],
+                        action: .add, direction: direction,
+                        changes: ["Deleted on target — re-creating from source"],
                         sourceContact: sourceContact, targetContact: nil))
                 }
             } else {
@@ -938,6 +1062,18 @@ class SyncEngine: ObservableObject {
         textual("Last name",   a.familyName,       b.familyName)
         textual("Middle name", a.middleName,       b.middleName)
         textual("Company",     a.organizationName, b.organizationName)
+
+        // The extended name/organisation scalars, always-on like Company.
+        // `applyToMac` writes them unconditionally, so they must be diffed
+        // too: undiffed, a Mac-only nickname edit produced no change and was
+        // silently erased by the next inbound update. All four round-trip
+        // Google — nickname via `nicknames`, prefix/suffix inside `names`,
+        // department inside `organizations`, each present in both the fetch
+        // personFields and the update mask.
+        textual("Nickname",    a.nickname,   b.nickname)
+        textual("Name prefix", a.namePrefix, b.namePrefix)
+        textual("Name suffix", a.nameSuffix, b.nameSuffix)
+        textual("Department",  a.department, b.department)
 
         // Per-field toggles from Settings → Common Sync → Fields to Sync
         if settings.syncJobTitle { textual("Job title", a.jobTitle, b.jobTitle) }
@@ -1014,7 +1150,8 @@ class SyncEngine: ObservableObject {
             // The apply path downloads the URL just in time (see
             // resolvingGooglePhoto), and once the Mac side has an image the
             // rule goes quiet, so it still converges.
-            if Self.googlePhotoNeedsCopy(google: google, mac: mac) {
+            if Self.googlePhotoNeedsCopy(google: google, mac: mac,
+                                         failedDownloads: Self.failedPhotoDownloads) {
                 diffs.append("Photo changed")
             }
         }
@@ -1022,13 +1159,39 @@ class SyncEngine: ObservableObject {
         return diffs
     }
 
+    /// Resource names whose photo download failed since this app launched.
+    ///
+    /// The photo rule consults it so a persistently failing photo URL stops
+    /// re-arming "Photo changed" — and the full update plus pre/post backup
+    /// pair it triggers — on every scheduled sync. `static` on purpose: the
+    /// coordinator builds a fresh engine per run, so instance state would
+    /// forget the failure exactly when it matters. In-memory only, as a
+    /// deliberate tradeoff: the set costs nothing to persist wrongly, and a
+    /// relaunch retries the download so a fixed URL heals itself without any
+    /// state to reset.
+    ///
+    /// `@MainActor` explicitly: shared across engine instances and mutated by
+    /// the (main-actor) apply path — the isolation is the contract here, not
+    /// an accident of the project default.
+    @MainActor static var failedPhotoDownloads: Set<String> = []
+
     /// The photo rule of the diff, extracted pure so it is testable: Google
     /// has a real photo (bytes or a non-default URL) and the Mac side has
     /// none. Once the Mac holds any image this returns false — that is the
     /// convergence guarantee.
+    ///
+    /// `failedDownloads` suppresses the rule for a contact whose photo URL
+    /// already failed to download this launch — but only when the URL is all
+    /// we have; bytes in hand always copy.
     nonisolated static func googlePhotoNeedsCopy(google: UnifiedContact,
-                                                 mac: UnifiedContact) -> Bool {
-        (google.photoData != nil || google.photoUrl != nil) && mac.photoData == nil
+                                                 mac: UnifiedContact,
+                                                 failedDownloads: Set<String> = []) -> Bool {
+        guard google.photoData != nil || google.photoUrl != nil,
+              mac.photoData == nil else { return false }
+        if google.photoData == nil,
+           let id = google.googleResourceName,
+           failedDownloads.contains(id) { return false }
+        return true
     }
 
     /// Strip fields that the user has disabled in Settings → Common Sync → Fields to Sync
@@ -1357,15 +1520,25 @@ class SyncEngine: ObservableObject {
         if error is URLError { return false }
         if error is GoogleOAuthError { return false }
         switch error {
+        case SyncEngineError.batchChunkFailed:
+            // The whole chunk failed as one HTTP call — one stale etag hands
+            // the identical error to up to 200 contacts, and three such syncs
+            // would set aside every one of them. A chunk-level error says
+            // nothing about any single member; only `batchItemRejected`
+            // (item-specific) may strike.
+            return false
         case GoogleContactsError.rateLimitExceeded,
              GoogleContactsError.networkError,
              GoogleContactsError.notAuthenticated,
              GoogleContactsError.invalidToken:
             return false
         case let GoogleContactsError.apiError(statusCode, _):
-            // 4xx (bar 429) judge the payload — this contact. 429 and 5xx
-            // are Google's problem and will pass on their own.
-            return statusCode != 429 && statusCode < 500
+            // 4xx judge the payload — this contact — except the ones that
+            // judge the *session*: 401/403 are auth and permission failures
+            // that hit every contact alike, and 429 and 5xx are Google's
+            // problem and will pass on their own.
+            return statusCode != 429 && statusCode != 401 && statusCode != 403
+                && statusCode < 500
         default:
             return true
         }
@@ -1557,9 +1730,14 @@ class SyncEngine: ObservableObject {
                 outcome.applied.insert(item.id)
             }
         } catch {
-            // One failed call fails its whole chunk. Attributing the error to every
-            // contact in it lets executeSync report and, for auth failures, abort.
-            for item in creates { outcome.failures[item.id] = error }
+            // One failed call fails its whole chunk. Attributing the error to
+            // every contact lets executeSync report and, for auth failures,
+            // abort — but wrapped as `batchChunkFailed`, so the three-strike
+            // rule can tell "the chunk's HTTP call failed" apart from "Google
+            // judged this contact" and not strike ~200 innocents at once.
+            for item in creates {
+                outcome.failures[item.id] = SyncEngineError.batchChunkFailed(underlying: error)
+            }
         }
     }
 
@@ -1585,7 +1763,10 @@ class SyncEngine: ObservableObject {
                 outcome.applied.insert(item.id)
             }
         } catch {
-            for item in updates { outcome.failures[item.id] = error }
+            // Chunk-level, so it must not strike any member — see runCreateBatch.
+            for item in updates {
+                outcome.failures[item.id] = SyncEngineError.batchChunkFailed(underlying: error)
+            }
         }
     }
 
@@ -1599,7 +1780,10 @@ class SyncEngine: ObservableObject {
                 outcome.applied.insert(item.id)
             }
         } catch {
-            for item in deletes { outcome.failures[item.id] = error }
+            // Chunk-level, so it must not strike any member — see runCreateBatch.
+            for item in deletes {
+                outcome.failures[item.id] = SyncEngineError.batchChunkFailed(underlying: error)
+            }
         }
     }
 
@@ -1616,18 +1800,38 @@ class SyncEngine: ObservableObject {
     /// contact, and the write itself still succeeds without the photo.
     private var loggedPhotoDownloadFailure = false
 
+    /// The circuit breaker's trip point: after this many *consecutive* failed
+    /// downloads in one run, no further downloads are attempted. Each attempt
+    /// against a stalling host costs up to the 30 s request timeout, so
+    /// hundreds of contacts would turn one bad host into hours — and only the
+    /// logging of that was rate-limited before.
+    private static let maxConsecutivePhotoFailures = 3
+
+    /// Consecutive photo download failures this run. Reset when `executeSync`
+    /// starts and on any successful download.
+    private var consecutivePhotoFailures = 0
+
     /// Fill in `photoData` from `photoUrl` just in time for a Mac write.
     ///
     /// `convertToPerson` never downloads photo bytes — that would fetch every
     /// photo on every sync. Instead the URL rides along on the unified contact
     /// and the bytes are fetched here, only when a Google → Mac write actually
     /// needs them. On any failure the contact is written without the photo:
-    /// the photo rule will simply report it again next sync.
+    /// the photo rule will report it again on the next run, unless the URL
+    /// keeps failing (see `failedPhotoDownloads`).
     private func resolvingGooglePhoto(_ contact: UnifiedContact) async -> UnifiedContact {
         guard settings.syncPhotos,
               contact.photoData == nil,
               let urlString = contact.photoUrl,
               let url = URL(string: urlString) else { return contact }
+
+        // Circuit breaker: the host is clearly not serving photos this run,
+        // so stop paying the timeout per contact. Not recorded as a failure
+        // for this contact — its URL was never tried, and the next run starts
+        // with a closed breaker and tries again.
+        guard consecutivePhotoFailures < Self.maxConsecutivePhotoFailures else {
+            return contact
+        }
 
         var resolved = contact
         do {
@@ -1636,19 +1840,38 @@ class SyncEngine: ObservableObject {
             let (data, response) = try await GoogleOAuthManager.apiSession.data(from: url)
             guard let http = response as? HTTPURLResponse,
                   (200...299).contains(http.statusCode) else {
-                logPhotoDownloadProblem(
-                    "HTTP \((response as? HTTPURLResponse)?.statusCode ?? -1)")
+                recordPhotoDownloadFailure(for: contact,
+                    details: "HTTP \((response as? HTTPURLResponse)?.statusCode ?? -1)")
                 return resolved
             }
             guard !data.isEmpty, data.count <= Self.maxPhotoBytes else {
-                logPhotoDownloadProblem("\(data.count) bytes exceeds the \(Self.maxPhotoBytes)-byte cap")
+                recordPhotoDownloadFailure(for: contact,
+                    details: "\(data.count) bytes exceeds the \(Self.maxPhotoBytes)-byte cap")
                 return resolved
             }
             resolved.photoData = data
+            consecutivePhotoFailures = 0
         } catch {
-            logPhotoDownloadProblem(error.localizedDescription)
+            recordPhotoDownloadFailure(for: contact, details: error.localizedDescription)
         }
         return resolved
+    }
+
+    /// One failed download: advance the run's circuit breaker, remember the
+    /// contact so the diff stops re-firing on it this launch, and log the
+    /// first problem of the run.
+    private func recordPhotoDownloadFailure(for contact: UnifiedContact, details: String) {
+        consecutivePhotoFailures += 1
+        if let id = contact.googleResourceName {
+            Self.failedPhotoDownloads.insert(id)
+        }
+        if consecutivePhotoFailures == Self.maxConsecutivePhotoFailures {
+            SyncHistory.shared.log(
+                source: "SyncEngine", action: "photo.downloadsSuspended",
+                details: "\(Self.maxConsecutivePhotoFailures) consecutive photo download failures — "
+                       + "skipping further photo downloads for the rest of this run")
+        }
+        logPhotoDownloadProblem(details)
     }
 
     private func logPhotoDownloadProblem(_ details: String) {
@@ -2356,12 +2579,13 @@ enum ContactMapper {
         mac.organizationName   = unified.organizationName   ?? ""
 
         if fields.extendedNames {
-            mac.namePrefix         = unified.namePrefix         ?? ""
-            mac.nameSuffix         = unified.nameSuffix         ?? ""
-            mac.nickname           = unified.nickname           ?? ""
-            mac.phoneticGivenName  = unified.phoneticGivenName  ?? ""
-            mac.phoneticFamilyName = unified.phoneticFamilyName ?? ""
-            mac.departmentName     = unified.department         ?? ""
+            mac.namePrefix          = unified.namePrefix          ?? ""
+            mac.nameSuffix          = unified.nameSuffix          ?? ""
+            mac.nickname            = unified.nickname            ?? ""
+            mac.phoneticGivenName   = unified.phoneticGivenName   ?? ""
+            mac.phoneticMiddleName  = unified.phoneticMiddleName  ?? ""
+            mac.phoneticFamilyName  = unified.phoneticFamilyName  ?? ""
+            mac.departmentName      = unified.department          ?? ""
         }
 
         if fields.jobTitle { mac.jobTitle = unified.jobTitle ?? "" }
@@ -2611,6 +2835,11 @@ enum SyncEngineError: LocalizedError {
     case missingContactData(String)
     case backupNotFound
     case batchItemRejected(String)
+    /// A whole batch chunk failed as one HTTP call. Distinct from
+    /// `batchItemRejected` on purpose: the item form is Google's judgement on
+    /// one contact and counts toward set-aside; this form says nothing about
+    /// any member and never strikes.
+    case batchChunkFailed(underlying: Error)
 
     var errorDescription: String? {
         switch self {
@@ -2626,6 +2855,8 @@ enum SyncEngineError: LocalizedError {
             return "Backup session not found."
         case .batchItemRejected(let name):
             return "Google rejected this contact in a batch request: \(name)"
+        case .batchChunkFailed(let underlying):
+            return "A batch of Google changes failed together: \(underlying.localizedDescription)"
         }
     }
 }

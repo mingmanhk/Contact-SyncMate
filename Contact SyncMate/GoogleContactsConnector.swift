@@ -60,13 +60,19 @@ class GoogleContactsConnector: ObservableObject {
     ///
     /// Photos are excluded because the API handles them through
     /// `people.updateContactPhoto`; passing them here is rejected outright.
+    ///
+    /// `biographies` is included even though notes sync is gated off today
+    /// (`notesFieldAvailable = false`): the diff compares notes and
+    /// `applyToMac` writes them, so the day the entitlement flips, notes must
+    /// already round-trip — fetched, masked, and read back — or re-enabling
+    /// arms note-clearing plus a permanent notes diff loop.
     private static let updatablePersonFields =
-        "names,emailAddresses,phoneNumbers,addresses,organizations,birthdays,urls,nicknames"
+        "names,emailAddresses,phoneNumbers,addresses,organizations,birthdays,urls,nicknames,biographies"
 
     /// Fields requested back from batch calls. Kept identical to the update mask
     /// plus `metadata`, which carries the fresh etag every subsequent update needs.
     private static let readablePersonFields =
-        "names,emailAddresses,phoneNumbers,addresses,organizations,birthdays,urls,nicknames,metadata"
+        "names,emailAddresses,phoneNumbers,addresses,organizations,birthdays,urls,nicknames,biographies,metadata"
 
     /// How many times a request is retried before the error is surfaced.
     ///
@@ -174,8 +180,10 @@ class GoogleContactsConnector: ObservableObject {
         var allContacts: [GoogleContact] = []
         var pageToken: String?
         
-        let personFields = "names,emailAddresses,phoneNumbers,addresses,organizations,photos,birthdays,urls,nicknames,metadata,memberships"
-        
+        // `biographies` for the same reason as the update mask above: notes
+        // must round-trip the moment the entitlement gate opens.
+        let personFields = "names,emailAddresses,phoneNumbers,addresses,organizations,photos,birthdays,urls,nicknames,biographies,metadata,memberships"
+
         repeat {
             var components = URLComponents(string: "\(baseURL)/people/me/connections")!
             var queryItems = [
@@ -229,8 +237,8 @@ class GoogleContactsConnector: ObservableObject {
             throw GoogleContactsError.notAuthenticated
         }
         
-        let personFields = "names,emailAddresses,phoneNumbers,addresses,organizations,photos,birthdays,urls,nicknames,metadata,memberships"
-        
+        let personFields = "names,emailAddresses,phoneNumbers,addresses,organizations,photos,birthdays,urls,nicknames,biographies,metadata,memberships"
+
         var components = URLComponents(string: "\(baseURL)/\(resourceName)")!
         components.queryItems = [
             URLQueryItem(name: "personFields", value: personFields)
@@ -629,7 +637,27 @@ class GoogleContactsConnector: ObservableObject {
     /// `ISO8601DateFormatter` (NSISO8601DateFormatter) is documented
     /// thread-safe, and it is only ever read after this immutable `let`
     /// initialises.
+    ///
+    /// Two formatters because the People API sends `updateTime` with
+    /// fractional seconds ("2026-08-11T09:41:30.123456Z") and a plain
+    /// internet-date-time formatter parses that to *nil* — so `gModified`
+    /// fell to `.distantPast`, `gChanged` never fired, and every Google-side
+    /// edit demoted to the unknown-vs-unknown conflict branch. The fractional
+    /// form is tried first; the bare form stays as the fallback in case the
+    /// wire format ever omits the fraction.
+    nonisolated(unsafe) private static let fractionalUpdateTimeFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
     nonisolated(unsafe) private static let updateTimeFormatter = ISO8601DateFormatter()
+
+    /// Parse a People API timestamp, with or without fractional seconds.
+    /// Internal (not private) so the fallback chain is unit-testable.
+    nonisolated static func parseUpdateTime(_ value: String) -> Date? {
+        fractionalUpdateTimeFormatter.date(from: value)
+            ?? updateTimeFormatter.date(from: value)
+    }
 
     /// The URL of a photo actually worth syncing, or nil.
     ///
@@ -657,6 +685,9 @@ class GoogleContactsConnector: ObservableObject {
             contact.familyName = names.familyName
             contact.namePrefix = names.honorificPrefix
             contact.nameSuffix = names.honorificSuffix
+            contact.phoneticGivenName = names.phoneticGivenName
+            contact.phoneticMiddleName = names.phoneticMiddleName
+            contact.phoneticFamilyName = names.phoneticFamilyName
         }
         
         // Nicknames
@@ -720,10 +751,14 @@ class GoogleContactsConnector: ObservableObject {
             $0.contactGroupMembership?.contactGroupResourceName
         } ?? []
         
-        // Update time
-        if let metadata = apiPerson.metadata,
-           let updateTime = metadata.sources?.first?.updateTime {
-            contact.updateTime = updateTimeFormatter.date(from: updateTime)
+        // Update time — from the CONTACT source when there is one. `sources`
+        // can also carry PROFILE / DOMAIN_PROFILE entries whose updateTime
+        // describes a different record, and `sources?.first` took whichever
+        // happened to come back first.
+        if let sources = apiPerson.metadata?.sources,
+           let updateTime = (sources.first(where: { $0.type == "CONTACT" })
+                                ?? sources.first)?.updateTime {
+            contact.updateTime = parseUpdateTime(updateTime)
         }
         
         return contact
@@ -733,13 +768,20 @@ class GoogleContactsConnector: ObservableObject {
         var person = PeopleAPIPerson(resourceName: contact.resourceName)
         person.etag = contact.etag
         
-        // Names
-        if contact.givenName != nil || contact.familyName != nil {
+        // Names — phonetics included, or the whole-object `names` mask would
+        // clear them on Google with every outbound update. The emptiness test
+        // covers the phonetics too so a phonetic-only record still writes.
+        if contact.givenName != nil || contact.familyName != nil
+            || contact.phoneticGivenName != nil || contact.phoneticMiddleName != nil
+            || contact.phoneticFamilyName != nil {
             person.names = [
                 PersonName(
                     givenName: contact.givenName,
                     middleName: contact.middleName,
                     familyName: contact.familyName,
+                    phoneticGivenName: contact.phoneticGivenName,
+                    phoneticMiddleName: contact.phoneticMiddleName,
+                    phoneticFamilyName: contact.phoneticFamilyName,
                     honorificPrefix: contact.namePrefix,
                     honorificSuffix: contact.nameSuffix
                 )
@@ -751,8 +793,11 @@ class GoogleContactsConnector: ObservableObject {
             person.nicknames = [PersonNickname(value: nickname)]
         }
         
-        // Organization
-        if contact.organizationName != nil || contact.jobTitle != nil {
+        // Organization — department is part of the emptiness test now that the
+        // diff tracks it: a department-only record must still write, or the
+        // `organizations` mask would clear it and the diff re-fire forever.
+        if contact.organizationName != nil || contact.department != nil
+            || contact.jobTitle != nil {
             person.organizations = [
                 PersonOrganization(
                     name: contact.organizationName,
@@ -1006,6 +1051,14 @@ nonisolated struct PersonName: Codable {
     var givenName: String?
     var middleName: String?
     var familyName: String?
+    /// The phonetic fields round-trip deliberately: without them, Google-side
+    /// phonetics were never read (so `applyToMac`'s `?? ""` cleared the Mac
+    /// copies on any inbound update) and the whole-object `names` update mask
+    /// cleared the Google copies on any outbound one — recurring loss the
+    /// diff could not even see, worst for CJK address books.
+    var phoneticGivenName: String?
+    var phoneticMiddleName: String?
+    var phoneticFamilyName: String?
     var honorificPrefix: String?
     var honorificSuffix: String?
     var displayName: String?

@@ -117,6 +117,15 @@ final class SyncCoordinator: ObservableObject {
     /// finishing run is still the one holding the handle.
     private var runGeneration = 0
 
+    /// Generation of the run the watchdog cancelled and gave up on, if any.
+    ///
+    /// A run wedged in synchronous XPC never observes that cancel, so its
+    /// handle stays set and the start gate refused every subsequent sync
+    /// until relaunch — silently, while the UI said "Please try again".
+    /// Recording the abandoned generation lets the next user-initiated start
+    /// orphan the zombie handle instead (see `claimStart`).
+    private var abandonedGeneration: Int?
+
     /// Whether the run being started came from the background timer.
     /// Set synchronously in `runSync` before the body task is spawned, read
     /// by the review-publish path to choose notification vs opening a window.
@@ -150,7 +159,7 @@ final class SyncCoordinator: ObservableObject {
         // used to pass `!isRunning` and spawn a second full run. Claiming the
         // phase here closes that window; the task-handle gate covers the
         // watchdog case where the phase was released but the run still lives.
-        guard !isRunning, currentRunTask == nil else { return }
+        guard claimStart(caller: "runSync") else { return }
         setPhase(.preparing, step: "Starting…", progress: 0)
         // A coordinator-owned Task, so cancelSync() holds the handle; awaiting
         // its value keeps every caller's structure unchanged.
@@ -171,6 +180,10 @@ final class SyncCoordinator: ObservableObject {
         let oauth = GoogleOAuthManager.shared
         guard oauth.isAuthenticated else {
             setFailed("Google account is not connected. Sign in via Settings → Accounts.")
+            // The same 12 s idle reset as every other failure path — without
+            // it the .failed banner persisted until something else moved the
+            // phase.
+            scheduleIdleReset(after: 12)
             return
         }
 
@@ -375,7 +388,7 @@ final class SyncCoordinator: ObservableObject {
     func applyReviewed(_ session: SyncSession) async {
         // Same double-start closure as runSync: claim the phase before the
         // first suspension, clear only our own handle afterwards.
-        guard !isRunning, currentRunTask == nil else { return }
+        guard claimStart(caller: "applyReviewed") else { return }
         setPhase(.syncing(0), step: "Applying reviewed changes…", progress: 0)
         runGeneration += 1
         let generation = runGeneration
@@ -456,6 +469,41 @@ final class SyncCoordinator: ObservableObject {
 
     // MARK: - Private helpers
 
+    /// Claim the right to start a new run, or say why not.
+    ///
+    /// Refuses while a run is genuinely active or winding down. When the only
+    /// holdout is a handle belonging to a run the watchdog already abandoned,
+    /// the zombie is orphaned instead: its handle is dropped and the start
+    /// proceeds — the caller's generation bump guarantees the zombie's
+    /// eventual completion cannot clear the new run's handle, and the
+    /// watchdog's cancel already stopped it at its next cancellation check.
+    ///
+    /// Every refusal is logged. A silently ignored click on Sync is
+    /// indistinguishable from a broken app, and this gate used to be exactly
+    /// that: a no-op with no trace anywhere.
+    private func claimStart(caller: String) -> Bool {
+        if isRunning {
+            SyncHistory.shared.log(
+                source: "SyncCoordinator", action: "sync.startRefused",
+                details: "\(caller) refused — a sync is already active (\(phase.label))")
+            return false
+        }
+        if currentRunTask != nil {
+            guard abandonedGeneration == runGeneration else {
+                SyncHistory.shared.log(
+                    source: "SyncCoordinator", action: "sync.startRefused",
+                    details: "\(caller) refused — the previous run is still winding down")
+                return false
+            }
+            SyncHistory.shared.log(
+                source: "SyncCoordinator", action: "sync.orphanedAbandonedRun",
+                details: "The watchdog-cancelled run never finished — starting a new run over it")
+            currentRunTask = nil
+        }
+        abandonedGeneration = nil
+        return true
+    }
+
     private func setPhase(_ p: SyncPhase, step: String = "", progress pg: Double = 0) {
         phase     = p
         stepLabel = step
@@ -502,6 +550,11 @@ final class SyncCoordinator: ObservableObject {
             // blocks a successor from overlapping a zombie that ignores
             // cancellation for a while.
             self.currentRunTask?.cancel()
+            // Remember which run was given up on: a run wedged in synchronous
+            // XPC never sees the cancel, so its handle may stay set forever —
+            // and "Please try again" must actually mean it. claimStart lets
+            // the next user start orphan exactly this generation's handle.
+            self.abandonedGeneration = self.runGeneration
             self.setFailed("Sync stopped responding and was cancelled. Please try again.")
             self.appState?.isSyncing = false
             self.appState?.syncProgress = nil
@@ -553,6 +606,10 @@ final class SyncCoordinator: ObservableObject {
                 return "Backup not found. Check Settings → Backups."
             case .batchItemRejected(let name):
                 return "Google rejected \(name). Other contacts in the same batch were unaffected."
+            case .batchChunkFailed(let underlying):
+                // The wrapper only marks the error as chunk-level for the
+                // three-strike rule; the user should read the real cause.
+                return friendlyMessage(for: underlying)
             }
         }
 
