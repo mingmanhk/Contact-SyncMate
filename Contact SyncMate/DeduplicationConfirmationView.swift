@@ -17,7 +17,10 @@ struct DeduplicationConfirmationView: View {
     @Environment(\.dismiss) private var dismiss
     
     let duplicateGroups: [DuplicateGroup]
-    let onDecisionsMade: ([UUID: DuplicateDecision]) -> Void
+    /// Decisions per group, plus the groups whose "Remember this choice"
+    /// toggle is on. The view collected the patterns all along but the old
+    /// single-argument callback silently dropped them.
+    let onDecisionsMade: ([UUID: DuplicateDecision], Set<UUID>) -> Void
     
     @State private var decisions: [UUID: DuplicateDecision] = [:]
     @State private var rememberPatterns: Set<UUID> = []
@@ -144,7 +147,7 @@ struct DeduplicationConfirmationView: View {
                 .foregroundStyle(.secondary)
             
             Button("Apply Decisions") {
-                onDecisionsMade(decisions)
+                onDecisionsMade(decisions, rememberPatterns)
                 dismiss()
             }
             .keyboardShortcut(.defaultAction)
@@ -662,13 +665,13 @@ struct MergeChangeRow: View {
     
     DeduplicationConfirmationView(
         duplicateGroups: [group],
-        onDecisionsMade: { _ in }
+        onDecisionsMade: { _, _ in }
     )
 }
 
 #Preview("Empty State") {
     DeduplicationConfirmationView(
         duplicateGroups: [],
-        onDecisionsMade: { _ in }
+        onDecisionsMade: { _, _ in }
     )
 }

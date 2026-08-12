@@ -98,6 +98,15 @@ final class SyncCoordinator: ObservableObject {
     /// publishes the session rather than showing a sheet itself.
     @Published var sessionAwaitingReview: SyncSession?
 
+    /// A finished duplicate scan waiting for the user to confirm.
+    ///
+    /// The scanning coordinator itself is published, not just its groups: it
+    /// retains the `scanResult` the confirmation sheet displays, and its
+    /// `applyUserDecisions` is the only way the user's choices get executed.
+    /// Same contract as `sessionAwaitingReview` — whichever view is on screen
+    /// presents the sheet and clears this once it has taken ownership.
+    @Published var dedupAwaitingConfirmation: DeduplicationCoordinator?
+
     // MARK: Weak refs (set by AppDelegate after launch)
 
     weak var appState: AppState?
@@ -256,14 +265,34 @@ final class SyncCoordinator: ObservableObject {
                         autoApplyIfSafe: settings.allowSilentAutoMerge
                     )
 
-                    // Surface the outcome: banner step + system notification
-                    // when duplicate groups are waiting for review.
+                    // Surface the outcome when duplicate groups are waiting
+                    // for review. The coordinator used to be discarded here,
+                    // which made the whole confirmation flow unreachable: the
+                    // same groups were recomputed and re-notified on every
+                    // run, and the notification pointed nowhere. Publishing
+                    // the coordinator retains the scan result the sheet
+                    // displays and the applyUserDecisions the sheet routes
+                    // the user's choices through.
                     if scan.needsUserConfirmation {
                         let n = scan.groupsNeedingConfirmation.count
                         setPhase(.preparing,
                                  step: "\(n) duplicate group\(n == 1 ? "" : "s") need review",
                                  progress: 0)
-                        SyncNotifier.notifyConflictsNeedReview(count: n)
+                        dedupAwaitingConfirmation = coordinator
+                        SyncHistory.shared.log(
+                            source: "SyncCoordinator", action: "dedup.awaitingConfirmation",
+                            details: "\(n) duplicate group\(n == 1 ? "" : "s") prepared for review")
+                        // Same presenter split as sessionAwaitingReview below:
+                        // a scheduled run notifies instead of surprising the
+                        // user with a window; a user-initiated run opens the
+                        // Dashboard, whose onChange/onAppear present the
+                        // confirmation sheet.
+                        if pendingRunIsScheduled {
+                            SyncNotifier.notifyConflictsNeedReview(count: n)
+                        } else {
+                            NotificationCenter.default.post(
+                                name: .openDashboardWindow, object: nil)
+                        }
                     }
                 }
             }

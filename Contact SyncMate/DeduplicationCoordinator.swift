@@ -140,9 +140,9 @@ class DeduplicationCoordinator: ObservableObject {
     func presentConfirmationUI() -> some View {
         DeduplicationConfirmationView(
             duplicateGroups: scanResult?.groupsNeedingConfirmation ?? [],
-            onDecisionsMade: { decisions in
+            onDecisionsMade: { decisions, rememberPatterns in
                 Task {
-                    await self.applyUserDecisions(decisions)
+                    await self.applyUserDecisions(decisions, rememberPatterns: rememberPatterns)
                 }
             }
         )

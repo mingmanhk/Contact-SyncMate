@@ -21,6 +21,12 @@ struct DashboardView: View {
     @State private var showHistoryView = false
     @State private var recentEvents: [SyncEvent] = []
 
+    // Dedup confirmation (picked up from sync.dedupAwaitingConfirmation).
+    // The coordinator is held here for the sheet's lifetime because it owns
+    // the scan result on display and executes the user's decisions.
+    @State private var showDedupConfirmation = false
+    @State private var dedupCoordinator: DeduplicationCoordinator?
+
     // Sync feedback (derived from sync.phase — see onChange below)
     @State private var syncResultBanner: SyncResultBanner?
     @State private var showClearHistoryConfirmation = false
@@ -118,11 +124,24 @@ struct DashboardView: View {
         .animation(.easeInOut(duration: 0.25), value: syncResultBanner != nil)
         .animation(.easeInOut(duration: 0.25), value: syncErrorMessage != nil)
         .animation(.easeInOut(duration: 0.2), value: appState.isSyncing)
-        .sheet(isPresented: $showSyncPreview) {
+        .sheet(isPresented: $showSyncPreview, onDismiss: {
+            // A dedup confirmation published in the same run waits behind the
+            // review sheet — two sheets cannot present in one transaction, and
+            // the review is the primary flow. Pick it up now that the review
+            // is out of the way.
+            presentDedupConfirmationIfPending()
+        }) {
             if let session = appState.currentSyncSession {
                 SyncPreviewView(session: session, isPresented: $showSyncPreview) { reviewed in
                     applyReviewedSession(reviewed)
                 }
+            }
+        }
+        .sheet(isPresented: $showDedupConfirmation, onDismiss: {
+            dedupCoordinator = nil
+        }) {
+            if let coordinator = dedupCoordinator {
+                coordinator.presentConfirmationUI()
             }
         }
         .sheet(isPresented: $showHistoryView) {
@@ -147,6 +166,14 @@ struct DashboardView: View {
             showSyncPreview = true
             sync.sessionAwaitingReview = nil
         }
+        // Same publish/present contract as sessionAwaitingReview: the scan's
+        // coordinator was a discarded local in runSync, so the confirmation
+        // sheet had no presenter and the "needs review" notification pointed
+        // nowhere.
+        .onChange(of: sync.dedupAwaitingConfirmation.map { ObjectIdentifier($0) }) { _, id in
+            guard id != nil else { return }
+            presentDedupConfirmationIfPending()
+        }
         .onAppear {
             recentEvents = Self.interestingEvents(from: SyncHistory.shared.events())
             // Give the coordinator a handle to AppState so it can update isSyncing etc.
@@ -159,6 +186,10 @@ struct DashboardView: View {
                 showSyncPreview = true
                 sync.sessionAwaitingReview = nil
             }
+            // A dedup confirmation published before this window existed —
+            // a menu-bar run, or a scheduled run whose notification the user
+            // just clicked. Deferred behind the review sheet if one opened.
+            presentDedupConfirmationIfPending()
         }
         // Drive banners from the coordinator's phase
         // The engine reports progress per contact, which makes it the natural
@@ -697,6 +728,24 @@ struct DashboardView: View {
         // review path publishes sessionAwaitingReview, which this view
         // presents via onChange/onAppear.
         Task { await sync.runSync() }
+    }
+
+    /// Take ownership of a published dedup confirmation, unless a review
+    /// sheet is (or is about to be) on screen — then it stays published and
+    /// the review sheet's onDismiss picks it up.
+    ///
+    /// Both orderings of the two onChange handlers are covered: if this runs
+    /// first the session is still awaiting pickup (`sessionAwaitingReview`
+    /// non-nil); if the session handler ran first the preview is already
+    /// showing (`showSyncPreview`).
+    private func presentDedupConfirmationIfPending() {
+        guard !showSyncPreview,
+              sync.sessionAwaitingReview == nil,
+              !showDedupConfirmation,
+              let coordinator = sync.dedupAwaitingConfirmation else { return }
+        dedupCoordinator = coordinator
+        showDedupConfirmation = true
+        sync.dedupAwaitingConfirmation = nil
     }
 
     /// Apply a session the user reviewed in the preview sheet.
