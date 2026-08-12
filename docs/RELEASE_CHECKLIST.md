@@ -7,6 +7,10 @@ every release.
 
 ## A. One-time account setup (blockers)
 
+- [ ] **Bootstrap the local config**: `bash Scripts/bootstrap-config.sh`
+      The OAuth loader (`GoogleOAuthConfig.swift`) is gitignored, so a clean
+      clone does not build until this script materialises it from the
+      committed template (and drops a placeholder `GoogleOAuthConfig.json`).
 - [ ] **Accept the latest Apple Program License Agreement**
       developer.apple.com → Account → Membership → agree to PLA.
       *Symptom if skipped: "Unable to process request — PLA Update available".*
@@ -29,8 +33,10 @@ every release.
 
 ## C. Pre-release verification (every release)
 
-- [ ] `xcodebuild -scheme "Contact SyncMate" build` → **BUILD SUCCEEDED**
-- [ ] `xcodebuild -scheme "Contact SyncMate" test` → **all tests pass**
+- [ ] `bash Scripts/verify-contact-syncmate.sh` → every phase reports **PASS**
+      (do not use bare `xcodebuild test`: the test host is a menu-bar app that
+      never exits after the last test, so its exit code is meaningless — the
+      script parses the log for the real result)
 - [ ] No new warnings introduced (`xcodebuild … 2>&1 | grep warning:`)
 - [ ] Manual smoke test (10 min):
   - [ ] Sign in to Google → email shows in Settings → Accounts
@@ -57,6 +63,8 @@ xcodebuild -project "Contact SyncMate.xcodeproj" \
   -archivePath build/ContactSyncMate.xcarchive archive
 
 # 2. Export with Developer ID signing
+#    ExportOptions.plist is committed at the repo root (method: developer-id).
+#    Replace its YOUR_TEAM_ID placeholder with your Team ID first.
 xcodebuild -exportArchive \
   -archivePath build/ContactSyncMate.xcarchive \
   -exportOptionsPlist ExportOptions.plist \
@@ -108,4 +116,7 @@ Before every submission:
 2. Set the build number to the commit count so any installed build maps to a
    unique commit: `agvtool new-version -all "$(git rev-list --count HEAD)"`
    (or edit `CURRENT_PROJECT_VERSION` in both configurations).
-3. Tag the exact submitted commit: `git tag -a "v$(MARKETING_VERSION)" -m "App Store submission" && git push origin --tags`.
+3. Tag the exact submitted commit:
+   `git tag -a "v$(agvtool what-marketing-version -terse1)" -m "App Store submission" && git push origin --tags`
+   (or write the version literally, e.g. `git tag -a v1.1 …` —
+   `$(MARKETING_VERSION)` is not valid shell and expands to nothing).

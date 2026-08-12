@@ -48,22 +48,10 @@ Everything runs on your Mac. There is no Contact SyncMate account and no
 server — and unless you enable optional AI matching, no way for anyone but you
 to see your contacts.
 
-
-WHY YOU MIGHT NEED IT
-
-Most people's address book lives in two places at once: a Google account for
-Gmail, Android, or work, and Apple Contacts across Mac, iPhone, and iPad.
-
-Over time the two copies drift apart. A number you fixed on your iPhone never
-reaches Gmail. A colleague added in Google Contacts never appears on your Mac.
-Re-importing to catch up leaves you with duplicates — "Bob Smith" sitting beside
-"Robert Smith", the same person twice with half the details on each card.
-
-Contact SyncMate reconciles the two lists instead of overwriting one with the
-other. It remembers which Google contact corresponds to which Mac contact,
-works out what genuinely changed on each side since the last run, merges
-field-level differences, and recognises the same person under different
-spellings.
+It reconciles rather than overwrites: it remembers which Google contact
+matches which Mac contact, moves only what genuinely changed since the last
+run, merges field-level differences, and recognises the same person under
+different spellings — so a second sync updates instead of duplicating.
 
 
 TWO-WAY SYNC, OR ONE-WAY
@@ -78,8 +66,8 @@ TWO-WAY SYNC, OR ONE-WAY
 SEE EVERY CHANGE BEFORE IT HAPPENS
 
 Every add, update, deletion, and merge is listed with the exact fields
-affected. Override any individual change, or use dry-run mode to compute the
-full result and write nothing at all.
+affected. Override any individual change, or use dry-run mode to compute
+everything and write nothing.
 
 Deletions never propagate unless you switch that on, and each one is confirmed
 separately.
@@ -88,7 +76,7 @@ separately.
 UNDO ANY SYNC
 
 A snapshot is taken automatically before and after every sync. Roll back an
-entire session, or restore one contact to any earlier version using the
+entire session, or restore one contact to any earlier version in the
 side-by-side version browser.
 
 A change log records what happened to every contact, in which direction, and
@@ -121,8 +109,8 @@ BUILT FOR macOS
 • Notifications when a sync finishes, fails, or needs your review
 • Shortcuts and Siri actions for automation
 • Spotlight search across past syncs
-• Background sync on your schedule, optionally only on AC power, only on Wi-Fi,
-  or only when your Mac is idle
+• Background sync on your schedule — optionally only on AC power, on Wi-Fi,
+  or when your Mac is idle
 • Light, dark, or system appearance; seven accent colours
 • Full keyboard navigation, VoiceOver, Reduce Motion, and Differentiate Without
   Color support
@@ -132,9 +120,8 @@ CHOOSE WHAT SYNCS
 
 Photos, birthdays, addresses, websites, job titles and organisations can each be
 turned on or off. Restrict sync to selected Mac groups or Google labels.
-Optionally normalise name capitalisation — handled correctly for names like
-"van der Berg", "McDonald" and "O'Brien", and never applied to Chinese,
-Japanese, or Korean names.
+Optionally normalise name capitalisation — correct for "van der Berg",
+"McDonald" and "O'Brien", never applied to Chinese, Japanese, or Korean names.
 
 Export either address book to CSV or Excel whenever you want an archive.
 
@@ -156,11 +143,11 @@ REQUIREMENTS
 
 macOS 14 Sonoma or later, and a Google account.
 
-The Contacts note field is not synced. Apple restricts it to apps holding a
-special entitlement, which this app does not have; the setting is disabled
-rather than failing silently. Every other field syncs normally.
+The Contacts note field is not synced — Apple restricts it to apps holding a
+special entitlement, so that setting is disabled rather than failing silently.
+Every other field syncs normally.
 ```
-*≈4,550 characters — currently over the 4,000 limit; trim before pasting.*
+*3,984 characters — within the 4,000 limit.*
 
 ---
 
@@ -347,7 +334,7 @@ Capture tips:
 | Field | Value |
 |---|---|
 | **Version** | `1.1` |
-| **Build** | `1` |
+| **Build** | commit count at archive time — `git rev-list --count HEAD` (see [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md), "Versioning & tagging") |
 | **Copyright** | `2026 Victor Lam` |
 | **What's New** | First release. |
 

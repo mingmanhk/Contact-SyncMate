@@ -389,7 +389,7 @@ All 41 findings filed 2026-08-09 on `mingmanhk/Contact-SyncMate` with `audit`, `
 | Transient failures poison set-aside | P-03 #53 | One dropped batch can permanently set aside ~200 contacts |
 | Backup index at scale | P-06 #56 | Main-thread encode of all retained sessions (photos incl.); RAM-resident forever |
 
-Severity totals: **0 Critical · 9 High (#42, #53, #56, #63, #67, #68, #78, #79, #80) · 17 Medium · 17 Low** across 43 findings in 34 issues (R-02 absorbs P-14, R-01 absorbs P-15, O-06 absorbs the O-07 assessment; P-12/O-12 were informational, not filed).
+Severity totals: **0 Critical · 9 High (#42, #53, #56, #63, #67, #68, #78, #79, #80) · 17 Medium · 17 Low** across 43 findings in 43 issues (#42–#84).
 
 **What cycle 2 confirmed sound:** retry/backoff + single-flight token refresh + pagination + batch alignment; zero reachable `try!`/`fatalError`/force-unwrap crash paths; exemplary menu-bar HIG behavior; minimal MAS-appropriate entitlements (the notes-entitlement denial is handled correctly); accurate OAuth verification docs; near-zero TODO debt; all 31 `Task {}` blocks have real error boundaries.
 

@@ -20,7 +20,7 @@ hosted policy, the hosted policy governs.
 - **Optional AI-assisted duplicate matching:** if — and only if — you switch on
   the explicit consent toggle in Settings → AI Matching (off by default; an API
   key alone does not enable it), limited fields of ambiguous duplicate pairs
-  (names, organisation, job title, email addresses, phone numbers) are sent to
+  (names, nickname, organisation, job title, email addresses, phone numbers) are sent to
   Anthropic (`api.anthropic.com`) under your own API key. Otherwise matching
   runs fully on-device.
 - Exactly two OAuth scopes are requested: `…/auth/contacts` and

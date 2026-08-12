@@ -1,6 +1,6 @@
 # CI for Contact SyncMate.
 #
-# The one non-obvious thing here: the 199 XCTest cases run inside the app
+# The one non-obvious thing here: the XCTest suite runs inside the app
 # itself, and the app is a menu-bar accessory that never quits after the last
 # test — `xcodebuild test`'s exit code is therefore meaningless. The log is
 # the source of truth, exactly as Scripts/verify-contact-syncmate.sh does

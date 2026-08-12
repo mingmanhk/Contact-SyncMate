@@ -9,7 +9,8 @@
 [![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-000000?logo=apple&logoColor=white)](https://www.apple.com/macos/)
 [![Swift](https://img.shields.io/badge/Swift-5.9-F05138?logo=swift&logoColor=white)](https://swift.org)
 [![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0071e3)](https://developer.apple.com/xcode/swiftui/)
-[![Tests](https://img.shields.io/badge/tests-109%20passing-2ea44f)](#testing)
+[![CI](https://github.com/mingmanhk/Contact-SyncMate/actions/workflows/ci.yml/badge.svg)](https://github.com/mingmanhk/Contact-SyncMate/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-214%20passing-2ea44f)](#testing)
 [![Privacy](https://img.shields.io/badge/telemetry-none-2ea44f)](#privacy-architecture)
 [![Backend](https://img.shields.io/badge/backend-none-2ea44f)](#privacy-architecture)
 
@@ -736,11 +737,27 @@ System Settings → Privacy & Security → Contacts when access was refused.
 - Xcode 15 or later
 - A Google Cloud project with the **People API** enabled
 
+### 0. Bootstrap the config
+
+Once you have the repo (step 1 below), run this first — a clean clone does not
+build without it:
+
+```bash
+bash Scripts/bootstrap-config.sh
+```
+
+`GoogleOAuthConfig.swift`, the loader that reads OAuth credentials from the
+gitignored JSON / Keychain, is itself gitignored — a guardrail from the era
+when it embedded credentials. The script materialises it from the committed,
+credential-free template (`Scripts/GoogleOAuthConfig.swift.template`) and
+drops a placeholder `GoogleOAuthConfig.json`. CI runs the same script.
+
 ### 1. Clone
 
 ```bash
 git clone https://github.com/mingmanhk/Contact-SyncMate.git
 cd Contact-SyncMate
+bash Scripts/bootstrap-config.sh   # step 0 — see above
 ```
 
 ### 2. Create an OAuth client
@@ -806,26 +823,48 @@ Full signing, notarisation, and submission steps are in
 
 ## Testing
 
-**109 tests, 0 failures.**
+**214 tests across 24 suites, 0 failures.**
 
 | Suite | Covers |
 |---|---|
 | `SyncEngineDiffTests` | Change classification across all three directions, conflict → merge, fuzzy match dedup |
+| `ConflictAutoResolutionTests` | Prefer Google / Prefer Mac auto-resolution of two-sided edits |
+| `SyncEngineMergeHelperTests` | Field-level merge helpers |
+| `SyncFailureKeyTests` | Stable identity keys for failed changes |
+| `ApplyToMacClearingTests` | Cleared fields propagate to the Mac side on update |
+| `GoogleErrorMessageTests` | Google API errors mapped to human-readable messages |
 | `SyncEngineModelTests` | Domain model invariants |
-| `NameFormattingEngineTests` | Title Case particles (`van der Berg`), prefixes (`McDonald`, `O'Brien`), hyphens, CJK safety, idempotence |
-| `DedupBlockingTests` | Blocking keys, candidate generation, exhaustive-vs-blocked switchover |
-| `SyncHistoryRetentionTests` | Age-based and count-based pruning |
-| `ContactNormalizerTests` | Phone/email/name normalisation |
-| `DeduplicationTests` | Scoring and grouping |
-| `ContactMappingStoreTests` | Mapping persistence |
-| `AppSettingsTests` | Defaults, persistence, reset |
-| `SyncHistoryTests` | Event log |
 | `UnifiedContactTests` | Model behaviour |
+| `ContactNormalizerTests` | Phone/email/name normalisation |
+| `ContactMappingStoreTests` | Mapping persistence |
+| `NameFormattingEngineTests` | Title Case particles (`van der Berg`), prefixes (`McDonald`, `O'Brien`), hyphens, CJK safety, idempotence |
+| `DeduplicationTests` | Scoring and grouping |
+| `ContactDeduplicatorScoreTests` | Individual scoring signal weights |
+| `DeduplicationMergeIntoTests` | Merge-into-primary field selection |
+| `DedupBlockingTests` | Blocking keys, candidate generation, exhaustive-vs-blocked switchover |
+| `GooglePhotoSyncTests` | Photo sync Google → Mac |
+| `GooglePhotoDiffTests` | Photo change detection in the diff |
+| `BackupSnapshotRoundTripTests` | Snapshot encode/decode round-trip |
+| `BackupIndexFormatTests` | `backup_index.json` format |
+| `SyncFailureStoreTests` | Persisted per-contact failure records |
+| `SyncHistoryTests` | Event log |
+| `SyncHistoryRetentionTests` | Age-based and count-based pruning |
+| `AppSettingsTests` | Defaults, persistence, reset |
 | `PerformanceTests` | Diff throughput |
 
 Tests pin the settings they depend on in `setUp`/`tearDown` — the app and the
 test bundle share a `UserDefaults` domain, so without that a user's real
 preferences leak into assertions.
+
+### Continuous integration
+
+Every push and pull request runs the suite on GitHub Actions
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)). The test host is a
+menu-bar app that never exits after the last test, so `xcodebuild test`'s exit
+code is meaningless — CI parses the log for the real result, exactly as
+[`Scripts/verify-contact-syncmate.sh`](Scripts/verify-contact-syncmate.sh)
+does locally. Run that script before opening a PR; it builds, tests, checks
+translations, and reports one PASS/FAIL line per phase.
 
 ---
 
@@ -836,28 +875,39 @@ Contact SyncMate/
 ├── Contact_SyncMateApp.swift      # @main · AppDelegate · status item · windows
 ├── AppState.swift                 # observable app-wide state
 ├── AppSettings.swift              # typed preferences + migration + enums
+├── Info.plist  PrivacyInfo.xcprivacy         # app config + privacy manifest
+├── Localizable.xcstrings  InfoPlist.xcstrings # en · zh string catalogs
 │
 ├── DesignSystem/
 │   ├── Color+App.swift            # semantic colour tokens (asset-backed)
 │   ├── AdaptiveIcon.swift         # SF Symbol wrapper + AppIcon registry
 │   ├── AppButtonStyle.swift       # hover / pressed / focus styles
 │   ├── KeychainStore.swift        # secret storage
+│   ├── LanguageManager.swift      # in-app language override (en / zh)
 │   └── SecurityScopedBookmark.swift # sandbox folder persistence
 │
 ├── SyncCoordinator.swift          # ⭐ the only sync entry point
 ├── SyncEngine.swift               # fetch → diff → apply · ContactMapper
-├── AutoSyncScheduler.swift        # repeating timer + conditions
+├── SyncTypes.swift                # sessions, results, change model
+├── AutoSyncScheduler.swift        # repeating timer
+├── AutoSyncConditions.swift       # AC power / Wi-Fi / idle gates
 ├── SyncBackupIntegration.swift    # rollback
+├── SyncFailureStore.swift         # persisted per-contact failures
+├── SyncErrorExplanation.swift     # plain-language error explanations
 │
 ├── GoogleOAuthManager.swift       # ASWebAuthenticationSession + PKCE
+├── GoogleOAuthConfig.swift        # gitignored loader — Scripts/bootstrap-config.sh
 ├── GoogleContactsConnector.swift  # People API client
 ├── MacContactsConnector.swift     # CNContactStore client
+├── GoogleContactsExporter.swift  MacContactsExporter.swift  # CSV / XLSX
 │
 ├── ContactDeduplicator.swift      # scoring + blocking
 ├── AIContactMatcher.swift         # on-device NLP + optional cloud tier
 ├── DeduplicationCoordinator.swift # scan orchestration
+├── DeduplicationModels.swift  DeduplicationDecisionStore.swift
 ├── ContactNormalizer.swift        # phone/email/name normalisation
 ├── NameFormattingEngine.swift     # opt-in casing, CJK-safe
+├── UnifiedContact.swift           # provider-neutral contact model
 │
 ├── ContactBackupManager.swift     # snapshots + versions
 ├── SyncHistory.swift              # audit log + retention
@@ -868,13 +918,21 @@ Contact SyncMate/
 │
 ├── DashboardView.swift  MenuBarView.swift  SettingsView.swift
 ├── OnboardingView.swift  SyncPreviewView.swift  ContactDiffView.swift
-├── GroupFilterPickerView.swift  BackupComparisonView.swift
+├── SyncFailuresView.swift  SyncHistoryView.swift  SyncHistoryAndBackupView.swift
+├── SyncHistoryViewModel.swift  ContactVersionHistoryView.swift
+├── GroupFilterPickerView.swift  RestoreBackupDialog.swift
+├── DeduplicationConfirmationView.swift  ContentView.swift
 └── Components/                    # StatusDot · badges · rows
 
 docs/
 ├── index.html  privacy.html  terms.html   # GitHub Pages site
-├── assets/                               # logo + SVG diagrams
-└── RELEASE_CHECKLIST.md
+├── assets/                                # logo + SVG diagrams
+├── APP_STORE_LISTING.md  RELEASE_CHECKLIST.md
+└── AUDIT.md  AUDIT-CYCLE3.md              # audit-cycle findings
+
+Scripts/
+├── bootstrap-config.sh            # materialise gitignored config (Setup step 0)
+└── verify-contact-syncmate.sh     # build → test → verify, log-parsed
 ```
 
 ---
@@ -1029,15 +1087,16 @@ Issues and pull requests are welcome.
    - **Never** call `CNContactStore` from the main actor — it is synchronous XPC to `contactsd` and causes priority-inversion hangs
    - Add SF Symbols to the `AppIcon` registry rather than inlining strings
 3. Add tests for new logic; pure functions preferred
-4. `xcodebuild … test` must pass before opening a PR
+4. `bash Scripts/verify-contact-syncmate.sh` must pass before opening a PR
 5. Never commit `GoogleOAuthConfig.json` or any credential
 
 ---
 
 ## License
 
-See [`LICENSE`](LICENSE). Third-party services used — Google People API, Apple
-Contacts, and optionally the Anthropic API — remain governed by their own terms.
+MIT — see [`LICENSE`](LICENSE). Third-party services used — Google People API,
+Apple Contacts, and optionally the Anthropic API — remain governed by their own
+terms.
 
 ---
 

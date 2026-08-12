@@ -6,6 +6,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+Nothing yet.
+
+## [1.1] - 2026-08-11
+
+The first release audited end-to-end. Three full audit cycles
+([`docs/AUDIT.md`](../docs/AUDIT.md), [`docs/AUDIT-CYCLE3.md`](../docs/AUDIT-CYCLE3.md))
+reviewed the sync engine, connectors, persistence, UI, and policies; everything
+below is the user-facing result.
+
+### Added
+- **Photo sync that actually works** — contact photos now sync Google → Mac,
+  with change detection so unchanged photos are not rewritten every run.
+- **Cancellable syncs** — a running sync can be stopped mid-flight; changes
+  already applied are recorded in history and remain reversible via backups.
+- **Full Chinese localization** — the entire UI is available in Simplified and
+  Traditional Chinese alongside English.
+- **Crash diagnostics** — failures during a sync are captured with enough
+  context to diagnose them, surfaced in a dedicated Sync Failures view with
+  plain-language explanations, and reported honestly in the sync summary.
+- **Privacy manifest** — the app bundle ships `PrivacyInfo.xcprivacy`
+  declaring its required-reason API usage and that no data is collected and
+  no tracking occurs.
+- **Continuous integration** — every push and pull request builds the app and
+  runs the full test suite on GitHub Actions.
+- **Group / label filtered sync** — restrict a sync to selected Mac groups or
+  Google labels via the group picker.
+
+### Changed
+- **Safety gates for merges and deletions** — deletions never propagate unless
+  explicitly enabled, and each one is confirmed individually; automatic merges
+  are limited to small, unambiguous groups with no critical field conflicts,
+  and the app no longer asks about merges that are not actually in doubt.
+- **Offline resilience** — network drops and transient Google API errors are
+  retried with backoff instead of failing the run; contacts that genuinely
+  cannot be written are set aside and reported rather than retried forever.
+- **Honest policies** — the privacy policy, terms, and App Store copy were
+  rewritten to state exactly what the app does: no backend, no telemetry,
+  unencrypted local backups disclosed, and the optional Anthropic AI tier
+  gated behind the user's own API key *plus* an explicit consent toggle.
+
+### Fixed
+- Duplicate contacts no longer appear after repeated syncs; edits made on the
+  Mac side are no longer dropped during two-way merges; backups no longer race
+  a running sync.
+
+## [0.x] - development scaffolding (historical)
+
+Pre-1.1 working notes, retained for archaeology. Some details below describe
+intermediate states that later changed.
+
 ### Runtime Wiring & Integration
 - **`AutoSyncScheduler.swift`** *(new file)* — `@MainActor` class that owns the repeating `DispatchSourceTimer` for auto-sync. Observes `AppSettings.autoSyncEnabled` and `autoSyncInterval` via Combine; re-arms the timer whenever either changes. Publishes the next fire date to `AppState.nextScheduledSync` so the Settings → Auto Sync tab countdown shows a live relative-time label.
 - **`Contact_SyncMateApp.swift`** — `AppDelegate` gains `setupAutoSyncScheduler()` (wires `AutoSyncScheduler` with a `triggerSync` closure ready for the real `SyncEngine`) and `setupLaunchAtLogin()` which registers/unregisters `SMAppService.mainApp` on macOS 13+ whenever the `launchAtLogin` preference changes, with a fallback comment for the LoginItem helper bundle path on macOS 12.
@@ -49,7 +100,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Settings Enhancements
 - **General tab** — Sync Mode section replaced plain radio picker with a tappable card-style list showing icon, name, and description inline. Appearance gains "Launch at login" and "Show pending-changes badge" toggles. New Notifications section lets users independently toggle alerts for sync completion, errors, and conflicts (with a deep-link button to System Settings → Notifications). Data & History section now includes a history retention duration picker (7/14/30/90 days or Forever). Reset All Settings now uses a `.confirmationDialog` to prevent accidental resets.
-- **Common Sync tab** — New "Fields to Sync" section lets users independently enable/disable Photos, Notes, Birthday, Websites, Addresses, and Job Title/Org on a per-field basis. New "Default Conflict Resolution" section replaces the implicit always-ask behaviour with an explicit choice (Always Ask / Prefer Google / Prefer Mac) shown as a card list with icons and descriptions. Merge Behaviour and Filters sections retain all prior controls; disabled group/label picker now shows a friendly "coming soon" note.
+- **Common Sync tab** — New "Fields to Sync" section lets users independently enable/disable Photos, Notes, Birthday, Websites, Addresses, and Job Title/Org on a per-field basis. New "Default Conflict Resolution" section replaces the implicit always-ask behaviour with an explicit choice (Always Ask / Prefer Google / Prefer Mac) shown as a card list with icons and descriptions. Merge Behaviour and Filters sections retain all prior controls.
 - **Manual Sync tab** — Safety and Advanced sections polished with SF Symbol labels per toggle. Dry run mode now shows an inline orange warning banner when active. Help text updated to be more descriptive for both sections.
 - **Auto Sync tab** — Picker labels updated to natural language ("Every 15 minutes", "Once a day"). A "Next sync in X" row below the interval picker shows a live countdown using `Text(date, style: .relative)` sourced from `AppState.nextScheduledSync`. Conditions section has SF Symbol labels per condition and a contextual footer explaining whether conditions are active. The whole tab animates in/out with `autoSyncEnabled`.
 - **`AppSettings`** — Added 12 new persisted properties: `notifyOnSyncComplete`, `notifyOnErrors`, `notifyOnConflicts`, `syncNotes`, `syncBirthday`, `syncWebsites`, `syncAddresses`, `syncJobTitle`, `defaultConflictResolution`, `launchAtLogin`, `showSyncBadge`, `historyRetentionDays`. Added `ConflictResolutionDefault` enum with display name, description, and icon.
@@ -69,5 +120,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial repository setup for Contact SyncMate.
 - Core types for deduplication results and decision handling (placeholders/stubs where applicable).
 
-[Unreleased]: https://github.com/your-org/contact-syncmate/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/your-org/contact-syncmate/releases/tag/v0.1.0
+[Unreleased]: https://github.com/mingmanhk/Contact-SyncMate/compare/v1.1...HEAD
+[1.1]: https://github.com/mingmanhk/Contact-SyncMate/compare/v0.1.0...v1.1
+[0.1.0]: https://github.com/mingmanhk/Contact-SyncMate/releases/tag/v0.1.0
