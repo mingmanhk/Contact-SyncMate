@@ -1012,7 +1012,26 @@ class GoogleOAuthManager: NSObject, ObservableObject {
             kSecValueData as String: data
         ]
 
-        let status = SecItemAdd(addQuery as CFDictionary, nil)
+        var status = SecItemAdd(addQuery as CFDictionary, nil)
+        if status != errSecSuccess {
+            // The delete above already ran, so at this point the value passed
+            // in is the *only* copy of the credential — failing here would
+            // leave the user token-less, and because this runs on every token
+            // refresh, "fails once" means "signed out on every refresh". That
+            // is exactly what happens on builds without a proper application
+            // identifier (ad-hoc/dev signing): the data protection keychain
+            // requires one, and SecItemAdd answers errSecMissingEntitlement.
+            // So on any add failure, retry into the legacy file keychain —
+            // same item, minus the two data-protection keys (the legacy
+            // keychain ignores kSecAttrAccessible anyway). Device-binding is
+            // best-effort where the platform allows it; keeping the user's
+            // credential at all is not negotiable.
+            Self.logger.warning("Protected keychain add failed (\(status)); retrying in the legacy keychain")
+            var legacyAddQuery = addQuery
+            legacyAddQuery.removeValue(forKey: kSecUseDataProtectionKeychain as String)
+            legacyAddQuery.removeValue(forKey: kSecAttrAccessible as String)
+            status = SecItemAdd(legacyAddQuery as CFDictionary, nil)
+        }
         guard status == errSecSuccess else {
             throw GoogleOAuthError.keychainError(status)
         }

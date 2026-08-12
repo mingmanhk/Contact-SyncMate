@@ -1465,25 +1465,51 @@ class ContactBackupManager: ObservableObject {
     /// known exception: a pre-sync fallback save landed the session file in the
     /// container while the full index in the custom folder kept the body. Any
     /// legacy entry whose file is missing is therefore written out from the
-    /// index's own copy before that copy is discarded — nothing is lost.
+    /// index's own copy before that copy is discarded — and *only* then: for
+    /// those entries the embedded copy is the sole copy, so the metadata-only
+    /// index replaces the legacy one on disk only after every needed body
+    /// write succeeded. On any failure the legacy index is left untouched and
+    /// the whole migration reruns on the next launch — this launch still gets
+    /// the decoded sessions in memory, so nothing changes for the user.
     private func migrateLegacyIndexLocked(_ sessions: [BackupSession]) {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
 
         var rewritten = 0
+        var failed = 0
         withBackupDirectory { dir in
             for session in sessions {
                 let file = dir.appendingPathComponent("\(session.id).json")
                 guard !FileManager.default.fileExists(atPath: file.path) else { continue }
-                if let data = try? encoder.encode(session) {
-                    try? data.write(to: file, options: [.atomic])
+                do {
+                    let data = try encoder.encode(session)
+                    try data.write(to: file, options: [.atomic])
                     rewritten += 1
+                } catch {
+                    Self.logger.error("Legacy index migration could not write session \(session.id, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                    failed += 1
                 }
             }
         }
 
         backupSessions = sessions.map(\.summary)
         contactVersionsIndex = Self.maxVersionNumbers(in: sessions)
+
+        guard failed == 0 else {
+            // Do not overwrite backup_index.json: for the sessions that failed
+            // to write, its embedded copies are the only copies. Leaving the
+            // legacy index in place is what schedules the retry — the next
+            // launch decodes it as `.legacy` and lands here again.
+            SyncHistory.shared.log(
+                source: "BackupManager",
+                action: "backupIndex.migrationDeferred",
+                details: "\(failed) session file(s) could not be recovered from the old index — keeping the old index and retrying at next launch"
+            )
+            return
+        }
+
+        // If this write fails the legacy index simply survives one more
+        // launch, which re-runs the (now no-op) body recovery and tries again.
         try? saveBackupIndex()
         try? saveContactVersionsIndex()
 
