@@ -1078,8 +1078,12 @@ class ContactBackupManager: ObservableObject {
                     + "backup files are unencrypted and will be uploaded by the sync service"
             )
             let alert = NSAlert()
-            alert.messageText = "This Folder Syncs to the Cloud"
-            alert.informativeText = """
+            alert.messageText = NSLocalizedString(
+                "This Folder Syncs to the Cloud",
+                comment: "Alert title shown when the chosen backup folder is cloud-synced"
+            )
+            alert.informativeText = NSLocalizedString(
+                """
                 The folder you chose appears to be synced by a cloud service \
                 (such as iCloud Drive, Dropbox, Google Drive, or OneDrive).
 
@@ -1089,9 +1093,11 @@ class ContactBackupManager: ObservableObject {
 
                 Backups will still be saved here. Choose a different folder if \
                 you do not want them leaving this Mac.
-                """
+                """,
+                comment: "Alert body shown when the chosen backup folder is cloud-synced"
+            )
             alert.alertStyle = .warning
-            alert.addButton(withTitle: "OK")
+            alert.addButton(withTitle: NSLocalizedString("OK", comment: "Alert dismiss button"))
             alert.runModal()
         }
 

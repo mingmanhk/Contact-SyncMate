@@ -1,22 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "·" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "·"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "·"
-          }
-        }
-      }
-    },
     "%@ %lld" : {
       "localizations" : {
         "en" : {
@@ -39,6 +23,23 @@
         }
       }
     },
+    "%@ was restored to version %lld." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 已还原至版本 %2$lld。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 已還原至版本 %2$lld。"
+          }
+        }
+      }
+    },
     "%@ • %@" : {
       "localizations" : {
         "en" : {
@@ -57,23 +58,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ • %2$@"
-          }
-        }
-      }
-    },
-    "%@ was restored to version %lld." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ 已还原至版本 %2$lld。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ 已還原至版本 %2$lld。"
           }
         }
       }
@@ -352,6 +336,40 @@
         }
       }
     },
+    "%lld duplicate groups need review" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld duplicate group needs review"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld duplicate groups need review"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 组重复项需要查看"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 組重複項目需要檢視"
+          }
+        }
+      }
+    },
     "%lld failed" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -577,39 +595,6 @@
         }
       }
     },
-    "•" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "•"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "•"
-          }
-        }
-      }
-    },
-    "• %@" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "• %@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "• %@"
-          }
-        }
-      }
-    },
     "+ %lld more" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -639,6 +624,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "+%lld"
+          }
+        }
+      }
+    },
+    "14 days" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "14 天"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "14 天"
           }
         }
       }
@@ -675,38 +676,6 @@
         }
       }
     },
-    "7 days" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "7 天"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "7 天"
-          }
-        }
-      }
-    },
-    "14 days" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "14 天"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "14 天"
-          }
-        }
-      }
-    },
     "30 days" : {
       "localizations" : {
         "zh-Hans" : {
@@ -719,6 +688,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "30 天"
+          }
+        }
+      }
+    },
+    "7 days" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "7 天"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "7 天"
           }
         }
       }
@@ -768,6 +753,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "將為目前聯絡人建立一個新備份"
+          }
+        }
+      }
+    },
+    "A previous session crashed. Diagnostics were saved on this Mac only — attach one to a support email if you'd like help." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次会话发生了崩溃。诊断信息仅保存在这台 Mac 上——如需帮助，可将其附加到支持邮件中。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次工作階段發生當機。診斷資訊僅儲存在這台 Mac 上——如需協助，可將其附加到支援電子郵件中。"
           }
         }
       }
@@ -985,6 +986,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "AI 配對"
+          }
+        }
+      }
+    },
+    "AI matching — scanning for duplicates…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 匹配 — 正在扫描重复项…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 比對 — 正在掃描重複項目…"
           }
         }
       }
@@ -3094,6 +3111,22 @@
         }
       }
     },
+    "Crash Reports" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "崩溃报告"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "當機報告"
+          }
+        }
+      }
+    },
     "Create Backup Now" : {
       "localizations" : {
         "zh-Hans" : {
@@ -3898,6 +3931,22 @@
         }
       }
     },
+    "Fetching contacts…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在获取联系人…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在取得聯絡人…"
+          }
+        }
+      }
+    },
     "Field" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4156,22 +4205,6 @@
         }
       }
     },
-    "Google → Mac" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Google → Mac"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Google → Mac"
-          }
-        }
-      }
-    },
     "Google access has expired. Please sign in again." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4233,6 +4266,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "尚未連接 Google 帳號。請開啟 Contact SyncMate → 設定 → 帳號 進行登入。"
+          }
+        }
+      }
+    },
+    "Google account is not connected. Sign in via Settings → Accounts." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未连接 Google 账号。请通过「设置 → 账号」登录。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未連接 Google 帳號。請透過「設定 → 帳號」登入。"
           }
         }
       }
@@ -4347,6 +4396,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Google 拒絕了這個請求。若應用程式的發布狀態為「測試中」，登入的電子郵件必須列在 OAuth 同意畫面的測試使用者名單中。"
+          }
+        }
+      }
+    },
+    "Google → Mac" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Google → Mac"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Google → Mac"
           }
         }
       }
@@ -4961,22 +5026,6 @@
         }
       }
     },
-    "Mac → Google" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mac → Google"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mac → Google"
-          }
-        }
-      }
-    },
     "Mac Contacts" : {
       "localizations" : {
         "zh-Hans" : {
@@ -5055,6 +5104,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mac 聯絡人已變更"
+          }
+        }
+      }
+    },
+    "Mac → Google" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac → Google"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac → Google"
           }
         }
       }
@@ -6074,22 +6139,6 @@
         }
       }
     },
-    "Off — turn on for background sync" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已关闭 — 开启即可背景同步"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已關閉 — 開啟即可背景同步"
-          }
-        }
-      }
-    },
     "Off by default — your names are never rewritten unless you opt in. Chinese, Japanese, and Korean names are always left unchanged. Title Case handles \"van der Berg\", \"McDonald\", and \"O'Brien\" correctly." : {
       "localizations" : {
         "zh-Hans" : {
@@ -6102,6 +6151,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "預設關閉 — 除非你主動開啟,姓名不會被改寫。中文、日文、韓文姓名一律保持原樣。首字母大寫模式能正確處理「van der Berg」、「McDonald」與「O'Brien」。"
+          }
+        }
+      }
+    },
+    "Off — turn on for background sync" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已关闭 — 开启即可背景同步"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已關閉 — 開啟即可背景同步"
           }
         }
       }
@@ -7597,6 +7662,22 @@
         }
       }
     },
+    "Scanning for duplicates…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在扫描重复项…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在掃描重複項目…"
+          }
+        }
+      }
+    },
     "Schedule" : {
       "localizations" : {
         "zh-Hans" : {
@@ -8296,6 +8377,22 @@
         }
       }
     },
+    "Starting…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在开始…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在開始…"
+          }
+        }
+      }
+    },
     "Stats" : {
       "localizations" : {
         "zh-Hans" : {
@@ -8432,6 +8529,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "同步"
+          }
+        }
+      }
+    },
+    "Sync cancelled." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步已取消。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步已取消。"
           }
         }
       }
@@ -9108,6 +9221,22 @@
         }
       }
     },
+    "The folder you chose appears to be synced by a cloud service (such as iCloud Drive, Dropbox, Google Drive, or OneDrive).\n\nBackups are not encrypted: they contain your contacts' names, phone numbers, email addresses, photos, and notes in plain text, and the sync service will upload them to its servers.\n\nBackups will still be saved here. Choose a different folder if you do not want them leaving this Mac." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "您选择的文件夹似乎由云服务同步（例如 iCloud 云盘、Dropbox、Google 云端硬盘或 OneDrive）。\n\n备份未经加密：其中以纯文本形式包含联系人的姓名、电话号码、电子邮件地址、照片和备注，同步服务会将它们上传到其服务器。\n\n备份仍会保存在此处。如果不希望它们离开这台 Mac，请选择其他文件夹。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "您選擇的資料夾似乎由雲端服務同步（例如 iCloud 雲碟、Dropbox、Google 雲端硬碟或 OneDrive）。\n\n備份未經加密：其中以純文字形式包含聯絡人的姓名、電話號碼、電子郵件位址、照片和備註，同步服務會將它們上傳到其伺服器。\n\n備份仍會儲存在此處。如果不希望它們離開這台 Mac，請選擇其他資料夾。"
+          }
+        }
+      }
+    },
     "The interface language changes after the app restarts." : {
       "localizations" : {
         "zh-Hans" : {
@@ -9326,6 +9455,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此聯絡人沒有先前的版本"
+          }
+        }
+      }
+    },
+    "This Folder Syncs to the Cloud" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此文件夹会同步到云端"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此資料夾會同步到雲端"
           }
         }
       }
@@ -9759,6 +9904,22 @@
         }
       }
     },
+    "waiting for a network connection" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待网络连接"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待網路連線"
+          }
+        }
+      }
+    },
     "waiting for AC power" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10050,6 +10211,55 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的 Mac 尚未設定任何聯絡人帳號"
+          }
+        }
+      }
+    },
+    "·" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "·"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "·"
+          }
+        }
+      }
+    },
+    "•" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "•"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "•"
+          }
+        }
+      }
+    },
+    "• %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• %@"
           }
         }
       }

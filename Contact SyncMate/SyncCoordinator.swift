@@ -169,7 +169,7 @@ final class SyncCoordinator: ObservableObject {
         // phase here closes that window; the task-handle gate covers the
         // watchdog case where the phase was released but the run still lives.
         guard claimStart(caller: "runSync") else { return }
-        setPhase(.preparing, step: "Starting…", progress: 0)
+        setPhase(.preparing, step: String(localized: "Starting…"), progress: 0)
         // A coordinator-owned Task, so cancelSync() holds the handle; awaiting
         // its value keeps every caller's structure unchanged.
         runGeneration += 1
@@ -188,7 +188,7 @@ final class SyncCoordinator: ObservableObject {
         // Pre-flight checks
         let oauth = GoogleOAuthManager.shared
         guard oauth.isAuthenticated else {
-            setFailed("Google account is not connected. Sign in via Settings → Accounts.")
+            setFailed(String(localized: "Google account is not connected. Sign in via Settings → Accounts."))
             // The same 12 s idle reset as every other failure path — without
             // it the .failed banner persisted until something else moved the
             // phase.
@@ -196,7 +196,7 @@ final class SyncCoordinator: ObservableObject {
             return
         }
 
-        setPhase(.preparing, step: "Fetching contacts…", progress: 0)
+        setPhase(.preparing, step: String(localized: "Fetching contacts…"), progress: 0)
 
         let engine = SyncEngine(
             googleConnector: GoogleContactsConnector(),
@@ -252,8 +252,8 @@ final class SyncCoordinator: ObservableObject {
                         && settings.aiCloudConsentGiven
                         && !settings.anthropicAPIKey.isEmpty
                     setPhase(.preparing,
-                             step: usingAI ? "AI matching — scanning for duplicates…"
-                                           : "Scanning for duplicates…",
+                             step: usingAI ? String(localized: "AI matching — scanning for duplicates…")
+                                           : String(localized: "Scanning for duplicates…"),
                              progress: 0)
 
                     let scan = await coordinator.scanForDuplicates(
@@ -276,7 +276,10 @@ final class SyncCoordinator: ObservableObject {
                     if scan.needsUserConfirmation {
                         let n = scan.groupsNeedingConfirmation.count
                         setPhase(.preparing,
-                                 step: "\(n) duplicate group\(n == 1 ? "" : "s") need review",
+                                 // The catalog's plural variation picks the right
+                                 // form; interpolating an Int yields the
+                                 // "%lld duplicate groups need review" format key.
+                                 step: String(localized: "\(n) duplicate groups need review"),
                                  progress: 0)
                         dedupAwaitingConfirmation = coordinator
                         SyncHistory.shared.log(
@@ -418,7 +421,7 @@ final class SyncCoordinator: ObservableObject {
         // Same double-start closure as runSync: claim the phase before the
         // first suspension, clear only our own handle afterwards.
         guard claimStart(caller: "applyReviewed") else { return }
-        setPhase(.syncing(0), step: "Applying reviewed changes…", progress: 0)
+        setPhase(.syncing(0), step: String(localized: "Applying reviewed changes…"), progress: 0)
         runGeneration += 1
         let generation = runGeneration
         currentRunTask = Task { await self.applyReviewedBody(session) }
@@ -427,7 +430,7 @@ final class SyncCoordinator: ObservableObject {
     }
 
     private func applyReviewedBody(_ session: SyncSession) async {
-        setPhase(.syncing(0), step: "Applying reviewed changes…", progress: 0)
+        setPhase(.syncing(0), step: String(localized: "Applying reviewed changes…"), progress: 0)
         appState?.isSyncing = true
 
         let engine = SyncEngine(
@@ -618,7 +621,10 @@ final class SyncCoordinator: ObservableObject {
         // the prepare phase (fetches), which throws rather than returning a
         // partial result.
         if error is CancellationError {
-            return "Sync cancelled."
+            // NSLocalizedString rather than String(localized:) — the latter's
+            // initializer is main-actor-isolated under the project's default
+            // isolation, and this helper is deliberately nonisolated.
+            return NSLocalizedString("Sync cancelled.", comment: "Status shown when the user cancels a sync")
         }
 
         if let syncError = error as? SyncEngineError {
